@@ -54,39 +54,53 @@ export default function ArticleList({ apiURL, keyToken }: Props) {
   };
 
   return (
-    <div className="md:pt-[67px] md:pb-[160px] py-16 md:px-[72px] px-[20px]">
-      <div className="flex flex-row flex-wrap text-primary gap-x-6 gap-y-12 justify-center md:mb-[100px] mb-16">
+    <div className="max-w-6xl mx-auto px-6 py-16 md:py-24">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
         {articles &&
           articles.map((item) => (
             <a
               key={item.documentId}
               href={`/articles/${item.slug}`}
-              className="group flex flex-col bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow max-w-sm w-full"
+              className="group flex flex-col bg-white rounded-xl overflow-hidden border border-gray-100 hover:border-gray-200 hover:shadow-lg transition-all duration-300"
             >
               {item.image ? (
-                <div className="h-48 overflow-hidden">
+                <div className="aspect-[16/10] overflow-hidden bg-[#f8fafc]">
                   <img
                     src={clientBuildImageUrl(apiURL, item.image.url)}
                     alt={item.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
                 </div>
               ) : (
-                <div className="h-48 bg-gray-100 flex items-center justify-center">
-                  <span className="text-gray-400 text-sm">No image</span>
+                <div className="aspect-[16/10] bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9] flex items-center justify-center">
+                  <svg className="w-12 h-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/>
+                  </svg>
                 </div>
               )}
               <div className="p-5 flex flex-col flex-grow">
-                <h3 className="text-lg font-semibold text-[#404F9D] mb-2 line-clamp-2">
+                {item.published_date && (
+                  <time className="text-xs text-[#64748b] mb-2">
+                    {new Date(item.published_date).toLocaleDateString("fr-FR", {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric",
+                    })}
+                  </time>
+                )}
+                <h3 className="text-base font-semibold text-gray-900 mb-2 line-clamp-2 group-hover:text-[#1e40af] transition-colors">
                   {item.title}
                 </h3>
                 {item.excerpt && (
-                  <p className="text-sm text-gray-600 line-clamp-3">
+                  <p className="text-sm text-[#64748b] line-clamp-3 flex-grow">
                     {item.excerpt}
                   </p>
                 )}
-                <span className="mt-auto pt-4 text-[#ED751D] text-sm font-medium">
-                  Lire la suite &rarr;
+                <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-[#1e40af]">
+                  Lire l'article
+                  <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
+                  </svg>
                 </span>
               </div>
             </a>
@@ -94,26 +108,26 @@ export default function ArticleList({ apiURL, keyToken }: Props) {
       </div>
 
       {articles?.length > 0 && meta && meta.pageCount > 1 && (
-        <div className="flex justify-center items-center gap-4">
+        <div className="flex justify-center items-center gap-3">
           <button
-            className={`px-6 py-3 rounded-full font-medium ${
+            className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
               currentPage === 1
-                ? "opacity-50 cursor-not-allowed bg-gray-200 text-gray-500"
-                : "bg-[#404F9D] text-white hover:bg-[#353e7a]"
+                ? "text-gray-400 bg-gray-100 cursor-not-allowed"
+                : "text-gray-700 bg-white border border-gray-200 hover:bg-gray-50"
             }`}
             disabled={currentPage === 1}
             onClick={handlePreviousPage}
           >
             Précédent
           </button>
-          <span className="text-[#404F9D] font-medium">
+          <span className="text-sm text-[#64748b] px-3">
             {currentPage} / {meta.pageCount}
           </span>
           <button
-            className={`px-6 py-3 rounded-full font-medium ${
+            className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
               currentPage === meta.pageCount
-                ? "opacity-50 cursor-not-allowed bg-gray-200 text-gray-500"
-                : "bg-[#404F9D] text-white hover:bg-[#353e7a]"
+                ? "text-gray-400 bg-gray-100 cursor-not-allowed"
+                : "text-gray-700 bg-white border border-gray-200 hover:bg-gray-50"
             }`}
             disabled={currentPage === meta.pageCount}
             onClick={handleNextPage}

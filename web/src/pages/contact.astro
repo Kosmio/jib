@@ -7,15 +7,16 @@ const strapiUrl = import.meta.env.REACT_STRAPI_URL || import.meta.env.STRAPI_URL
 const recaptchaSiteKey = import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY || "";
 ---
 
-<Layout title="Contact" description="Contactez-nous">
+<Layout title="Contact" description="Contactez-nous pour toute question ou projet">
   <Hero
     title="Contactez-nous"
-    subtitle={["Une question ? Un projet ? N'hésitez pas à nous écrire."]}
-    bgHeight="h-[350px] md:h-[400px]"
-    paddingT="md:pt-[180px] pt-[114px]"
+    subtitle="Une question, une idée de projet ? Nous serions ravis d'échanger avec vous."
+    compact
   />
 
-  <div id="content" class="bg-white py-16 md:py-24 px-5 md:px-[80px]">
-    <ContactForm client:visible strapiUrl={strapiUrl} recaptchaSiteKey={recaptchaSiteKey} />
-  </div>
+  <section class="py-16 md:py-24 bg-white">
+    <div class="max-w-2xl mx-auto px-6">
+      <ContactForm client:visible strapiUrl={strapiUrl} recaptchaSiteKey={recaptchaSiteKey} />
+    </div>
+  </section>
 </Layout>

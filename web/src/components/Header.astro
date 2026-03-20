@@ -1,33 +1,62 @@
 ---
-export interface Props {
-  color?: string;
-  textColor?: string;
-}
+const currentPath = Astro.url.pathname;
 
-const { color = "#404F9D", textColor = "text-primary" } = Astro.props;
+const links = [
+  { href: "/", label: "Accueil" },
+  { href: "/articles", label: "Articles" },
+  { href: "/contact", label: "Contact" },
+];
 ---
 
-<header class={`fixed top-0 left-0 right-0 z-50 bg-white shadow-sm`}>
-  <nav class="2xl:container mx-auto flex items-center justify-between px-5 md:px-12 h-16">
-    <a href="/" class={`font-bold text-xl ${textColor}`}>
-      Skeleton
+<header class="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100">
+  <nav class="max-w-6xl mx-auto flex items-center justify-between px-6 h-16">
+    <a href="/" class="flex items-center gap-2 font-bold text-lg text-primary">
+      <img src="/assets/skelly-head.png" alt="Skelly" class="w-8 h-8 object-contain" />
+      Skelly
     </a>
-    <ul class={`hidden md:flex items-center gap-8 text-sm font-medium ${textColor}`}>
-      <li><a href="/" class="hover:opacity-70">Accueil</a></li>
-      <li><a href="/articles" class="hover:opacity-70">Articles</a></li>
-      <li><a href="/contact" class="hover:opacity-70">Contact</a></li>
+
+    <ul class="hidden md:flex items-center gap-8 text-sm font-medium">
+      {links.map(({ href, label }) => (
+        <li>
+          <a
+            href={href}
+            class:list={[
+              "transition-colors",
+              currentPath === href || (href !== "/" && currentPath.startsWith(href))
+                ? "text-primary"
+                : "text-gray-600 hover:text-primary",
+            ]}
+          >
+            {label}
+          </a>
+        </li>
+      ))}
     </ul>
-    <button id="mobile-menu-btn" class="md:hidden p-2" aria-label="Menu">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M3 12H21M3 6H21M3 18H21" stroke={color} stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <button id="mobile-menu-btn" class="md:hidden p-2 text-gray-600" aria-label="Menu">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
       </svg>
     </button>
   </nav>
-  <div id="mobile-menu" class={`hidden md:hidden px-5 pb-4 ${textColor}`}>
-    <ul class="flex flex-col gap-4 text-sm font-medium">
-      <li><a href="/" class="hover:opacity-70">Accueil</a></li>
-      <li><a href="/articles" class="hover:opacity-70">Articles</a></li>
-      <li><a href="/contact" class="hover:opacity-70">Contact</a></li>
+
+  <div id="mobile-menu" class="hidden md:hidden border-t border-gray-100 bg-white px-6 pb-4">
+    <ul class="flex flex-col gap-3 pt-3 text-sm font-medium">
+      {links.map(({ href, label }) => (
+        <li>
+          <a
+            href={href}
+            class:list={[
+              "block py-1 transition-colors",
+              currentPath === href || (href !== "/" && currentPath.startsWith(href))
+                ? "text-primary"
+                : "text-gray-600 hover:text-primary",
+            ]}
+          >
+            {label}
+          </a>
+        </li>
+      ))}
     </ul>
   </div>
 </header>

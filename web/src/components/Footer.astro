@@ -3,108 +3,82 @@ const recaptchaSiteKey = import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY || "";
 const strapiUrl = import.meta.env.REACT_STRAPI_URL || import.meta.env.STRAPI_URL || "";
 ---
 
-<footer class="md:px-[80px] px-[20px] gap-6 md:grid md:grid-cols-2 bg-primary text-white mx-auto md:pt-[108px] pt-16 pb-6">
-  <div class="md:col-span-1">
-    <a href="/" class="text-2xl font-bold mb-12 md:mb-16 block">Skeleton</a>
-    <ul class="space-y-[12px] text-base md:mb-[55px] mb-[63px]">
-      <li><a class="font-medium hover:opacity-70" href="/">Accueil</a></li>
-      <li><a class="hover:opacity-70" href="/articles">Articles</a></li>
-      <li><a class="hover:opacity-70" href="/contact">Contact</a></li>
-    </ul>
-  </div>
-  <div class="md:col-span-1">
-    <p class="md:text-h2 text-[26px] font-semibold md:leading-h2 md:mb-4">
-      Restez informé
-    </p>
-    <p class="mb-6">
-      Inscrivez-vous à notre newsletter pour recevoir les dernières actualités.
-    </p>
-    <p class="text-sm font-medium mb-3">Abonnez-vous à notre Newsletter</p>
-    <div class="mb-16">
-      <div id="nl-alert">
-        <div id="nl-success-alert" class="hidden bg-green-100 border-green-400 text-green-700 border px-4 py-3 mb-4 rounded relative" role="alert">
-          <span class="block sm:inline">Merci de vous être abonné à la newsletter.</span>
-          <span class="absolute top-0 bottom-0 right-0 px-4 py-3">
-            <svg class="nl-alert-close fill-current h-6 w-6 cursor-pointer" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><title>Close</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
-          </span>
-        </div>
-        <div id="nl-error-alert" class="hidden bg-red-100 border-red-400 text-red-700 border px-4 py-3 mb-4 rounded relative" role="alert">
-          <span id="nl-alert-message" class="block sm:inline">Une erreur est survenue, veuillez réessayer.</span>
-          <span class="absolute top-0 bottom-0 right-0 px-4 py-3">
-            <svg class="nl-alert-close fill-current h-6 w-6 cursor-pointer" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><title>Close</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
-          </span>
-        </div>
+<footer class="bg-gray-900 text-gray-300">
+  <div class="max-w-6xl mx-auto px-6 pt-16 pb-8">
+    <div class="grid md:grid-cols-3 gap-12 mb-12">
+      <!-- Brand -->
+      <div>
+        <a href="/" class="flex items-center gap-2 font-bold text-lg text-white mb-4">
+          <img src="/assets/skelly-head.png" alt="Skelly" class="w-8 h-8 object-contain" />
+          Skelly
+        </a>
+        <p class="text-sm text-gray-400 leading-relaxed">
+          Votre starter pour démarrer rapidement vos projets web.
+        </p>
       </div>
 
-      <form id="newsletter-form" class="mb-6 flex flex-nowrap">
-        <input
-          class="md:h-16 h-12 w-full text-black px-10 rounded-bl-full rounded-tl-full"
-          type="email"
-          placeholder="Email"
-          name="email"
-          required
-        />
-        <input type="hidden" name="recaptchaToken" id="recaptchaToken" />
-        <button
-          class="md:h-16 h-12 items-center flex justify-center cta text-white bg-white hover:text-primary relative overflow-hidden rounded-r-full px-[55px] py-[20px]"
-          type="submit"
-        >
-          <span class="z-20 relative whitespace-nowrap">S'inscrire</span>
-          <span class="overlay bg-secondary"></span>
-        </button>
-      </form>
-      <p class="text-sm opacity-80">
-        En cliquant sur "S'inscrire", vous acceptez de recevoir des
-        communications. Consultez notre politique de confidentialité.
-      </p>
-    </div>
-    <div class="flex lg:flex-row flex-wrap lg:gap-4 flex-col lg:mt-0 mt-4 mb-8">
-      <button type="button" data-cc="c-settings" class="self-start hover:opacity-70">Gestion des cookies</button>
-    </div>
-  </div>
+      <!-- Navigation -->
+      <div>
+        <h3 class="text-white font-semibold mb-4 text-sm uppercase tracking-wider">Navigation</h3>
+        <ul class="space-y-2 text-sm">
+          <li><a href="/" class="hover:text-white transition-colors">Accueil</a></li>
+          <li><a href="/articles" class="hover:text-white transition-colors">Articles</a></li>
+          <li><a href="/contact" class="hover:text-white transition-colors">Contact</a></li>
+        </ul>
+      </div>
 
-  <div class="col-span-2 flex flex-col md:flex-row justify-between border-t border-white/20 pt-6">
-    <div class="md:flex md:items-end">&copy; Skeleton {new Date().getFullYear()}</div>
+      <!-- Newsletter -->
+      <div>
+        <h3 class="text-white font-semibold mb-4 text-sm uppercase tracking-wider">Newsletter</h3>
+        <p class="text-sm text-gray-400 mb-4">Recevez nos dernières actualités directement dans votre boîte mail.</p>
+
+        <div id="nl-alert" class="mb-3">
+          <div id="nl-success-alert" class="hidden text-sm bg-green-900/50 text-green-300 border border-green-700 px-3 py-2 rounded-lg">
+            Merci pour votre inscription !
+          </div>
+          <div id="nl-error-alert" class="hidden text-sm bg-red-900/50 text-red-300 border border-red-700 px-3 py-2 rounded-lg">
+            <span id="nl-alert-message">Une erreur est survenue, veuillez réessayer.</span>
+          </div>
+        </div>
+
+        <form id="newsletter-form" class="flex">
+          <input
+            type="email"
+            name="email"
+            placeholder="votre@email.com"
+            required
+            class="flex-1 px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-l-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-primary-light"
+          />
+          <input type="hidden" name="recaptchaToken" id="recaptchaToken" />
+          <button
+            type="submit"
+            class="px-5 py-2.5 bg-primary-light hover:bg-primary text-white text-sm font-medium rounded-r-lg transition-colors"
+          >
+            OK
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Bottom bar -->
+    <div class="border-t border-gray-800 pt-6 flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-gray-500">
+      <p>&copy; {new Date().getFullYear()} Skelly. Tous droits réservés.</p>
+      <button type="button" data-cc="c-settings" class="hover:text-gray-300 transition-colors">
+        Gestion des cookies
+      </button>
+    </div>
   </div>
 </footer>
 
-<style>
-  .cta {
-    position: relative;
-    overflow: hidden;
-  }
-  .overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    transition: transform 0.3s ease;
-    transform-origin: right;
-  }
-  .cta:hover .overlay {
-    transform: scaleX(0);
-  }
-</style>
-
 <script define:vars={{ recaptchaSiteKey, strapiUrl }}>
-  const nlSuccessAlert = document.querySelector('#nl-success-alert');
-  const nlErrorAlert = document.querySelector('#nl-error-alert');
-
   document.addEventListener('DOMContentLoaded', function() {
-    function hideAlert() {
+    const nlSuccessAlert = document.querySelector('#nl-success-alert');
+    const nlErrorAlert = document.querySelector('#nl-error-alert');
+
+    document.querySelector('#newsletter-form').addEventListener('submit', function(event) {
+      event.preventDefault();
       nlSuccessAlert.classList.add('hidden');
       nlErrorAlert.classList.add('hidden');
-    }
-
-    document.getElementById('nl-alert').addEventListener("click", function(e) {
-      if (e.target.classList.contains("nl-alert-close")) {
-        hideAlert();
-      }
-    });
-
-    document.querySelector('#newsletter-form').addEventListener('submit', function (event) {
-      event.preventDefault();
 
       if (recaptchaSiteKey && typeof grecaptcha !== 'undefined') {
         grecaptcha.enterprise.ready(function() {
@@ -120,7 +94,6 @@ const strapiUrl = import.meta.env.REACT_STRAPI_URL || import.meta.env.STRAPI_URL
 
     function submitNewsletter() {
       var formData = new FormData(document.querySelector('#newsletter-form'));
-
       fetch(strapiUrl + '/api/newsletter/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -131,6 +104,7 @@ const strapiUrl = import.meta.env.REACT_STRAPI_URL || import.meta.env.STRAPI_URL
       }).then(function(res) {
         if (res.status === 200) {
           nlSuccessAlert.classList.remove('hidden');
+          document.querySelector('#newsletter-form').reset();
         } else {
           nlErrorAlert.classList.remove('hidden');
         }

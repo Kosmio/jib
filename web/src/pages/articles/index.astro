@@ -7,15 +7,14 @@ const apiURL = import.meta.env.REACT_STRAPI_URL || import.meta.env.STRAPI_URL;
 const keyToken = import.meta.env.STRAPI_KEY;
 ---
 
-<Layout title="Articles" description="Tous les articles">
+<Layout title="Articles" description="Tous nos articles et publications">
   <Hero
     title="Articles"
-    subtitle={["Retrouvez toutes nos publications."]}
-    bgHeight="h-[350px] md:h-[400px]"
-    paddingT="md:pt-[180px] pt-[114px]"
+    subtitle="Retrouvez toutes nos publications et actualités."
+    compact
   />
 
-  <div id="content" class="bg-gray-light">
+  <section class="bg-surface min-h-[50vh]">
     <ArticleList client:visible apiURL={apiURL} keyToken={keyToken} />
-  </div>
+  </section>
 </Layout>

@@ -2,89 +2,85 @@
 
 const SEED_ARTICLES = [
   {
-    title: 'Bienvenue sur le Skeleton',
-    slug: 'bienvenue-sur-le-skeleton',
-    excerpt: "Découvrez ce projet squelette Astro + Strapi, prêt à l'emploi pour démarrer rapidement vos projets web.",
-    content: `## Un point de départ pour vos projets
+    title: 'Bienvenue sur Skelly',
+    slug: 'bienvenue-sur-skelly',
+    excerpt: "Découvrez Skelly, votre nouveau starter pour démarrer rapidement vos projets web.",
+    content: `## Skelly est prêt
 
-Ce skeleton combine **Astro** en SSR avec **Strapi v5** comme CMS headless. Il inclut tout ce dont vous avez besoin pour démarrer :
+Félicitations, votre site est en ligne ! Skelly est construit sur une stack technique moderne, pensée pour la performance et la simplicité de maintenance.
 
-- Gestion de contenu via Strapi
-- Rendu côté serveur avec Astro
-- Composants React interactifs
-- Tailwind CSS pour le style
-- Docker pour le déploiement
+### Ce que vous pouvez faire
 
-### Comment l'utiliser
+- **Publier des articles** via l'interface d'administration
+- **Recevoir des messages** grâce au formulaire de contact
+- **Collecter des inscriptions** à votre newsletter
+- **Respecter la vie privée** de vos visiteurs avec la gestion des cookies
 
-1. Clonez ce projet
-2. Personnalisez les types de contenu dans Strapi
-3. Adaptez les composants Astro à votre charte graphique
-4. Déployez avec Docker
+### Comment modifier le contenu
 
-C'est aussi simple que ça !`,
+Rendez-vous sur l'interface d'administration pour créer, modifier ou supprimer vos articles. Chaque article peut contenir du texte riche, des images et des liens.
+
+Le contenu est séparé du code : vous pouvez modifier vos textes sans toucher au design.`,
     published_date: '2026-01-15',
   },
   {
-    title: 'Formulaire de contact et newsletter',
-    slug: 'formulaire-de-contact-et-newsletter',
-    excerpt: 'Le skeleton inclut un formulaire de contact fonctionnel et une inscription newsletter avec protection reCAPTCHA.',
-    content: `## Contact et Newsletter intégrés
+    title: 'Publier et gérer vos articles',
+    slug: 'publier-et-gerer-vos-articles',
+    excerpt: "Apprenez à créer, organiser et publier vos articles depuis l'interface d'administration de votre site.",
+    content: `## Créer un article
 
-### Formulaire de contact
+Depuis le panneau d'administration, vous pouvez créer un nouvel article en renseignant :
 
-Le formulaire de contact envoie les messages via **Brevo** (ex-Sendinblue). Il suffit de configurer les variables d'environnement :
+1. Un **titre** clair et descriptif
+2. Un **résumé** qui apparaîtra dans les aperçus
+3. Le **contenu** en texte enrichi (gras, listes, liens, images...)
+4. Une **image** de couverture optionnelle
+5. Une **date de publication**
 
-- \`EMAIL_API_KEY\` — votre clé API Brevo
-- \`EMAIL_CONTACT_TO\` — l'adresse de réception
-- \`EMAIL_CONTACT_TEMPLATE_ID\` — l'ID du template transactionnel
+### Mise en forme du contenu
 
-### Newsletter
+Le contenu supporte la syntaxe Markdown, ce qui permet de structurer facilement vos textes :
 
-L'inscription newsletter dans le footer fonctionne de la même manière, avec en plus une vérification **reCAPTCHA Enterprise** pour bloquer les bots.
+- Les titres avec \`##\` et \`###\`
+- Le **gras** et l'*italique*
+- Les listes numérotées et à puces
+- Les blocs de code avec \`\`\`
+- Les liens et les images
 
-### Protection reCAPTCHA
+### Brouillons et publication
 
-Le reCAPTCHA Enterprise est intégré côté frontend (score-based, invisible) et vérifié côté Strapi avant chaque inscription.`,
+Vous pouvez sauvegarder un article en brouillon avant de le publier. Seuls les articles publiés apparaissent sur le site.`,
     published_date: '2026-02-01',
   },
   {
-    title: 'Déploiement avec Docker',
-    slug: 'deploiement-avec-docker',
-    excerpt: "L'infrastructure Docker inclut des Dockerfiles multi-stage, un script de déploiement unifié et des overlays par environnement.",
-    content: `## Infrastructure Docker
+    title: 'Personnaliser votre site',
+    slug: 'personnaliser-votre-site',
+    excerpt: "Ce guide vous explique comment adapter le design, les couleurs et les fonctionnalités de votre site à votre identité.",
+    content: `## Adapter le design
 
-Le skeleton suit la même structure que nos projets en production :
+Le site utilise un système de thème centralisé. Les couleurs, la typographie et les espacements se modifient en un seul endroit.
 
-### Structure
+### Couleurs
 
-\`\`\`
-infra/
-├── deploy/
-│   ├── base/docker-compose.base.yml
-│   ├── overlays/
-│   │   ├── local/
-│   │   ├── dev/
-│   │   └── prod/
-│   └── scripts/deploy.sh
-├── docker/
-│   ├── strapi/Dockerfile
-│   └── website/Dockerfile
-└── make/
-    ├── make_strapi.mk
-    └── make_web.mk
-\`\`\`
+Les couleurs principales sont définies dans le fichier de thème :
 
-### Commandes
+- **Couleur primaire** — utilisée pour les boutons, les liens et les éléments d'accent
+- **Couleur d'accentuation** — utilisée pour les appels à l'action
+- **Couleurs neutres** — arrière-plans et textes
 
-- \`make infra-up\` — démarre l'infrastructure locale (Postgres)
-- \`make infra-down\` — arrête tout
-- \`make build\` — construit les images Docker
-- \`make lint\` — lint les Dockerfiles avec Hadolint
+### Typographie
 
-### Environnements
+La police par défaut est Inter, une typographie moderne et lisible. Elle peut être remplacée par n'importe quelle police Google Fonts.
 
-Chaque environnement a son propre overlay avec ses variables. Les secrets ne sont jamais commités — ils sont injectés au déploiement.`,
+### Fonctionnalités optionnelles
+
+Certaines fonctionnalités s'activent via la configuration :
+
+- **Analytics** — ajoutez votre URL Matomo pour suivre la fréquentation
+- **reCAPTCHA** — protégez vos formulaires contre les robots
+- **Newsletter** — connectez votre compte Brevo pour les inscriptions
+
+Chaque fonctionnalité est indépendante et s'active uniquement si elle est configurée.`,
     published_date: '2026-03-01',
   },
 ];

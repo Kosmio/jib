@@ -26,9 +26,6 @@ importers:
       astro:
         specifier: ^6.0.7
         version: 6.0.7(@types/node@25.0.3)(jiti@2.6.1)(lightningcss@1.32.0)(rollup@4.59.0)(terser@5.46.0)(typescript@5.9.3)(yaml@2.8.2)
-      github-markdown-css:
-        specifier: ^5.9.0
-        version: 5.9.0
       react:
         specifier: ^19.2.4
         version: 19.2.4
@@ -1084,10 +1081,6 @@ packages:
   gensync@1.0.0-beta.2:
     resolution: {integrity: sha512-3hN7NaskYvMDLQY55gnW3NQ+mesEAepTqlg+VEbj7zzqEMBVNhzcGYYeqFo/TlYz6eQiFcp1HcsCZO+nGgS8zg==}
     engines: {node: '>=6.9.0'}
-
-  github-markdown-css@5.9.0:
-    resolution: {integrity: sha512-tmT5sY+zvg2302XLYEfH2mtkViIM1SWf2nvYoF5N1ZsO0V6B2qZTiw3GOzw4vpjLygK/KG35qRlPFweHqfzz5w==}
-    engines: {node: '>=10'}
 
   github-slugger@2.0.0:
     resolution: {integrity: sha512-IaOQ9puYtjrkq7Y0Ygl9KDZnrf/aiUJYUpVf89y8kyaxbRG7Y1SrX/jaumrv81vc61+kiMempujsM3Yw7w5qcw==}
@@ -2966,8 +2959,6 @@ snapshots:
     optional: true
 
   gensync@1.0.0-beta.2: {}
-
-  github-markdown-css@5.9.0: {}
 
   github-slugger@2.0.0: {}
 

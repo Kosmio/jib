@@ -17,14 +17,16 @@ const { title, description = "" } = Astro.props;
     <meta charset="UTF-8" />
     <meta name="description" content={description} />
     <meta name="viewport" content="width=device-width" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
     <link
       rel="stylesheet"
       type="text/css"
       href="/assets/cookieconsent.css"
     />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
       rel="stylesheet"
     />
     <meta name="generator" content={Astro.generator} />
@@ -47,12 +49,12 @@ const { title, description = "" } = Astro.props;
       </script>
     )}
   </head>
-  <body class="font-sans text-[16px]">
-    <div class="2xl:container mx-auto">
-      <Header />
+  <body class="font-sans text-gray-900 antialiased">
+    <Header />
+    <main>
       <slot />
-      <Footer />
-    </div>
+    </main>
+    <Footer />
     <script defer src="/assets/cookieconsent.js"></script>
   </body>
 </html>

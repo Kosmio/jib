@@ -1,36 +1,20 @@
 @import "tailwindcss";
 
-/* Force-include dynamic classes used in Button.astro */
-@source inline("bg-secondary bg-white bg-primary hover:text-primary text-white shadow-gray-light");
-
 @theme {
-  --color-primary: #404F9D;
-  --color-secondary: #ED751D;
-  --color-gray-light: #F7F8FA;
+  --color-primary: #1e40af;
+  --color-primary-light: #3b82f6;
+  --color-primary-dark: #1e3a8a;
+  --color-accent: #f59e0b;
+  --color-accent-dark: #d97706;
+  --color-surface: #f8fafc;
+  --color-surface-alt: #f1f5f9;
+  --color-muted: #64748b;
 
-  --font-sans: "Poppins", sans-serif;
-
-  --text-h1: 5rem;
-  --text-h2: 3.157rem;
-  --text-h3: 2.369rem;
-
-  --leading-h2: 4rem;
-
-  --spacing-75: 75px;
+  --font-sans: "Inter", system-ui, sans-serif;
 
   --breakpoint-sm: 480px;
   --breakpoint-md: 768px;
-  --breakpoint-lg: 976px;
-  --breakpoint-mlg: 1125px;
-  --breakpoint-xl: 1275px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
   --breakpoint-2xl: 1440px;
-
-  --shadow-cta: -8px 8px 0px;
-
-  --animate-slideup: slideup 1s ease 0s 1 normal forwards;
-
-  @keyframes slideup {
-    0% { opacity: 0; transform: translateY(250px); }
-    100% { opacity: 1; transform: translateY(0); }
-  }
 }

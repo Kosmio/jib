@@ -1,67 +1,44 @@
 ---
-import Button from "./Button.astro";
-
 export interface Props {
   title: string;
-  titleColor?: string;
-  subtitle?: string[];
-  subtitleColor?: string;
-  bgColor?: string;
+  subtitle?: string;
   ctaLink?: string;
   ctaText?: string;
-  paddingT?: string;
-  bgHeight?: string;
+  compact?: boolean;
 }
 
 const {
   title,
-  titleColor = "text-white",
   subtitle,
-  subtitleColor = "text-white",
-  bgColor = "bg-primary",
   ctaLink,
   ctaText,
-  paddingT = "md:pt-[221px] pt-[114px]",
-  bgHeight = "h-[500px] md:h-[600px]",
+  compact = false,
 } = Astro.props;
 ---
 
-<div
-  class={`md:px-[48px] px-[20px] ${paddingT} relative ${bgColor} ${bgHeight} flex flex-col md:items-start items-center`}
->
-  <div>
-    <h1
-      class={`pb-6 font-semibold lg:text-[64px] leading-[4.5rem] text-[36px] max-w-xl ${titleColor}`}
-    >
+<section class={`relative bg-gradient-to-br from-primary-dark via-primary to-primary-light ${compact ? "pt-28 pb-16" : "pt-36 pb-24 md:pt-44 md:pb-32"}`}>
+  <div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PHBhdGggZD0iTTM2IDM0djItSDJ2LTJoMzR6bTAtMzBWMkgyVjBoMzR6TTAgMjZ2LTJoMTh2Mkgwem0wLTEwdi0yaDEydjJIMHoiLz48L2c+PC9nPjwvc3ZnPg==')] opacity-50"></div>
+  <div class="relative max-w-4xl mx-auto px-6 text-center">
+    <h1 class={`font-bold text-white leading-tight ${compact ? "text-3xl md:text-4xl" : "text-4xl md:text-5xl lg:text-6xl"}`}>
       {title}
     </h1>
     {subtitle && (
-      <div class="flex flex-col">
-        {subtitle.map((line) => (
-          <p
-            class={`text-base font-normal mt-1 max-w-lg mb-2 ${subtitleColor}`}
-            set:html={line}
-          />
-        ))}
-      </div>
+      <p class={`mt-4 text-blue-100 max-w-2xl mx-auto ${compact ? "text-base" : "text-lg md:text-xl"}`}>
+        {subtitle}
+      </p>
     )}
     {ctaLink && ctaText && (
-      <div class="flex items-start justify-start pt-10">
-        <Button
-          text={ctaText}
-          textMobile={ctaText}
+      <div class="mt-8">
+        <a
           href={ctaLink}
-          defaultColor="secondary"
-          shadowColor="gray-light"
-        />
+          class="inline-flex items-center gap-2 px-8 py-3.5 bg-accent hover:bg-accent-dark text-white font-semibold rounded-lg transition-colors shadow-lg shadow-accent/25"
+        >
+          {ctaText}
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
+          </svg>
+        </a>
       </div>
     )}
   </div>
-  <div class="absolute w-full left-0 bottom-[30px] flex justify-center">
-    <a href="#content">
-      <svg width="24" height="14" viewBox="0 0 24 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M4.25017 1.00004L12.0102 8.76004L19.7702 1.00004C20.5502 0.220039 21.8102 0.220039 22.5902 1.00004C23.3702 1.78004 23.3702 3.04004 22.5902 3.82004L13.4102 13C12.6302 13.78 11.3702 13.78 10.5902 13L1.41017 3.82004C1.03566 3.44638 0.825195 2.93907 0.825195 2.41004C0.825195 1.881 1.03566 1.3737 1.41017 1.00004C2.19017 0.240039 3.47017 0.220039 4.25017 1.00004Z" fill="white"></path>
-      </svg>
-    </a>
-  </div>
-</div>
+</section>

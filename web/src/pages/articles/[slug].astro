@@ -33,65 +33,72 @@ const otherArticles = allArticles?.data
 ---
 
 <Layout title={article.title} description={article.excerpt}>
-  <div class="bg-gray-light flex flex-col lg:px-[190px] md:px-16 px-5 md:pt-[140px] pt-[114px] md:pb-[160px] pb-16">
-    <div class="flex flex-col mt-4 gap-8 text-primary">
-      <h1 class="md:text-[38px] md:leading-[50px] text-2xl font-semibold">
+  <!-- Article header -->
+  <section class="bg-gradient-to-br from-primary-dark via-primary to-primary-light pt-28 pb-16 md:pt-36 md:pb-20">
+    <div class="max-w-3xl mx-auto px-6 text-center">
+      <time class="text-sm text-blue-200">{publishDate}</time>
+      <h1 class="mt-3 text-3xl md:text-4xl lg:text-5xl font-bold text-white leading-tight">
         {article.title}
       </h1>
       {article.excerpt && (
-        <p class="text-justify">{article.excerpt}</p>
+        <p class="mt-4 text-lg text-blue-100 max-w-2xl mx-auto">{article.excerpt}</p>
       )}
-      <span class="text-[#828EC9]">Publié le {publishDate}</span>
     </div>
-  </div>
+  </section>
 
-  <div class="flex flex-col lg:px-[190px] md:px-16 px-5 text-primary">
+  <!-- Article content -->
+  <article class="max-w-3xl mx-auto px-6">
     {image && (
-      <div class="sm:mt-[-80px] mt-[-20px] flex flex-col justify-center md:px-20">
+      <div class="-mt-8 mb-12 rounded-xl overflow-hidden shadow-xl">
         <img
           alt={image.alternativeText || article.title}
           src={buildImageUrl(image.url)}
+          class="w-full"
         />
       </div>
     )}
-    <div class="md:px-20 mt-16 text-justify">
+
+    <div class="py-12 prose prose-lg max-w-none">
       <MarkdownContent markdown={article.content || ""} />
     </div>
-  </div>
+  </article>
 
+  <!-- Related articles -->
   {otherArticles.length > 0 && (
-    <div class="justify-center lg:px-[80px] px-5 md:pt-16 md:pb-[104px] py-16 text-primary bg-gray-light">
-      <h2 class="text-[32px] leading-[48px] text-center font-semibold text-primary mb-10">
-        D'autres articles
-      </h2>
-      <div class="flex flex-row flex-wrap gap-10 justify-center">
-        {otherArticles.map((other) => (
-          <a
-            href={`/articles/${other.slug}`}
-            class="group flex flex-col bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow max-w-sm w-full"
-          >
-            {other.image ? (
-              <div class="h-48 overflow-hidden">
-                <img
-                  src={buildImageUrl(other.image.url)}
-                  alt={other.title}
-                  class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                />
-              </div>
-            ) : (
-              <div class="h-48 bg-gray-100 flex items-center justify-center">
-                <span class="text-gray-400 text-sm">No image</span>
-              </div>
-            )}
-            <div class="p-5">
-              <h3 class="text-lg font-semibold text-primary mb-2">{other.title}</h3>
-              {other.excerpt && (
-                <p class="text-sm text-gray-600 line-clamp-3">{other.excerpt}</p>
+    <section class="py-20 bg-surface">
+      <div class="max-w-6xl mx-auto px-6">
+        <h2 class="text-2xl font-bold text-gray-900 mb-8">Autres articles</h2>
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
+          {otherArticles.map((other) => (
+            <a
+              href={`/articles/${other.slug}`}
+              class="group flex flex-col bg-white rounded-xl overflow-hidden border border-gray-100 hover:border-gray-200 hover:shadow-lg transition-all duration-300"
+            >
+              {other.image ? (
+                <div class="aspect-[16/10] overflow-hidden bg-surface">
+                  <img
+                    src={buildImageUrl(other.image.url)}
+                    alt={other.title}
+                    class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                </div>
+              ) : (
+                <div class="aspect-[16/10] bg-gradient-to-br from-surface to-surface-alt flex items-center justify-center">
+                  <svg class="w-12 h-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/>
+                  </svg>
+                </div>
               )}
-            </div>
-          </a>
-        ))}
+              <div class="p-5">
+                <h3 class="font-semibold text-gray-900 mb-1 group-hover:text-primary transition-colors">{other.title}</h3>
+                {other.excerpt && (
+                  <p class="text-sm text-muted line-clamp-2">{other.excerpt}</p>
+                )}
+              </div>
+            </a>
+          ))}
+        </div>
       </div>
-    </div>
+    </section>
   )}
 </Layout>
