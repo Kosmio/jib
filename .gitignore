@@ -10,10 +10,11 @@ node_modules/
 # logs
 *.log
 
-# Environment (root level only)
-/.env
-/.env.local
-/.env.*
+# Environment files (contain secrets — never commit)
+.env
+.env.local
+.env.*
+!.env.example
 
 # Infrastructure secrets (never commit these)
 infra/deploy/overlays/*/.env.secrets

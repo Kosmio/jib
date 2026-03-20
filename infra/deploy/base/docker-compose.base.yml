@@ -42,9 +42,7 @@ services:
       EMAIL_LIST_ID: ${EMAIL_LIST_ID:-}
       EMAIL_CONTACT_TO: ${EMAIL_CONTACT_TO:-}
       EMAIL_CONTACT_TEMPLATE_ID: ${EMAIL_CONTACT_TEMPLATE_ID:-}
-      RECAPTCHA_PROJECT_ID: ${RECAPTCHA_PROJECT_ID:-}
-      RECAPTCHA_SITE_KEY: ${RECAPTCHA_SITE_KEY:-}
-      RECAPTCHA_API_KEY: ${RECAPTCHA_API_KEY:-}
+      ALTCHA_HMAC_KEY: ${ALTCHA_HMAC_KEY:-}
     depends_on:
       - postgres
     networks:
@@ -59,11 +57,9 @@ services:
     container_name: skeleton-web
     environment:
       STRAPI_URL: ${STRAPI_INTERNAL_URL}
-      STRAPI_KEY: ${STRAPI_API_KEY}
       REACT_STRAPI_URL: ${STRAPI_PUBLIC_URL}
       PUBLIC_MATOMO_URL: ${PUBLIC_MATOMO_URL:-}
       PUBLIC_MATOMO_SITE_ID: ${PUBLIC_MATOMO_SITE_ID:-}
-      PUBLIC_RECAPTCHA_SITE_KEY: ${RECAPTCHA_SITE_KEY:-}
     depends_on:
       - strapi
     networks:

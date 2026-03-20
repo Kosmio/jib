@@ -16,6 +16,7 @@
     "@tailwindcss/vite": "^4.2.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "altcha": "^2.3.0",
     "astro": "^6.0.7",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",

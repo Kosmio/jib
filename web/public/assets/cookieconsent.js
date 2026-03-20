@@ -70,15 +70,6 @@ cc.run({
               "readonly": true
             }
           },
-          {
-            "title": "Cookies de performance et analytiques",
-            "description": "Grâce à ces cookies, nous sommes en mesure de suivre le trafic et la visibilité des différentes pages.",
-            "toggle": {
-              "value": "analytics",
-              "enabled": false,
-              "readonly": false
-            }
-          }
         ],
         "cookie_table_headers": [
           {"col1": "Nom"},

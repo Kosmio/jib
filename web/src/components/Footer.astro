@@ -1,6 +1,6 @@
 ---
-const recaptchaSiteKey = import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY || "";
 const strapiUrl = import.meta.env.REACT_STRAPI_URL || import.meta.env.STRAPI_URL || "";
+const cookieConsent = import.meta.env.PUBLIC_COOKIE_CONSENT === "true";
 ---
 
 <footer class="bg-gray-900 text-gray-300">
@@ -37,25 +37,34 @@ const strapiUrl = import.meta.env.REACT_STRAPI_URL || import.meta.env.STRAPI_URL
             Merci pour votre inscription !
           </div>
           <div id="nl-error-alert" class="hidden text-sm bg-red-900/50 text-red-300 border border-red-700 px-3 py-2 rounded-lg">
-            <span id="nl-alert-message">Une erreur est survenue, veuillez réessayer.</span>
+            Une erreur est survenue, veuillez réessayer.
           </div>
         </div>
 
-        <form id="newsletter-form" class="flex">
-          <input
-            type="email"
-            name="email"
-            placeholder="votre@email.com"
-            required
-            class="flex-1 px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-l-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-primary-light"
-          />
-          <input type="hidden" name="recaptchaToken" id="recaptchaToken" />
-          <button
-            type="submit"
-            class="px-5 py-2.5 bg-primary-light hover:bg-primary text-white text-sm font-medium rounded-r-lg transition-colors"
-          >
-            OK
-          </button>
+        <form id="newsletter-form">
+          <div class="flex">
+            <input
+              type="email"
+              name="email"
+              placeholder="votre@email.com"
+              required
+              class="flex-1 px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-l-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-primary-light"
+            />
+            <button
+              type="submit"
+              class="px-5 py-2.5 bg-primary-light hover:bg-primary text-white text-sm font-medium rounded-r-lg transition-colors"
+            >
+              OK
+            </button>
+          </div>
+          <div class="mt-2">
+            <altcha-widget
+              challengeurl={`${strapiUrl}/api/captcha/challenge`}
+              auto="onsubmit"
+              hidefooter
+              style="--altcha-max-width: 100%;"
+            ></altcha-widget>
+          </div>
         </form>
       </div>
     </div>
@@ -63,14 +72,20 @@ const strapiUrl = import.meta.env.REACT_STRAPI_URL || import.meta.env.STRAPI_URL
     <!-- Bottom bar -->
     <div class="border-t border-gray-800 pt-6 flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-gray-500">
       <p>&copy; {new Date().getFullYear()} Skelly. Tous droits réservés.</p>
-      <button type="button" data-cc="c-settings" class="hover:text-gray-300 transition-colors">
-        Gestion des cookies
-      </button>
+      {cookieConsent && (
+        <button type="button" data-cc="c-settings" class="hover:text-gray-300 transition-colors">
+          Gestion des cookies
+        </button>
+      )}
     </div>
   </div>
 </footer>
 
-<script define:vars={{ recaptchaSiteKey, strapiUrl }}>
+<script>
+  import 'altcha';
+</script>
+
+<script define:vars={{ strapiUrl }}>
   document.addEventListener('DOMContentLoaded', function() {
     const nlSuccessAlert = document.querySelector('#nl-success-alert');
     const nlErrorAlert = document.querySelector('#nl-error-alert');
@@ -80,37 +95,26 @@ const strapiUrl = import.meta.env.REACT_STRAPI_URL || import.meta.env.STRAPI_URL
       nlSuccessAlert.classList.add('hidden');
       nlErrorAlert.classList.add('hidden');
 
-      if (recaptchaSiteKey && typeof grecaptcha !== 'undefined') {
-        grecaptcha.enterprise.ready(function() {
-          grecaptcha.enterprise.execute(recaptchaSiteKey, { action: 'newsletterSubscribe' }).then(function(token) {
-            document.getElementById('recaptchaToken').value = token;
-            submitNewsletter();
-          });
-        });
-      } else {
-        submitNewsletter();
-      }
-    });
+      var form = document.querySelector('#newsletter-form');
+      var formData = new FormData(form);
 
-    function submitNewsletter() {
-      var formData = new FormData(document.querySelector('#newsletter-form'));
       fetch(strapiUrl + '/api/newsletter/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: formData.get('email'),
-          recaptchaToken: formData.get('recaptchaToken'),
+          captchaToken: formData.get('altcha'),
         }),
       }).then(function(res) {
         if (res.status === 200) {
           nlSuccessAlert.classList.remove('hidden');
-          document.querySelector('#newsletter-form').reset();
+          form.reset();
         } else {
           nlErrorAlert.classList.remove('hidden');
         }
       }).catch(function() {
         nlErrorAlert.classList.remove('hidden');
       });
-    }
+    });
   });
 </script>

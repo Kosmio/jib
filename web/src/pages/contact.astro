@@ -4,7 +4,6 @@ import Hero from "../components/Hero.astro";
 import ContactForm from "../react-components/ContactForm";
 
 const strapiUrl = import.meta.env.REACT_STRAPI_URL || import.meta.env.STRAPI_URL || "";
-const recaptchaSiteKey = import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY || "";
 ---
 
 <Layout title="Contact" description="Contactez-nous pour toute question ou projet">
@@ -16,7 +15,7 @@ const recaptchaSiteKey = import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY || "";
 
   <section class="py-16 md:py-24 bg-white">
     <div class="max-w-2xl mx-auto px-6">
-      <ContactForm client:visible strapiUrl={strapiUrl} recaptchaSiteKey={recaptchaSiteKey} />
+      <ContactForm client:visible strapiUrl={strapiUrl} />
     </div>
   </section>
 </Layout>

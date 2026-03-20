@@ -4,7 +4,6 @@ import Hero from "../../components/Hero.astro";
 import ArticleList from "../../react-components/ArticleList";
 
 const apiURL = import.meta.env.REACT_STRAPI_URL || import.meta.env.STRAPI_URL;
-const keyToken = import.meta.env.STRAPI_KEY;
 ---
 
 <Layout title="Articles" description="Tous nos articles et publications">
@@ -15,6 +14,6 @@ const keyToken = import.meta.env.STRAPI_KEY;
   />
 
   <section class="bg-surface min-h-[50vh]">
-    <ArticleList client:visible apiURL={apiURL} keyToken={keyToken} />
+    <ArticleList client:visible apiURL={apiURL} />
   </section>
 </Layout>

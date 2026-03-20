@@ -18,11 +18,13 @@ const { title, description = "" } = Astro.props;
     <meta name="description" content={description} />
     <meta name="viewport" content="width=device-width" />
     <link rel="icon" type="image/png" href="/favicon.png" />
-    <link
-      rel="stylesheet"
-      type="text/css"
-      href="/assets/cookieconsent.css"
-    />
+    {import.meta.env.PUBLIC_COOKIE_CONSENT === "true" && (
+      <link
+        rel="stylesheet"
+        type="text/css"
+        href="/assets/cookieconsent.css"
+      />
+    )}
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -31,12 +33,10 @@ const { title, description = "" } = Astro.props;
     />
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
-    {import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY && (
-      <script defer src={`https://www.google.com/recaptcha/enterprise.js?render=${import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY}`}></script>
-    )}
     {import.meta.env.PUBLIC_MATOMO_URL && import.meta.env.PUBLIC_MATOMO_SITE_ID && (
-      <script type="text/plain" data-cookiecategory="analytics" define:vars={{ matomoUrl: import.meta.env.PUBLIC_MATOMO_URL, matomoSiteId: import.meta.env.PUBLIC_MATOMO_SITE_ID }}>
+      <script define:vars={{ matomoUrl: import.meta.env.PUBLIC_MATOMO_URL, matomoSiteId: import.meta.env.PUBLIC_MATOMO_SITE_ID }}>
         var _paq = window._paq = window._paq || [];
+        _paq.push(['disableCookies']);
         _paq.push(['trackPageView']);
         _paq.push(['enableLinkTracking']);
         (function() {
@@ -55,6 +55,8 @@ const { title, description = "" } = Astro.props;
       <slot />
     </main>
     <Footer />
-    <script defer src="/assets/cookieconsent.js"></script>
+    {import.meta.env.PUBLIC_COOKIE_CONSENT === "true" && (
+      <script defer src="/assets/cookieconsent.js"></script>
+    )}
   </body>
 </html>

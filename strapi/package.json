@@ -11,9 +11,9 @@
   },
   "dependencies": {
     "@getbrevo/brevo": "^5.0.1",
-    "@google-cloud/recaptcha-enterprise": "^6.4.0",
     "@strapi/plugin-users-permissions": "5.40.0",
     "@strapi/strapi": "5.40.0",
+    "altcha-lib": "^1.4.1",
     "better-sqlite3": "^12.8.0",
     "pg": "^8.20.0",
     "react": "^18.3.1",

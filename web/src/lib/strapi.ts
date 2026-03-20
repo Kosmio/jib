@@ -4,11 +4,9 @@ export const buildImageUrl = (baseUrl: string) =>
   `${import.meta.env.REACT_STRAPI_URL}${baseUrl}`;
 
 const strapiFetch = (targetUrl: string) =>
-  fetch(`${import.meta.env.STRAPI_URL}/api${targetUrl}`, {
-    headers: {
-      Authorization: `Bearer ${import.meta.env.STRAPI_KEY}`,
-    },
-  }).then((res) => res.json());
+  fetch(`${import.meta.env.STRAPI_URL}/api${targetUrl}`).then((res) =>
+    res.json()
+  );
 
 export const getArticles = (
   params: {
@@ -28,17 +26,12 @@ export const getArticles = (
 export const getArticleBySlug = (slug: string): Promise<Responses<Article>> =>
   strapiFetch(`/articles?filters[slug][$eq]=${slug}&populate=*`);
 
-// Client-side fetch helpers (for React components that receive URL and key as props)
-export const clientFetch = (url: string, key: string, targetUrl: string) =>
-  fetch(`${url}/api${targetUrl}`, {
-    headers: {
-      Authorization: `Bearer ${key}`,
-    },
-  }).then((res) => res.json());
+// Client-side fetch helpers (for React components)
+const clientFetch = (url: string, targetUrl: string) =>
+  fetch(`${url}/api${targetUrl}`).then((res) => res.json());
 
 export const getArticlesWithPagination = (
   url: string,
-  key: string,
   params: {
     page?: number;
     pageSize?: number;
@@ -46,7 +39,6 @@ export const getArticlesWithPagination = (
 ): Promise<Responses<Article>> => {
   return clientFetch(
     url,
-    key,
     `/articles?sort=id%3Adesc&pagination[page]=${params.page}&pagination[pageSize]=${params.pageSize}&populate=*`
   );
 };

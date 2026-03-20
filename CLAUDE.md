@@ -24,7 +24,7 @@ skeleton-astro-strapi/
 │   │   └── api/                # Content types + custom controllers
 │   │       ├── article/        # Articles (standard CRUD via factories)
 │   │       ├── contact/        # Contact form (custom POST endpoint)
-│   │       └── newsletter/     # Newsletter subscription (reCAPTCHA + Brevo)
+│   │       └── newsletter/     # Newsletter subscription (Altcha + Brevo)
 │   └── .env.example
 ├── web/                        # Astro 6 SSR frontend
 │   ├── astro.config.mjs        # SSR + React + Tailwind vite plugin
@@ -85,7 +85,7 @@ On first Strapi start, the bootstrap seeds 3 demo articles and sets French as th
 ### Environment variable split
 - `STRAPI_URL` + `STRAPI_KEY` — server-side only (in Astro frontmatter)
 - `REACT_STRAPI_URL` — public URL passed as props to React components
-- `PUBLIC_*` — available everywhere (Matomo, reCAPTCHA site key)
+- `PUBLIC_*` — available everywhere (Matomo)
 
 ## Build & Deploy
 

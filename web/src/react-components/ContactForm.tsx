@@ -1,18 +1,38 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 
 type Props = {
   strapiUrl: string;
-  recaptchaSiteKey: string;
 };
 
-export default function ContactForm({ strapiUrl, recaptchaSiteKey }: Props) {
+export default function ContactForm({ strapiUrl }: Props) {
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [altchaToken, setAltchaToken] = useState<string>("");
+  const altchaRef = useRef<HTMLElement>(null);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     subject: "",
     message: "",
   });
+
+  useEffect(() => {
+    // Load altcha widget client-side only (registers customElements)
+    import("altcha");
+  }, []);
+
+  useEffect(() => {
+    const widget = altchaRef.current;
+    if (!widget) return;
+
+    const handleStateChange = (ev: any) => {
+      if (ev.detail?.state === "verified" && ev.detail?.payload) {
+        setAltchaToken(ev.detail.payload);
+      }
+    };
+
+    widget.addEventListener("statechange", handleStateChange);
+    return () => widget.removeEventListener("statechange", handleStateChange);
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -23,35 +43,30 @@ export default function ContactForm({ strapiUrl, recaptchaSiteKey }: Props) {
     setStatus("loading");
 
     try {
-      let recaptchaToken = "";
-
-      if (recaptchaSiteKey && typeof window !== "undefined" && (window as any).grecaptcha) {
-        recaptchaToken = await new Promise<string>((resolve) => {
-          (window as any).grecaptcha.enterprise.ready(() => {
-            (window as any).grecaptcha.enterprise
-              .execute(recaptchaSiteKey, { action: "contactForm" })
-              .then(resolve);
-          });
-        });
-      }
-
       const response = await fetch(`${strapiUrl}/api/contact/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
-          recaptchaToken,
+          captchaToken: altchaToken,
         }),
       });
 
       if (response.ok) {
         setStatus("success");
         setFormData({ name: "", email: "", subject: "", message: "" });
+        setAltchaToken("");
+        // Reset the Altcha widget so a new challenge is fetched for the next submit
+        (altchaRef.current as any)?.reset?.();
       } else {
         setStatus("error");
+        (altchaRef.current as any)?.reset?.();
+        setAltchaToken("");
       }
     } catch {
       setStatus("error");
+      (altchaRef.current as any)?.reset?.();
+      setAltchaToken("");
     }
   };
 
@@ -116,6 +131,17 @@ export default function ContactForm({ strapiUrl, recaptchaSiteKey }: Props) {
           onChange={handleChange}
           className="w-full px-4 py-3 bg-[#f8fafc] border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#1e40af]/20 focus:border-[#1e40af] outline-none transition-colors resize-vertical"
           placeholder="Décrivez votre projet ou votre question..."
+        />
+      </div>
+
+      <div>
+        {/* @ts-ignore — altcha-widget is a web component */}
+        <altcha-widget
+          ref={altchaRef}
+          challengeurl={`${strapiUrl}/api/captcha/challenge`}
+          auto="onfocus"
+          hidefooter
+          style={{ maxWidth: "100%" } as any}
         />
       </div>
 

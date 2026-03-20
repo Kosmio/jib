@@ -107,7 +107,7 @@ Examples: `ContactForm.tsx`, `ArticleList.tsx`, `MarkdownContent.tsx`
 React components must be explicitly hydrated with a client directive:
 
 ```astro
-<ContactForm client:visible strapiUrl={strapiUrl} recaptchaSiteKey={key} />
+<ContactForm client:visible strapiUrl={strapiUrl} />
 ```
 
 **Directives:**
@@ -233,7 +233,7 @@ When Tailwind classes are constructed dynamically (e.g., `bg-${color}`), they wo
 `Layout.astro` is the single base layout. It handles:
 - HTML boilerplate (lang, meta, fonts, favicon)
 - Global CSS import (`src/styles/app.css`)
-- Third-party scripts (reCAPTCHA, Matomo) — conditionally loaded based on env vars
+- Third-party scripts (Matomo) — conditionally loaded based on env vars
 - Header and Footer components
 - Cookie consent script
 

@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+a, button, [type="submit"], [role="button"] {
+  cursor: pointer;
+}
+
 @theme {
   --color-primary: #1e40af;
   --color-primary-light: #3b82f6;

@@ -5,10 +5,8 @@ module.exports = ({ env }) => ({
   app: {
     keys: env.array('APP_KEYS'),
   },
-  recaptcha: {
-    projectId: env('RECAPTCHA_PROJECT_ID'),
-    siteKey: env('RECAPTCHA_SITE_KEY'),
-    apiKey: env('RECAPTCHA_API_KEY'),
+  captcha: {
+    hmacKey: env('ALTCHA_HMAC_KEY'),
   },
   email: {
     apiKey: env('EMAIL_API_KEY'),

@@ -77,7 +77,7 @@ La police par défaut est Inter, une typographie moderne et lisible. Elle peut �
 Certaines fonctionnalités s'activent via la configuration :
 
 - **Analytics** — ajoutez votre URL Matomo pour suivre la fréquentation
-- **reCAPTCHA** — protégez vos formulaires contre les robots
+- **Anti-bot** — protégez vos formulaires avec Altcha (self-hosted)
 - **Newsletter** — connectez votre compte Brevo pour les inscriptions
 
 Chaque fonctionnalité est indépendante et s'active uniquement si elle est configurée.`,
@@ -114,5 +114,42 @@ module.exports = {
       }
       strapi.log.info(`Seeded ${SEED_ARTICLES.length} demo articles.`);
     }
+
+    // Set public permissions for API endpoints
+    await setPublicPermissions(strapi, [
+      { api: 'article', actions: ['find', 'findOne'] },
+      { api: 'captcha', actions: ['challenge'] },
+      { api: 'contact', actions: ['send'] },
+      { api: 'newsletter', actions: ['subscribe'] },
+    ]);
   },
 };
+
+async function setPublicPermissions(strapi, endpoints) {
+  const publicRole = await strapi.db.query('plugin::users-permissions.role').findOne({
+    where: { type: 'public' },
+  });
+
+  if (!publicRole) return;
+
+  for (const { api, actions } of endpoints) {
+    for (const action of actions) {
+      const existing = await strapi.db.query('plugin::users-permissions.permission').findOne({
+        where: {
+          role: publicRole.id,
+          action: `api::${api}.${api}.${action}`,
+        },
+      });
+
+      if (!existing) {
+        await strapi.db.query('plugin::users-permissions.permission').create({
+          data: {
+            role: publicRole.id,
+            action: `api::${api}.${api}.${action}`,
+          },
+        });
+        strapi.log.info(`Granted public permission: ${api}.${action}`);
+      }
+    }
+  }
+}

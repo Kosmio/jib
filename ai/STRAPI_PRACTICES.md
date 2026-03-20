@@ -15,7 +15,7 @@ Strapi serves as a headless CMS exposing a REST API. The backend has three roles
 ```
 strapi/
 ├── config/                  # Environment-driven configuration
-│   ├── server.js            # Server, email, reCAPTCHA config
+│   ├── server.js            # Server, email, captcha config
 │   ├── database.js          # Database connection
 │   ├── admin.js             # Admin panel secrets
 │   ├── middlewares.js        # Middleware stack
@@ -162,7 +162,7 @@ module.exports = ({ env }) => ({
 
 **Rules:**
 - Never hardcode URLs, API keys, or credentials in source code
-- Group related config under named sections (`email`, `recaptcha`)
+- Group related config under named sections (`email`, `captcha`)
 - Use `env()` for strings, `env.int()` for numbers, `env.array()` for comma-separated lists
 - Provide sensible defaults only for non-sensitive values (host, port)
 - Document all required env vars in `.env.example`
@@ -259,12 +259,13 @@ await client.transactionalEmails.sendTransacEmail({ templateId, to, replyTo, par
 await client.contacts.createContact({ email, listIds: [listId] });
 ```
 
-### reCAPTCHA Enterprise
+### Altcha (captcha)
 
-Use `@google-cloud/recaptcha-enterprise` for server-side token verification:
-- Verify the token action matches the expected action
-- Reject scores below 0.5
-- All config (project ID, site key, API key) from env vars
+Anti-bot protection uses Altcha, a self-hosted proof-of-work solution (MIT, GDPR-friendly, no third-party):
+- The `captcha` API exposes `GET /api/captcha/challenge` to generate challenges
+- The `captcha` service provides `verify(token)` using `altcha-lib`
+- Config: `ALTCHA_HMAC_KEY` env var (single secret, no API keys needed)
+- When `ALTCHA_HMAC_KEY` is not set, captcha verification is skipped
 
 ---
 

@@ -4,7 +4,6 @@ import type { Article } from "../lib/types";
 
 type Props = {
   apiURL: string;
-  keyToken: string;
 };
 
 type MetaType = {
@@ -14,7 +13,7 @@ type MetaType = {
   total: number;
 };
 
-export default function ArticleList({ apiURL, keyToken }: Props) {
+export default function ArticleList({ apiURL }: Props) {
   const [articles, setArticles] = useState<Array<Article>>([]);
   const [meta, setMeta] = useState<MetaType>();
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -23,7 +22,7 @@ export default function ArticleList({ apiURL, keyToken }: Props) {
     let isSubscribed = true;
 
     const fetchData = async () => {
-      const response = await getArticlesWithPagination(apiURL, keyToken, {
+      const response = await getArticlesWithPagination(apiURL, {
         pageSize: 6,
         page: currentPage,
       });
