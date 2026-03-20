@@ -13,33 +13,33 @@ if (!article) {
 
 const allArticles = await getArticles();
 
-const publishDate = article.attributes.published_date
-  ? new Date(article.attributes.published_date).toLocaleDateString("fr-FR", {
+const publishDate = article.published_date
+  ? new Date(article.published_date).toLocaleDateString("fr-FR", {
       year: "numeric",
       month: "long",
       day: "numeric",
     })
-  : new Date(article.attributes.publishedAt).toLocaleDateString("fr-FR", {
+  : new Date(article.publishedAt).toLocaleDateString("fr-FR", {
       year: "numeric",
       month: "long",
       day: "numeric",
     });
 
-const image = article.attributes.image?.data;
+const image = article.image;
 
 const otherArticles = allArticles?.data
-  ?.filter((a) => a.id !== article.id)
+  ?.filter((a) => a.documentId !== article.documentId)
   ?.slice(0, 3) || [];
 ---
 
-<Layout title={article.attributes.title} description={article.attributes.excerpt}>
+<Layout title={article.title} description={article.excerpt}>
   <div class="bg-gray-light flex flex-col lg:px-[190px] md:px-16 px-5 md:pt-[140px] pt-[114px] md:pb-[160px] pb-16">
     <div class="flex flex-col mt-4 gap-8 text-primary">
       <h1 class="md:text-[38px] md:leading-[50px] text-2xl font-semibold">
-        {article.attributes.title}
+        {article.title}
       </h1>
-      {article.attributes.excerpt && (
-        <p class="text-justify">{article.attributes.excerpt}</p>
+      {article.excerpt && (
+        <p class="text-justify">{article.excerpt}</p>
       )}
       <span class="text-[#828EC9]">Publié le {publishDate}</span>
     </div>
@@ -49,13 +49,13 @@ const otherArticles = allArticles?.data
     {image && (
       <div class="sm:mt-[-80px] mt-[-20px] flex flex-col justify-center md:px-20">
         <img
-          alt={image.attributes.alternativeText || article.attributes.title}
-          src={buildImageUrl(image.attributes.url)}
+          alt={image.alternativeText || article.title}
+          src={buildImageUrl(image.url)}
         />
       </div>
     )}
     <div class="md:px-20 mt-16 text-justify">
-      <MarkdownContent markdown={article.attributes.content || ""} />
+      <MarkdownContent markdown={article.content || ""} />
     </div>
   </div>
 
@@ -67,14 +67,14 @@ const otherArticles = allArticles?.data
       <div class="flex flex-row flex-wrap gap-10 justify-center">
         {otherArticles.map((other) => (
           <a
-            href={`/articles/${other.attributes.slug}`}
+            href={`/articles/${other.slug}`}
             class="group flex flex-col bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow max-w-sm w-full"
           >
-            {other.attributes.image?.data ? (
+            {other.image ? (
               <div class="h-48 overflow-hidden">
                 <img
-                  src={buildImageUrl(other.attributes.image.data.attributes.url)}
-                  alt={other.attributes.title}
+                  src={buildImageUrl(other.image.url)}
+                  alt={other.title}
                   class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
               </div>
@@ -84,9 +84,9 @@ const otherArticles = allArticles?.data
               </div>
             )}
             <div class="p-5">
-              <h3 class="text-lg font-semibold text-primary mb-2">{other.attributes.title}</h3>
-              {other.attributes.excerpt && (
-                <p class="text-sm text-gray-600 line-clamp-3">{other.attributes.excerpt}</p>
+              <h3 class="text-lg font-semibold text-primary mb-2">{other.title}</h3>
+              {other.excerpt && (
+                <p class="text-sm text-gray-600 line-clamp-3">{other.excerpt}</p>
               )}
             </div>
           </a>

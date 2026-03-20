@@ -59,15 +59,15 @@ export default function ArticleList({ apiURL, keyToken }: Props) {
         {articles &&
           articles.map((item) => (
             <a
-              key={item.id}
-              href={`/articles/${item.attributes.slug}`}
+              key={item.documentId}
+              href={`/articles/${item.slug}`}
               className="group flex flex-col bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow max-w-sm w-full"
             >
-              {item.attributes.image?.data ? (
+              {item.image ? (
                 <div className="h-48 overflow-hidden">
                   <img
-                    src={clientBuildImageUrl(apiURL, item.attributes.image.data.attributes.url)}
-                    alt={item.attributes.title}
+                    src={clientBuildImageUrl(apiURL, item.image.url)}
+                    alt={item.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                 </div>
@@ -78,11 +78,11 @@ export default function ArticleList({ apiURL, keyToken }: Props) {
               )}
               <div className="p-5 flex flex-col flex-grow">
                 <h3 className="text-lg font-semibold text-[#404F9D] mb-2 line-clamp-2">
-                  {item.attributes.title}
+                  {item.title}
                 </h3>
-                {item.attributes.excerpt && (
+                {item.excerpt && (
                   <p className="text-sm text-gray-600 line-clamp-3">
-                    {item.attributes.excerpt}
+                    {item.excerpt}
                   </p>
                 )}
                 <span className="mt-auto pt-4 text-[#ED751D] text-sm font-medium">

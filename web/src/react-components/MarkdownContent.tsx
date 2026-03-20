@@ -1,5 +1,5 @@
-import ReactMarkdown from 'react-markdown';
-import gfm from 'remark-gfm';
+import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import "github-markdown-css/github-markdown-dark.css";
 import React from 'react';
@@ -10,10 +10,10 @@ export interface MarkdownContentProps {
 }
 
 const components = {
-  ul: ({ node, className, ordered, ...props }: any) => (
+  ul: ({ node, className, ...props }: any) => (
     <ul className={`${className ?? ""} list-disc list-inside`} {...props} />
   ),
-  ol: ({ node, className, ordered, ...props }: any) => (
+  ol: ({ node, className, ...props }: any) => (
     <ol className={`${className ?? ""} list-decimal list-inside`} {...props} />
   ),
   img: ({ node, ...props }: any) => (
@@ -29,13 +29,13 @@ const components = {
 export const MarkdownContent = (props: MarkdownContentProps) => {
   const { markdown, className } = props;
   return (
-    <ReactMarkdown
+    <Markdown
       className={`${className ?? ""} markdown-body`}
       rehypePlugins={[rehypeRaw]}
-      remarkPlugins={[gfm]}
+      remarkPlugins={[remarkGfm]}
       components={components}
     >
       {markdown}
-    </ReactMarkdown>
+    </Markdown>
   );
 };

@@ -5,5 +5,9 @@ module.exports = ({ env }) => ({
   apiToken: {
     salt: env('API_TOKEN_SALT'),
   },
-  url: env('BASE_URL', 'http://localhost:1337') + "/admin",
+  transfer: {
+    token: {
+      salt: env('TRANSFER_TOKEN_SALT'),
+    },
+  },
 });

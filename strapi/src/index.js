@@ -7,7 +7,7 @@ const SEED_ARTICLES = [
     excerpt: "Découvrez ce projet squelette Astro + Strapi, prêt à l'emploi pour démarrer rapidement vos projets web.",
     content: `## Un point de départ pour vos projets
 
-Ce skeleton combine **Astro** en SSR avec **Strapi v4** comme CMS headless. Il inclut tout ce dont vous avez besoin pour démarrer :
+Ce skeleton combine **Astro** en SSR avec **Strapi v5** comme CMS headless. Il inclut tout ce dont vous avez besoin pour démarrer :
 
 - Gestion de contenu via Strapi
 - Rendu côté serveur avec Astro
@@ -108,14 +108,12 @@ module.exports = {
     }
 
     // Seed demo articles if none exist
-    const articleCount = await strapi.entityService.count('api::article.article');
-    if (articleCount === 0) {
+    const articles = await strapi.documents('api::article.article').findMany({ limit: 1 });
+    if (articles.length === 0) {
       for (const article of SEED_ARTICLES) {
-        await strapi.entityService.create('api::article.article', {
-          data: {
-            ...article,
-            publishedAt: new Date(),
-          },
+        await strapi.documents('api::article.article').create({
+          data: article,
+          status: 'published',
         });
       }
       strapi.log.info(`Seeded ${SEED_ARTICLES.length} demo articles.`);

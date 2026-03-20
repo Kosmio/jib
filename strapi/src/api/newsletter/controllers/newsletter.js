@@ -4,7 +4,6 @@
  * A set of functions called "actions" for `newsletter`
  */
 const { RecaptchaEnterpriseServiceClient } = require('@google-cloud/recaptcha-enterprise');
-const brevo = require('@getbrevo/brevo');
 
 module.exports = {
   subscribe: async (ctx) => {
@@ -26,15 +25,15 @@ module.exports = {
         return ctx.send({ message: 'Recaptcha verification failed, potential bot detected' }, 403);
       }
 
-      const apiInstance = new brevo.ContactsApi();
-      apiInstance.setApiKey(brevo.ContactsApiApiKeys.apiKey, strapi.config.get('server.email.apiKey'));
+      const { BrevoClient } = require('@getbrevo/brevo');
+      const client = new BrevoClient({ apiKey: strapi.config.get('server.email.apiKey') });
 
       const listId = parseInt(strapi.config.get('server.email.listId'));
-      const createContact = new brevo.CreateContact();
-      createContact.email = email;
-      createContact.listIds = [listId];
 
-      await apiInstance.createContact(createContact);
+      await client.contacts.createContact({
+        email,
+        listIds: [listId],
+      });
 
       return ctx.send({ message: 'success' }, 200);
     } catch (error) {
