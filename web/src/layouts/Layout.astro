@@ -1,0 +1,57 @@
+---
+import Header from "../components/Header.astro";
+import Footer from "../components/Footer.astro";
+
+export interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description = "" } = Astro.props;
+---
+
+<!DOCTYPE html>
+<html lang="fr" class="scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="description" content={description} />
+    <meta name="viewport" content="width=device-width" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="/assets/cookieconsent.css"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+    {import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY && (
+      <script defer src={`https://www.google.com/recaptcha/enterprise.js?render=${import.meta.env.PUBLIC_RECAPTCHA_SITE_KEY}`}></script>
+    )}
+    {import.meta.env.PUBLIC_MATOMO_URL && import.meta.env.PUBLIC_MATOMO_SITE_ID && (
+      <script type="text/plain" data-cookiecategory="analytics" define:vars={{ matomoUrl: import.meta.env.PUBLIC_MATOMO_URL, matomoSiteId: import.meta.env.PUBLIC_MATOMO_SITE_ID }}>
+        var _paq = window._paq = window._paq || [];
+        _paq.push(['trackPageView']);
+        _paq.push(['enableLinkTracking']);
+        (function() {
+          var u = matomoUrl;
+          _paq.push(['setTrackerUrl', u + 'matomo.php']);
+          _paq.push(['setSiteId', matomoSiteId]);
+          var d = document, g = d.createElement('script'), s = d.getElementsByTagName('script')[0];
+          g.async = true; g.src = u + 'matomo.js'; s.parentNode.insertBefore(g, s);
+        })();
+      </script>
+    )}
+  </head>
+  <body class="font-sans text-[16px]">
+    <div class="2xl:container mx-auto">
+      <Header />
+      <slot />
+      <Footer />
+    </div>
+    <script defer src="/assets/cookieconsent.js"></script>
+  </body>
+</html>

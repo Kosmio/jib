@@ -1,0 +1,21 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import Hero from "../../components/Hero.astro";
+import ArticleList from "../../react-components/ArticleList";
+
+const apiURL = import.meta.env.REACT_STRAPI_URL || import.meta.env.STRAPI_URL;
+const keyToken = import.meta.env.STRAPI_KEY;
+---
+
+<Layout title="Articles" description="Tous les articles">
+  <Hero
+    title="Articles"
+    subtitle={["Retrouvez toutes nos publications."]}
+    bgHeight="h-[350px] md:h-[400px]"
+    paddingT="md:pt-[180px] pt-[114px]"
+  />
+
+  <div id="content" class="bg-gray-light">
+    <ArticleList client:visible apiURL={apiURL} keyToken={keyToken} />
+  </div>
+</Layout>

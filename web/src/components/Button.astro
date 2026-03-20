@@ -1,0 +1,56 @@
+---
+export interface Props {
+  text?: string;
+  textMobile?: string;
+  href: string;
+  defaultColor?: string;
+  hoverColor?: string;
+  textColor?: string;
+  textHoverColor?: string;
+  shadowColor?: string;
+  maxWidth?: string;
+  target?: string;
+}
+
+const {
+  text = "My button",
+  textMobile = "My button",
+  href = "#",
+  defaultColor = "secondary",
+  hoverColor = "white",
+  textColor = "white",
+  textHoverColor = "primary",
+  shadowColor = "gray-light",
+  target = "_self",
+  maxWidth,
+} = Astro.props;
+---
+
+<a
+  target={target}
+  href={href}
+  class={`cta border-0 bg-${hoverColor} text-${textColor} h-[64px] hover:text-${textHoverColor} w-full ${maxWidth} relative overflow-hidden rounded-[30px] px-[55px] py-[20px] hover:cursor-pointer flex justify-center shadow-cta md:shadow-[#00000033] shadow-[#353e7114]`}
+>
+  <span class="z-10 relative sm:block hidden">{text}</span>
+  <span class="z-10 relative sm:hidden block whitespace-nowrap">{textMobile}</span>
+  <span class={`overlay bg-${defaultColor}`}></span>
+</a>
+
+<style>
+  .cta {
+    position: relative;
+    overflow: hidden;
+  }
+  .overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    transition: transform 0.3s ease;
+    transform-origin: right;
+  }
+  .cta:hover .overlay {
+    transform: scaleX(0);
+  }
+</style>

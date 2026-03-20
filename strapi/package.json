@@ -1,0 +1,39 @@
+{
+  "name": "@skeleton/strapi",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A Strapi application",
+  "scripts": {
+    "develop": "strapi develop",
+    "start": "strapi start",
+    "build": "strapi build",
+    "strapi": "strapi"
+  },
+  "dependencies": {
+    "@getbrevo/brevo": "^2.0.0",
+    "@google-cloud/recaptcha-enterprise": "^5.13.0",
+    "@strapi/plugin-i18n": "4.4.5",
+    "@strapi/plugin-users-permissions": "4.4.5",
+    "@strapi/strapi": "4.4.5",
+    "better-sqlite3": "^11.0.0",
+    "pg": "^8.8.0"
+  },
+  "author": {
+    "name": "A Strapi developer"
+  },
+  "strapi": {
+    "uuid": "00000000-0000-0000-0000-000000000000"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=6.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "sharp",
+      "better-sqlite3",
+      "esbuild"
+    ]
+  },
+  "license": "MIT"
+}

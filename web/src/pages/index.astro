@@ -1,0 +1,89 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Hero from "../components/Hero.astro";
+import Card from "../components/Card.astro";
+import Button from "../components/Button.astro";
+import { getArticles, buildImageUrl } from "../lib/strapi";
+
+const articles = await getArticles({ limit: 6, start: 0 });
+---
+
+<Layout title="Skeleton - Astro + Strapi" description="A generic skeleton project built with Astro SSR and Strapi CMS">
+  <Hero
+    title="Skeleton Astro + Strapi"
+    subtitle={[
+      "Un projet squelette prêt à l'emploi pour démarrer rapidement vos projets web.",
+      "Astro SSR + Strapi CMS + Tailwind CSS + Docker"
+    ]}
+    ctaLink="/articles"
+    ctaText="Voir les articles"
+  />
+
+  <div id="content" class="bg-gray-light py-16 md:py-24 px-5 md:px-[80px]">
+    <h2 class="text-[32px] leading-[48px] text-center font-semibold text-primary mb-10">
+      Derniers articles
+    </h2>
+
+    {articles?.data?.length > 0 ? (
+      <div class="flex flex-row flex-wrap gap-8 justify-center mb-12">
+        {articles.data.map((article) => (
+          <Card
+            title={article.attributes.title}
+            text={article.attributes.excerpt}
+            slug={article.attributes.slug}
+            image={article.attributes.image?.data
+              ? buildImageUrl(article.attributes.image.data.attributes.url)
+              : undefined}
+          />
+        ))}
+      </div>
+    ) : (
+      <div class="text-center text-gray-500 py-12">
+        <p class="text-lg mb-4">Aucun article pour le moment.</p>
+        <p class="text-sm">Ajoutez des articles via le panneau d'administration Strapi sur <a href="http://localhost:1337/admin" class="text-primary underline" target="_blank">localhost:1337/admin</a>.</p>
+      </div>
+    )}
+
+    <div class="flex justify-center mt-8">
+      <Button
+        text="Tous les articles"
+        textMobile="Tous les articles"
+        href="/articles"
+        defaultColor="primary"
+        shadowColor="gray-light"
+      />
+    </div>
+  </div>
+
+  <div class="bg-white py-16 md:py-24 px-5 md:px-[80px]">
+    <h2 class="text-[32px] leading-[48px] text-center font-semibold text-primary mb-6">
+      Fonctionnalités du skeleton
+    </h2>
+    <div class="max-w-3xl mx-auto grid md:grid-cols-2 gap-6">
+      <div class="p-6 bg-gray-light rounded-lg">
+        <h3 class="font-semibold text-primary mb-2">Astro SSR</h3>
+        <p class="text-sm text-gray-600">Rendu côté serveur avec l'adaptateur Node.js pour des pages dynamiques et performantes.</p>
+      </div>
+      <div class="p-6 bg-gray-light rounded-lg">
+        <h3 class="font-semibold text-primary mb-2">Strapi CMS</h3>
+        <p class="text-sm text-gray-600">Gestion de contenu headless avec API REST, types de contenu personnalisables.</p>
+      </div>
+      <div class="p-6 bg-gray-light rounded-lg">
+        <h3 class="font-semibold text-primary mb-2">Formulaire de contact</h3>
+        <p class="text-sm text-gray-600">Formulaire React avec envoi d'email via Brevo et protection reCAPTCHA.</p>
+      </div>
+      <div class="p-6 bg-gray-light rounded-lg">
+        <h3 class="font-semibold text-primary mb-2">Newsletter</h3>
+        <p class="text-sm text-gray-600">Inscription newsletter dans le footer avec validation reCAPTCHA et Brevo.</p>
+      </div>
+      <div class="p-6 bg-gray-light rounded-lg">
+        <h3 class="font-semibold text-primary mb-2">Cookie Consent</h3>
+        <p class="text-sm text-gray-600">Bannière de consentement RGPD avec catégories (nécessaires, analytiques).</p>
+      </div>
+      <div class="p-6 bg-gray-light rounded-lg">
+        <h3 class="font-semibold text-primary mb-2">Docker</h3>
+        <p class="text-sm text-gray-600">Docker Compose pour le développement local, Dockerfiles multi-stage pour la production.</p>
+      </div>
+    </div>
+  </div>
+</Layout>

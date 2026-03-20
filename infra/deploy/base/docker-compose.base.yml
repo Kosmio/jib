@@ -1,0 +1,78 @@
+# Base Docker Compose configuration for Skeleton Astro + Strapi
+# This file defines all services without environment-specific configuration.
+# Use overlays to customize for local/dev/prod environments.
+
+services:
+  # =============================================================================
+  # DATABASE
+  # =============================================================================
+  postgres:
+    image: postgres:${POSTGRES_VERSION:-15-alpine}
+    platform: linux/amd64
+    container_name: skeleton-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    networks:
+      - net
+
+  # =============================================================================
+  # CMS
+  # =============================================================================
+  strapi:
+    image: ${DOCKER_REGISTRY_REPOSITORY}skeleton-strapi:${SKELETON_VERSION}
+    platform: linux/amd64
+    container_name: skeleton-strapi
+    environment:
+      HOST: 0.0.0.0
+      PORT: 1337
+      BASE_URL: ${STRAPI_BASE_URL}
+      APP_KEYS: ${STRAPI_APP_KEYS}
+      API_TOKEN_SALT: ${STRAPI_API_TOKEN_SALT}
+      ADMIN_JWT_SECRET: ${STRAPI_ADMIN_JWT_SECRET}
+      JWT_SECRET: ${STRAPI_JWT_SECRET}
+      DATABASE_CLIENT: postgres
+      DATABASE_HOST: ${POSTGRES_HOSTNAME}
+      DATABASE_PORT: 5432
+      DATABASE_NAME: ${POSTGRES_DB}
+      DATABASE_USERNAME: ${POSTGRES_USER}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      EMAIL_API_KEY: ${EMAIL_API_KEY:-}
+      EMAIL_LIST_ID: ${EMAIL_LIST_ID:-}
+      EMAIL_CONTACT_TO: ${EMAIL_CONTACT_TO:-}
+      EMAIL_CONTACT_TEMPLATE_ID: ${EMAIL_CONTACT_TEMPLATE_ID:-}
+      RECAPTCHA_PROJECT_ID: ${RECAPTCHA_PROJECT_ID:-}
+      RECAPTCHA_SITE_KEY: ${RECAPTCHA_SITE_KEY:-}
+      RECAPTCHA_API_KEY: ${RECAPTCHA_API_KEY:-}
+    depends_on:
+      - postgres
+    networks:
+      - net
+
+  # =============================================================================
+  # FRONTEND
+  # =============================================================================
+  web:
+    image: ${DOCKER_REGISTRY_REPOSITORY}skeleton-web:${SKELETON_VERSION}
+    platform: linux/amd64
+    container_name: skeleton-web
+    environment:
+      STRAPI_URL: ${STRAPI_INTERNAL_URL}
+      STRAPI_KEY: ${STRAPI_API_KEY}
+      REACT_STRAPI_URL: ${STRAPI_PUBLIC_URL}
+      PUBLIC_MATOMO_URL: ${PUBLIC_MATOMO_URL:-}
+      PUBLIC_MATOMO_SITE_ID: ${PUBLIC_MATOMO_SITE_ID:-}
+      PUBLIC_RECAPTCHA_SITE_KEY: ${RECAPTCHA_SITE_KEY:-}
+    depends_on:
+      - strapi
+    networks:
+      - net
+
+networks:
+  net:
+    name: ${DOCKER_NETWORK}
+    external: true
+
+volumes:
+  postgres-data:

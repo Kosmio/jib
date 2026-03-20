@@ -1,0 +1,38 @@
+---
+export interface Props {
+  image?: string;
+  title: string;
+  text?: string;
+  slug: string;
+}
+
+const { image, title, text, slug } = Astro.props;
+---
+
+<a
+  href={`/articles/${slug}`}
+  class="group flex flex-col bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow max-w-sm w-full"
+>
+  {image ? (
+    <div class="h-48 overflow-hidden">
+      <img
+        src={image}
+        alt={title}
+        class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+      />
+    </div>
+  ) : (
+    <div class="h-48 bg-gray-light flex items-center justify-center">
+      <span class="text-gray-400 text-sm">No image</span>
+    </div>
+  )}
+  <div class="p-5 flex flex-col flex-grow">
+    <h3 class="text-lg font-semibold text-primary mb-2 line-clamp-2">{title}</h3>
+    {text && (
+      <p class="text-sm text-gray-600 line-clamp-3">{text}</p>
+    )}
+    <span class="mt-auto pt-4 text-secondary text-sm font-medium">
+      Lire la suite &rarr;
+    </span>
+  </div>
+</a>

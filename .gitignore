@@ -1,0 +1,35 @@
+.idea
+
+# build output
+dist/
+.output/
+
+# dependencies
+node_modules/
+
+# logs
+*.log
+
+# Environment (root level only)
+/.env
+/.env.local
+/.env.*
+
+# Infrastructure secrets (never commit these)
+infra/deploy/overlays/*/.env.secrets
+infra/deploy/overlays/*/.env.*.merged
+/tmp/.env.*
+
+# Keep infrastructure env files (they contain no secrets, just placeholders)
+# infra/deploy/overlays/*/.env.* files are tracked
+
+# Strapi
+.tmp/
+.cache/
+build/
+
+# Docker postgres volume
+/data
+
+# macOS-specific files
+.DS_Store

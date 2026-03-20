@@ -1,0 +1,32 @@
+# Production environment overlay
+# Uses built Docker images, resource limits, always restart
+
+services:
+  postgres:
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    restart: always
+    ports:
+      - "127.0.0.1:5432:5432"
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  strapi:
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  web:
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+volumes:
+  postgres-data:
+    name: skeleton-postgres-data

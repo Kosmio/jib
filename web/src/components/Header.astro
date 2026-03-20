@@ -1,0 +1,39 @@
+---
+export interface Props {
+  color?: string;
+  textColor?: string;
+}
+
+const { color = "#404F9D", textColor = "text-primary" } = Astro.props;
+---
+
+<header class={`fixed top-0 left-0 right-0 z-50 bg-white shadow-sm`}>
+  <nav class="2xl:container mx-auto flex items-center justify-between px-5 md:px-12 h-16">
+    <a href="/" class={`font-bold text-xl ${textColor}`}>
+      Skeleton
+    </a>
+    <ul class={`hidden md:flex items-center gap-8 text-sm font-medium ${textColor}`}>
+      <li><a href="/" class="hover:opacity-70">Accueil</a></li>
+      <li><a href="/articles" class="hover:opacity-70">Articles</a></li>
+      <li><a href="/contact" class="hover:opacity-70">Contact</a></li>
+    </ul>
+    <button id="mobile-menu-btn" class="md:hidden p-2" aria-label="Menu">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M3 12H21M3 6H21M3 18H21" stroke={color} stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+  </nav>
+  <div id="mobile-menu" class={`hidden md:hidden px-5 pb-4 ${textColor}`}>
+    <ul class="flex flex-col gap-4 text-sm font-medium">
+      <li><a href="/" class="hover:opacity-70">Accueil</a></li>
+      <li><a href="/articles" class="hover:opacity-70">Articles</a></li>
+      <li><a href="/contact" class="hover:opacity-70">Contact</a></li>
+    </ul>
+  </div>
+</header>
+
+<script>
+  document.getElementById('mobile-menu-btn')?.addEventListener('click', () => {
+    document.getElementById('mobile-menu')?.classList.toggle('hidden');
+  });
+</script>

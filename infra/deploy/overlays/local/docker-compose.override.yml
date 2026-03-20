@@ -1,0 +1,19 @@
+# Local development overlay
+# Exposes ports for direct access, uses host volumes
+# Strapi and web run locally via pnpm dev, not in Docker
+
+services:
+  postgres:
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - ~/DockerVolumes/skeleton/postgres:/var/lib/postgresql
+
+  # Disable services meant for remote deployments — run locally via pnpm dev
+  strapi:
+    profiles:
+      - disabled
+
+  web:
+    profiles:
+      - disabled
