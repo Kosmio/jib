@@ -22,4 +22,5 @@ COPY --from=node-build /usr/src/app/pnpm-lock.yaml /usr/share/web/html/pnpm-lock
 RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /usr/share/web/html
 RUN pnpm install --prod --frozen-lockfile
+EXPOSE 80
 CMD ["/bin/sh", "-c", "HOST=0.0.0.0 PORT=80 node dist/server/entry.mjs"]
