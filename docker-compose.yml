@@ -1,0 +1,88 @@
+# =============================================================================
+# Docker Compose — Coolify deployment
+# =============================================================================
+# Deploy this file directly in Coolify as a Docker Compose resource.
+# All environment variables should be set in Coolify's UI.
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # DATABASE
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: jib-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-strapi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in Coolify}
+      POSTGRES_DB: ${POSTGRES_DB:-strapi}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-strapi}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # CMS — Strapi v5
+  # ---------------------------------------------------------------------------
+  strapi:
+    build:
+      context: .
+      dockerfile: infra/docker/strapi/Dockerfile
+    container_name: jib-strapi
+    environment:
+      HOST: 0.0.0.0
+      PORT: 1337
+      NODE_ENV: production
+      BASE_URL: ${STRAPI_BASE_URL:-http://localhost:1337}
+      APP_KEYS: ${STRAPI_APP_KEYS:?Set STRAPI_APP_KEYS in Coolify}
+      API_TOKEN_SALT: ${STRAPI_API_TOKEN_SALT:?Set API_TOKEN_SALT in Coolify}
+      ADMIN_JWT_SECRET: ${STRAPI_ADMIN_JWT_SECRET:?Set ADMIN_JWT_SECRET in Coolify}
+      JWT_SECRET: ${STRAPI_JWT_SECRET:?Set JWT_SECRET in Coolify}
+      TRANSFER_TOKEN_SALT: ${STRAPI_TRANSFER_TOKEN_SALT:-}
+      DATABASE_CLIENT: postgres
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_NAME: ${POSTGRES_DB:-strapi}
+      DATABASE_USERNAME: ${POSTGRES_USER:-strapi}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+      # Email (Brevo)
+      EMAIL_API_KEY: ${EMAIL_API_KEY:-}
+      EMAIL_LIST_ID: ${EMAIL_LIST_ID:-}
+      EMAIL_CONTACT_TO: ${EMAIL_CONTACT_TO:-}
+      EMAIL_CONTACT_TEMPLATE_ID: ${EMAIL_CONTACT_TEMPLATE_ID:-}
+      # Captcha
+      ALTCHA_HMAC_KEY: ${ALTCHA_HMAC_KEY:-}
+    volumes:
+      - strapi-uploads:/app/public/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: always
+
+  # ---------------------------------------------------------------------------
+  # FRONTEND — Astro SSR
+  # ---------------------------------------------------------------------------
+  web:
+    build:
+      context: .
+      dockerfile: infra/docker/website/Dockerfile
+    container_name: jib-web
+    environment:
+      HOST: 0.0.0.0
+      PORT: 80
+      STRAPI_URL: http://strapi:1337
+      REACT_STRAPI_URL: ${STRAPI_PUBLIC_URL:-http://localhost:1337}
+      PUBLIC_MATOMO_URL: ${PUBLIC_MATOMO_URL:-}
+      PUBLIC_MATOMO_SITE_ID: ${PUBLIC_MATOMO_SITE_ID:-}
+      PUBLIC_COOKIE_CONSENT: ${PUBLIC_COOKIE_CONSENT:-false}
+    depends_on:
+      - strapi
+    restart: always
+
+volumes:
+  postgres-data:
+  strapi-uploads:
