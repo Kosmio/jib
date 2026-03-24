@@ -1,30 +1,30 @@
 VERSION = $(shell cat VERSION)
 
-SKELETON_STRAPI_DOCKERFILE	:= infra/docker/strapi/Dockerfile
-SKELETON_STRAPI_NAME		:= skeleton-strapi
-SKELETON_STRAPI_IMG			:= ${SKELETON_STRAPI_NAME}:${VERSION}
+JIB_STRAPI_DOCKERFILE	:= infra/docker/strapi/Dockerfile
+JIB_STRAPI_NAME		:= jib-strapi
+JIB_STRAPI_IMG			:= ${JIB_STRAPI_NAME}:${VERSION}
 
 .PHONY: lint build test stage promote
 
-lint: docker-skeleton-strapi-lint
+lint: docker-jib-strapi-lint
 
-build: docker-skeleton-strapi-build
+build: docker-jib-strapi-build
 
 test:
 	echo 'No Test'
 
-stage: docker-skeleton-strapi-stage
+stage: docker-jib-strapi-stage
 
 promote:
 	echo 'No Promote'
 
-docker-skeleton-strapi-lint:
-	@docker run --rm -i hadolint/hadolint hadolint - < ${SKELETON_STRAPI_DOCKERFILE}
+docker-jib-strapi-lint:
+	@docker run --rm -i hadolint/hadolint hadolint - < ${JIB_STRAPI_DOCKERFILE}
 
-docker-skeleton-strapi-build:
+docker-jib-strapi-build:
 	@docker build --no-cache=true \
-		-f ${SKELETON_STRAPI_DOCKERFILE} -t ${SKELETON_STRAPI_IMG} .
+		-f ${JIB_STRAPI_DOCKERFILE} -t ${JIB_STRAPI_IMG} .
 
-docker-skeleton-strapi-stage:
-	@docker tag ${SKELETON_STRAPI_IMG} ${CI_REGISTRY_URL}/${SKELETON_STRAPI_IMG}
-	@docker push ${CI_REGISTRY_URL}/${SKELETON_STRAPI_IMG}
+docker-jib-strapi-stage:
+	@docker tag ${JIB_STRAPI_IMG} ${CI_REGISTRY_URL}/${JIB_STRAPI_IMG}
+	@docker push ${CI_REGISTRY_URL}/${JIB_STRAPI_IMG}

@@ -1,30 +1,30 @@
 VERSION = $(shell cat VERSION)
 
-SKELETON_WEB_DOCKERFILE	:= infra/docker/website/Dockerfile
-SKELETON_WEB_NAME		:= skeleton-web
-SKELETON_WEB_IMG		:= ${SKELETON_WEB_NAME}:${VERSION}
+JIB_WEB_DOCKERFILE	:= infra/docker/website/Dockerfile
+JIB_WEB_NAME		:= jib-web
+JIB_WEB_IMG		:= ${JIB_WEB_NAME}:${VERSION}
 
 .PHONY: lint build test stage promote
 
-lint: docker-skeleton-web-lint
+lint: docker-jib-web-lint
 
-build: docker-skeleton-web-build
+build: docker-jib-web-build
 
 test:
 	echo 'No Test'
 
-stage: docker-skeleton-web-stage
+stage: docker-jib-web-stage
 
 promote:
 	echo 'No Promote'
 
-docker-skeleton-web-lint:
-	@docker run --rm -i hadolint/hadolint hadolint - < ${SKELETON_WEB_DOCKERFILE}
+docker-jib-web-lint:
+	@docker run --rm -i hadolint/hadolint hadolint - < ${JIB_WEB_DOCKERFILE}
 
-docker-skeleton-web-build:
+docker-jib-web-build:
 	@docker build --no-cache=true \
-		-f ${SKELETON_WEB_DOCKERFILE} -t ${SKELETON_WEB_IMG} .
+		-f ${JIB_WEB_DOCKERFILE} -t ${JIB_WEB_IMG} .
 
-docker-skeleton-web-stage:
-	@docker tag ${SKELETON_WEB_IMG} ${CI_REGISTRY_URL}/${SKELETON_WEB_IMG}
-	@docker push ${CI_REGISTRY_URL}/${SKELETON_WEB_IMG}
+docker-jib-web-stage:
+	@docker tag ${JIB_WEB_IMG} ${CI_REGISTRY_URL}/${JIB_WEB_IMG}
+	@docker push ${CI_REGISTRY_URL}/${JIB_WEB_IMG}

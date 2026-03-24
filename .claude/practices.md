@@ -1,4 +1,4 @@
-# Project Practices — Skeleton Astro + Strapi
+# Project Practices — Journées de l'Innovation Filière Bois
 
 ## Practice docs to read
 

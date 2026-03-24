@@ -1,5 +1,5 @@
 {
-  "name": "@skeleton/web",
+  "name": "@journees-innovation-bois/web",
   "type": "module",
   "version": "0.0.1",
   "private": true,
@@ -20,9 +20,6 @@
     "astro": "^6.0.7",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
-    "react-markdown": "^10.1.0",
-    "rehype-raw": "^7.0.0",
-    "remark-gfm": "^4.0.1",
-    "tailwindcss": "^4.2.2"
+"tailwindcss": "^4.2.2"
   }
 }

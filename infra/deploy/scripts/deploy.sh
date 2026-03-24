@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # =============================================================================
-# Unified Deployment Script for Skeleton Astro + Strapi
+# Unified Deployment Script for Journées Innovation Bois
 # =============================================================================
 # Usage: ./deploy.sh <environment> <action> [options]
 #
@@ -85,7 +85,7 @@ create_network() {
 
   if [[ -z "$network_name" ]]; then
     echo "Warning: DOCKER_NETWORK not set in $ENV_FILE, using default"
-    network_name="skeleton-network"
+    network_name="jib-network"
   fi
 
   if ! docker network inspect "$network_name" &>/dev/null; then
@@ -100,7 +100,7 @@ compose_cmd() {
     -f "$COMPOSE_BASE" \
     -f "$COMPOSE_OVERLAY" \
     --env-file "$ENV_FILE" \
-    --project-name "skeleton-$ENVIRONMENT" \
+    --project-name "jib-$ENVIRONMENT" \
     "$@"
 }
 
@@ -131,7 +131,7 @@ resolve_services() {
 # Show current configuration
 show_info() {
   echo "============================================="
-  echo "Skeleton Astro + Strapi Deployment"
+  echo "Journées Innovation Bois Deployment"
   echo "============================================="
   echo "Environment: $ENVIRONMENT"
   echo "Action: $ACTION"
@@ -215,7 +215,7 @@ case "$ACTION" in
     echo "Press Ctrl+C within 5 seconds to cancel..."
     sleep 5
 
-    PROJECT_NAME="skeleton-$ENVIRONMENT"
+    PROJECT_NAME="jib-$ENVIRONMENT"
 
     RUNNING_CONTAINERS=$(docker ps --filter "label=com.docker.compose.project=$PROJECT_NAME" -q)
     if [[ -n "$RUNNING_CONTAINERS" ]]; then

@@ -23,38 +23,3 @@ export interface Responses<T extends Entity> {
     };
   };
 }
-
-export type Image = Entity & {
-  name: string;
-  alternativeText: string;
-  caption: string;
-  width: number;
-  height: number;
-  formats: {
-    thumbnail: {
-      ext: string;
-      url: string;
-      hash: string;
-      mime: string;
-      name: string;
-      size: number;
-      width: number;
-      height: number;
-    };
-  };
-  hash: string;
-  ext: string;
-  mime: string;
-  size: number;
-  url: string;
-};
-
-export type Article = Entity & {
-  title: string;
-  slug: string;
-  content: string;
-  excerpt: string;
-  published_date: string;
-  publishedAt: string;
-  image: Image | null;
-};

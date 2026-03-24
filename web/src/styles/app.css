@@ -5,14 +5,15 @@ a, button, [type="submit"], [role="button"] {
 }
 
 @theme {
-  --color-primary: #1e40af;
-  --color-primary-light: #3b82f6;
-  --color-primary-dark: #1e3a8a;
-  --color-accent: #f59e0b;
-  --color-accent-dark: #d97706;
-  --color-surface: #f8fafc;
-  --color-surface-alt: #f1f5f9;
-  --color-muted: #64748b;
+  --color-primary: #00B194;
+  --color-primary-light: #33C4AD;
+  --color-primary-dark: #009B81;
+  --color-accent: #BA8748;
+  --color-accent-dark: #A07339;
+  --color-surface: #F3E3CF;
+  --color-surface-alt: #D9CEC0;
+  --color-muted: #5D6C73;
+  --color-text: #1F2D3D;
 
   --font-sans: "Inter", system-ui, sans-serif;
 

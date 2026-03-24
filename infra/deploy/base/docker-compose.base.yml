@@ -1,4 +1,4 @@
-# Base Docker Compose configuration for Skeleton Astro + Strapi
+# Base Docker Compose configuration for Journées de l'Innovation Filière Bois
 # This file defines all services without environment-specific configuration.
 # Use overlays to customize for local/dev/prod environments.
 
@@ -9,7 +9,7 @@ services:
   postgres:
     image: postgres:${POSTGRES_VERSION:-15-alpine}
     platform: linux/amd64
-    container_name: skeleton-postgres
+    container_name: jib-postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -21,9 +21,9 @@ services:
   # CMS
   # =============================================================================
   strapi:
-    image: ${DOCKER_REGISTRY_REPOSITORY}skeleton-strapi:${SKELETON_VERSION}
+    image: ${DOCKER_REGISTRY_REPOSITORY}jib-strapi:${JIB_VERSION}
     platform: linux/amd64
-    container_name: skeleton-strapi
+    container_name: jib-strapi
     environment:
       HOST: 0.0.0.0
       PORT: 1337
@@ -52,9 +52,9 @@ services:
   # FRONTEND
   # =============================================================================
   web:
-    image: ${DOCKER_REGISTRY_REPOSITORY}skeleton-web:${SKELETON_VERSION}
+    image: ${DOCKER_REGISTRY_REPOSITORY}jib-web:${JIB_VERSION}
     platform: linux/amd64
-    container_name: skeleton-web
+    container_name: jib-web
     environment:
       STRAPI_URL: ${STRAPI_INTERNAL_URL}
       REACT_STRAPI_URL: ${STRAPI_PUBLIC_URL}
