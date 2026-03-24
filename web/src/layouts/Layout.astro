@@ -6,9 +6,13 @@ import Footer from "../components/Footer.astro";
 export interface Props {
   title: string;
   description?: string;
+  ogImage?: string;
+  ogType?: string;
 }
 
-const { title, description = "" } = Astro.props;
+const { title, description = "", ogImage, ogType = "website" } = Astro.props;
+const canonicalUrl = new URL(Astro.url.pathname, Astro.site || "https://journees-innovation-bois.fr");
+const ogImageUrl = ogImage || "/assets/logo-xylo.png";
 ---
 
 <!DOCTYPE html>
@@ -28,10 +32,27 @@ const { title, description = "" } = Astro.props;
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Sora:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
     <meta name="generator" content={Astro.generator} />
+    <link rel="canonical" href={canonicalUrl.href} />
+
+    <!-- OpenGraph -->
+    <meta property="og:type" content={ogType} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonicalUrl.href} />
+    <meta property="og:image" content={ogImageUrl} />
+    <meta property="og:locale" content="fr_FR" />
+    <meta property="og:site_name" content="Journées de l'Innovation Filière Bois" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImageUrl} />
+
     <title>{title}</title>
     {import.meta.env.PUBLIC_MATOMO_URL && import.meta.env.PUBLIC_MATOMO_SITE_ID && (
       <script define:vars={{ matomoUrl: import.meta.env.PUBLIC_MATOMO_URL, matomoSiteId: import.meta.env.PUBLIC_MATOMO_SITE_ID }}>

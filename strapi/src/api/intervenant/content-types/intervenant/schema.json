@@ -1,0 +1,49 @@
+{
+  "kind": "collectionType",
+  "collectionName": "intervenants",
+  "info": {
+    "singularName": "intervenant",
+    "pluralName": "intervenants",
+    "displayName": "Intervenant"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "name"
+    },
+    "title": {
+      "type": "string"
+    },
+    "organization": {
+      "type": "string",
+      "required": true
+    },
+    "bio": {
+      "type": "richtext"
+    },
+    "photo": {
+      "type": "media",
+      "multiple": false,
+      "allowedTypes": ["images"]
+    },
+    "topic": {
+      "type": "string"
+    },
+    "linkedin_url": {
+      "type": "string"
+    },
+    "programme_items": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::programme-item.programme-item",
+      "mappedBy": "intervenants"
+    }
+  }
+}

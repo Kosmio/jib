@@ -1,0 +1,77 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Hero from "../components/Hero.astro";
+import { getPartenaires, buildImageUrl } from "../lib/strapi";
+
+let partenaires = { data: [] } as Awaited<ReturnType<typeof getPartenaires>>;
+try {
+  partenaires = await getPartenaires({ is_global: true });
+} catch {}
+
+const categoryLabels: Record<string, string> = {
+  soutien: "Soutien national",
+  coorganisateur: "Co-organisateurs",
+  institutionnel: "Partenaires institutionnels",
+  prive: "Partenaires privés",
+};
+
+const categoryOrder = ["soutien", "coorganisateur", "institutionnel", "prive"];
+
+const grouped = categoryOrder.reduce((acc, cat) => {
+  const items = partenaires?.data?.filter((p) => p.category === cat) || [];
+  if (items.length > 0) acc.push({ category: cat, label: categoryLabels[cat] || cat, items });
+  return acc;
+}, [] as { category: string; label: string; items: typeof partenaires.data }[]);
+---
+
+<Layout title="Nos partenaires — Journées de l'Innovation Filière Bois" description="Découvrez les partenaires des Journées de l'Innovation de la Filière Bois : soutiens nationaux, co-organisateurs et partenaires institutionnels.">
+  <Hero
+    title="Nos partenaires"
+    subtitle="Une dynamique collective pour accompagner l'innovation dans la filière bois."
+    compact
+  />
+
+  <section class="py-16 md:py-24 bg-white">
+    <div class="max-w-6xl mx-auto px-6">
+      {grouped.length > 0 ? (
+        <div class="space-y-16">
+          {grouped.map(({ label, items }) => (
+            <div>
+              <h2 class="text-xl font-bold text-gray-900 mb-8">{label}</h2>
+              <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {items.map((partenaire) => (
+                  <a
+                    href={partenaire.website || "#"}
+                    target={partenaire.website ? "_blank" : undefined}
+                    rel={partenaire.website ? "noopener" : undefined}
+                    class="flex flex-col items-center text-center p-6 rounded-xl bg-surface border border-gray-100 hover:shadow-md transition-shadow group"
+                  >
+                    {partenaire.logo ? (
+                      <img
+                        src={buildImageUrl(partenaire.logo.url)}
+                        alt={partenaire.name}
+                        class="h-16 object-contain mb-4 grayscale group-hover:grayscale-0 transition-all"
+                      />
+                    ) : (
+                      <div class="h-16 flex items-center justify-center mb-4">
+                        <span class="text-lg font-bold text-primary/30">{partenaire.name}</span>
+                      </div>
+                    )}
+                    <h3 class="font-semibold text-gray-900 text-sm">{partenaire.name}</h3>
+                    {partenaire.description && (
+                      <p class="mt-2 text-xs text-muted leading-relaxed">{partenaire.description}</p>
+                    )}
+                  </a>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div class="text-center py-12">
+          <p class="text-muted text-lg">Les partenaires seront bientôt présentés.</p>
+        </div>
+      )}
+    </div>
+  </section>
+</Layout>

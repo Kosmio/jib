@@ -16,14 +16,19 @@ const {
 } = Astro.props;
 ---
 
-<section class={`relative bg-gradient-to-br from-primary-dark via-primary to-primary-light ${compact ? "pt-28 pb-16" : "pt-36 pb-24 md:pt-44 md:pb-32"}`}>
-  <div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PHBhdGggZD0iTTM2IDM0djItSDJ2LTJoMzR6bTAtMzBWMkgyVjBoMzR6TTAgMjZ2LTJoMTh2Mkgwem0wLTEwdi0yaDEydjJIMHoiLz48L2c+PC9nPjwvc3ZnPg==')] opacity-50"></div>
+<section class={`relative bg-wood overflow-hidden ${compact ? "pt-28 pb-14" : "pt-36 pb-24 md:pt-44 md:pb-32"}`}>
+  <!-- Wood texture -->
+  <div class="absolute inset-0 opacity-[0.08]" style="background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIj48ZmlsdGVyIGlkPSJuIj48ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iLjY1IiBudW1PY3RhdmVzPSI0IiBzdGl0Y2hUaWxlcz0ic3RpdGNoIi8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjIwMCIgaGVpZ2h0PSIyMDAiIGZpbHRlcj0idXJsKCNuKSIgb3BhY2l0eT0iMSIvPjwvc3ZnPg==');"></div>
+
+  <!-- Subtle radial glow -->
+  <div class="absolute inset-0" style="background: radial-gradient(circle at 50% 50%, rgba(246,196,83,0.08), transparent 60%);"></div>
+
   <div class="relative max-w-4xl mx-auto px-6 text-center">
-    <h1 class={`font-bold text-white leading-tight ${compact ? "text-3xl md:text-4xl" : "text-4xl md:text-5xl lg:text-6xl"}`}>
+    <h1 class={`font-heading font-semibold text-white leading-tight ${compact ? "text-3xl md:text-4xl" : "text-4xl md:text-5xl lg:text-6xl"}`}>
       {title}
     </h1>
     {subtitle && (
-      <p class={`mt-4 text-blue-100 max-w-2xl mx-auto ${compact ? "text-base" : "text-lg md:text-xl"}`}>
+      <p class={`mt-4 text-white/70 max-w-2xl mx-auto ${compact ? "text-base" : "text-lg md:text-xl"}`}>
         {subtitle}
       </p>
     )}
@@ -31,7 +36,7 @@ const {
       <div class="mt-8">
         <a
           href={ctaLink}
-          class="inline-flex items-center gap-2 px-8 py-3.5 bg-accent hover:bg-accent-dark text-white font-semibold rounded-lg transition-colors shadow-lg shadow-accent/25"
+          class="hero-cta inline-flex items-center gap-2 px-6 py-3 md:px-7 md:py-3.5 bg-gold hover:bg-gold-light text-wood-dark font-semibold rounded-xl transition-all duration-200 shadow-lg shadow-gold/25"
         >
           {ctaText}
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

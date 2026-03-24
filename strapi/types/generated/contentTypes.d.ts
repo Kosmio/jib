@@ -430,33 +430,194 @@ export interface AdminUser extends Struct.CollectionTypeSchema {
   };
 }
 
-export interface ApiArticleArticle extends Struct.CollectionTypeSchema {
-  collectionName: 'articles';
+export interface ApiEditionEdition extends Struct.CollectionTypeSchema {
+  collectionName: 'editions';
   info: {
-    description: '';
-    displayName: 'Article';
-    pluralName: 'articles';
-    singularName: 'article';
+    displayName: 'Edition';
+    pluralName: 'editions';
+    singularName: 'edition';
   };
   options: {
     draftAndPublish: true;
   };
   attributes: {
-    content: Schema.Attribute.RichText;
+    city: Schema.Attribute.String & Schema.Attribute.Required;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
-    excerpt: Schema.Attribute.Text;
+    date: Schema.Attribute.Date & Schema.Attribute.Required;
+    description: Schema.Attribute.RichText;
+    gallery: Schema.Attribute.Media<'images', true>;
     image: Schema.Attribute.Media<'images'>;
+    inscription_url: Schema.Attribute.String;
+    lieux: Schema.Attribute.Component<'edition.lieu', true>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
-      'api::article.article'
+      'api::edition.edition'
     > &
       Schema.Attribute.Private;
-    published_date: Schema.Attribute.Date;
+    partenaires: Schema.Attribute.Relation<
+      'manyToMany',
+      'api::partenaire.partenaire'
+    >;
+    programme_items: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::programme-item.programme-item'
+    >;
     publishedAt: Schema.Attribute.DateTime;
+    region: Schema.Attribute.Enumeration<
+      [
+        'normandie',
+        'region-sud',
+        'nouvelle-aquitaine',
+        'auvergne-rhone-alpes',
+        'ile-de-france',
+        'bretagne',
+        'occitanie',
+        'grand-est',
+        'hauts-de-france',
+        'pays-de-la-loire',
+        'bourgogne-franche-comte',
+        'centre-val-de-loire',
+        'corse',
+      ]
+    > &
+      Schema.Attribute.Required;
     slug: Schema.Attribute.UID<'title'>;
+    status: Schema.Attribute.Enumeration<['upcoming', 'open', 'full', 'past']> &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'upcoming'>;
+    summary: Schema.Attribute.RichText;
+    testimonials: Schema.Attribute.RichText;
+    title: Schema.Attribute.String & Schema.Attribute.Required;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    video_urls: Schema.Attribute.Text;
+    year: Schema.Attribute.Integer & Schema.Attribute.Required;
+  };
+}
+
+export interface ApiIntervenantIntervenant extends Struct.CollectionTypeSchema {
+  collectionName: 'intervenants';
+  info: {
+    displayName: 'Intervenant';
+    pluralName: 'intervenants';
+    singularName: 'intervenant';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  attributes: {
+    bio: Schema.Attribute.RichText;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    linkedin_url: Schema.Attribute.String;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::intervenant.intervenant'
+    > &
+      Schema.Attribute.Private;
+    name: Schema.Attribute.String & Schema.Attribute.Required;
+    organization: Schema.Attribute.String & Schema.Attribute.Required;
+    photo: Schema.Attribute.Media<'images'>;
+    programme_items: Schema.Attribute.Relation<
+      'manyToMany',
+      'api::programme-item.programme-item'
+    >;
+    publishedAt: Schema.Attribute.DateTime;
+    slug: Schema.Attribute.UID<'name'>;
+    title: Schema.Attribute.String;
+    topic: Schema.Attribute.String;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiPartenairePartenaire extends Struct.CollectionTypeSchema {
+  collectionName: 'partenaires';
+  info: {
+    displayName: 'Partenaire';
+    pluralName: 'partenaires';
+    singularName: 'partenaire';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  attributes: {
+    category: Schema.Attribute.Enumeration<
+      ['soutien', 'coorganisateur', 'institutionnel', 'prive']
+    > &
+      Schema.Attribute.Required;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    description: Schema.Attribute.Text;
+    editions: Schema.Attribute.Relation<'manyToMany', 'api::edition.edition'>;
+    is_global: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::partenaire.partenaire'
+    > &
+      Schema.Attribute.Private;
+    logo: Schema.Attribute.Media<'images'>;
+    name: Schema.Attribute.String & Schema.Attribute.Required;
+    publishedAt: Schema.Attribute.DateTime;
+    slug: Schema.Attribute.UID<'name'>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    website: Schema.Attribute.String;
+  };
+}
+
+export interface ApiProgrammeItemProgrammeItem
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'programme_items';
+  info: {
+    displayName: 'Programme Item';
+    pluralName: 'programme-items';
+    singularName: 'programme-item';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  attributes: {
+    category: Schema.Attribute.Enumeration<
+      [
+        'introduction',
+        'finance',
+        'recherche',
+        'temoignages',
+        'actions',
+        'pause',
+        'cloture',
+      ]
+    >;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    description: Schema.Attribute.RichText;
+    edition: Schema.Attribute.Relation<'manyToOne', 'api::edition.edition'>;
+    end_time: Schema.Attribute.String & Schema.Attribute.Required;
+    intervenants: Schema.Attribute.Relation<
+      'manyToMany',
+      'api::intervenant.intervenant'
+    >;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::programme-item.programme-item'
+    > &
+      Schema.Attribute.Private;
+    order: Schema.Attribute.Integer;
+    publishedAt: Schema.Attribute.DateTime;
+    start_time: Schema.Attribute.String & Schema.Attribute.Required;
     title: Schema.Attribute.String & Schema.Attribute.Required;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -975,7 +1136,10 @@ declare module '@strapi/strapi' {
       'admin::transfer-token': AdminTransferToken;
       'admin::transfer-token-permission': AdminTransferTokenPermission;
       'admin::user': AdminUser;
-      'api::article.article': ApiArticleArticle;
+      'api::edition.edition': ApiEditionEdition;
+      'api::intervenant.intervenant': ApiIntervenantIntervenant;
+      'api::partenaire.partenaire': ApiPartenairePartenaire;
+      'api::programme-item.programme-item': ApiProgrammeItemProgrammeItem;
       'plugin::content-releases.release': PluginContentReleasesRelease;
       'plugin::content-releases.release-action': PluginContentReleasesReleaseAction;
       'plugin::i18n.locale': PluginI18NLocale;

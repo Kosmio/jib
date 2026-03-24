@@ -28,6 +28,10 @@ infra/deploy/overlays/*/.env.*.merged
 .tmp/
 .cache/
 build/
+strapi/public/uploads/
+
+# Spec/reference files (not source code)
+spec/mail-html/
 
 # Docker postgres volume
 /data

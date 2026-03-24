@@ -1,0 +1,154 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import Hero from "../../components/Hero.astro";
+import { getEditions, buildImageUrl } from "../../lib/strapi";
+import { regionLabels } from "../../lib/types";
+
+let editions = { data: [] } as Awaited<ReturnType<typeof getEditions>>;
+try {
+  editions = await getEditions();
+} catch {}
+
+const statusLabels: Record<string, string> = {
+  upcoming: "À venir",
+  open: "Inscriptions ouvertes",
+  full: "Complet",
+  past: "Passée",
+};
+
+const statusColors: Record<string, string> = {
+  upcoming: "bg-gray-100 text-gray-700",
+  open: "bg-primary/10 text-primary-dark",
+  full: "bg-accent/10 text-accent-dark",
+  past: "bg-surface-alt text-muted",
+};
+
+// Region enum slug → display label + map coordinates (viewBox 630x651)
+const regionData: Record<string, { label: string; x: number; y: number }> = {
+  "normandie": { label: "Normandie", x: 200, y: 140 },
+  "region-sud": { label: "Région Sud", x: 385, y: 430 },
+  "nouvelle-aquitaine": { label: "Nouvelle-Aquitaine", x: 185, y: 370 },
+  "auvergne-rhone-alpes": { label: "Auvergne-Rhône-Alpes", x: 370, y: 320 },
+  "ile-de-france": { label: "Île-de-France", x: 280, y: 175 },
+  "bretagne": { label: "Bretagne", x: 60, y: 180 },
+  "occitanie": { label: "Occitanie", x: 270, y: 470 },
+  "grand-est": { label: "Grand Est", x: 400, y: 150 },
+  "hauts-de-france": { label: "Hauts-de-France", x: 295, y: 75 },
+  "pays-de-la-loire": { label: "Pays de la Loire", x: 140, y: 260 },
+  "bourgogne-franche-comte": { label: "Bourgogne-Franche-Comté", x: 380, y: 250 },
+  "centre-val-de-loire": { label: "Centre-Val de Loire", x: 240, y: 270 },
+  "corse": { label: "Corse", x: 530, y: 510 },
+};
+
+const editionsWithCoords = editions?.data?.map((edition) => {
+  const rd = regionData[edition.region];
+  return {
+    ...edition,
+    regionLabel: rd?.label || edition.region,
+    coords: rd ? { x: rd.x, y: rd.y } : null,
+    isOpen: edition.status === 'open',
+    isPast: edition.status === 'past',
+    color: edition.status === 'open' ? '#F6C453' : edition.status === 'past' ? '#BA8748' : '#00B194',
+    statusText: edition.status === 'open'
+      ? 'Inscriptions ouvertes'
+      : edition.status === 'past'
+        ? 'Passée'
+        : new Date(edition.date).toLocaleDateString("fr-FR", { month: "long", year: "numeric" }),
+  };
+}).filter((e) => e.coords) || [];
+---
+
+<Layout title="Les éditions — Journées de l'Innovation Filière Bois" description="Retrouvez toutes les éditions des Journées de l'Innovation de la Filière Bois, par région et par année.">
+  <Hero
+    title="Les éditions"
+    subtitle="Retrouvez toutes les Journées de l'Innovation, passées et à venir, région par région."
+    compact
+  />
+
+  <!-- Carte interactive France -->
+  {editions?.data?.length > 0 && (
+    <section class="py-12 md:py-16 bg-surface">
+      <div class="max-w-5xl mx-auto px-6">
+        <h2 class="text-xl md:text-2xl font-bold text-gray-900 text-center mb-8">La tournée en France</h2>
+        <div class="relative max-w-lg mx-auto">
+          <!-- France map with real region outlines -->
+          <div class="relative">
+            <img src="/assets/france-regions.svg" alt="Carte de France" class="w-full h-auto" />
+            <!-- Marker overlay (same viewBox 630x651) -->
+            <svg viewBox="0 0 630 651" class="absolute inset-0 w-full h-full" xmlns="http://www.w3.org/2000/svg">
+              {editionsWithCoords.map((ed) => (
+                <a href={`/editions/${ed.slug}`} class="group">
+                  {ed.isOpen && (
+                    <circle cx={ed.coords!.x} cy={ed.coords!.y} r="22" fill="none" stroke={ed.color} stroke-width="2.5" opacity="0.4">
+                      <animate attributeName="r" values="16;26;16" dur="2s" repeatCount="indefinite" />
+                      <animate attributeName="opacity" values="0.5;0.1;0.5" dur="2s" repeatCount="indefinite" />
+                    </circle>
+                  )}
+                  <circle cx={ed.coords!.x} cy={ed.coords!.y} r="14" fill={ed.color} opacity="0.9" class="cursor-pointer" />
+                  <circle cx={ed.coords!.x} cy={ed.coords!.y} r="6" fill="white" opacity="0.9" />
+                  <text x={ed.coords!.x} y={ed.coords!.y + 30} text-anchor="middle" fill="#1F2D3D" font-size="13" font-weight="600" font-family="Sora, sans-serif">
+                    {ed.regionLabel}
+                  </text>
+                  <text x={ed.coords!.x} y={ed.coords!.y + 46} text-anchor="middle" fill="#5D6C73" font-size="10" font-family="Inter, sans-serif">
+                    {ed.statusText}
+                  </text>
+                </a>
+              ))}
+            </svg>
+          </div>
+        </div>
+      </div>
+    </section>
+  )}
+
+  <!-- Liste des éditions -->
+  <section class="py-16 md:py-24 bg-white">
+    <div class="max-w-6xl mx-auto px-6">
+      {editions?.data?.length > 0 ? (
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
+          {editions.data.map((edition) => (
+            <a href={`/editions/${edition.slug}`} class="group block rounded-xl border border-gray-100 overflow-hidden hover:shadow-lg transition-shadow">
+              {edition.image ? (
+                <div class="aspect-video bg-surface overflow-hidden">
+                  <img
+                    src={buildImageUrl(edition.image.url)}
+                    alt={edition.title}
+                    class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                </div>
+              ) : (
+                <div class="aspect-video bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center">
+                  <span class="text-4xl font-bold text-primary/20">{regionLabels[edition.region] || edition.region}</span>
+                </div>
+              )}
+              <div class="p-5">
+                <div class="flex items-center gap-2 mb-3">
+                  <span class={`text-xs font-medium px-2.5 py-1 rounded-full ${statusColors[edition.status] || statusColors.upcoming}`}>
+                    {statusLabels[edition.status] || edition.status}
+                  </span>
+                  <span class="text-xs text-muted">{edition.year}</span>
+                </div>
+                <h3 class="font-semibold text-gray-900 text-lg group-hover:text-primary transition-colors">
+                  {edition.title}
+                </h3>
+                <p class="mt-1 text-sm text-muted">
+                  {new Date(edition.date).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })} — {edition.city}
+                </p>
+                {edition.lieux?.length > 0 && (
+                  <p class="mt-1 text-xs text-muted">
+                    {edition.lieux.map((l) => l.name).join(" & ")}
+                  </p>
+                )}
+              </div>
+            </a>
+          ))}
+        </div>
+      ) : (
+        <div class="text-center py-12">
+          <p class="text-muted text-lg">Les éditions seront bientôt annoncées.</p>
+          <p class="mt-2 text-sm text-muted">Inscrivez-vous à la newsletter pour être informé.</p>
+        </div>
+      )}
+    </div>
+  </section>
+</Layout>

@@ -1,0 +1,48 @@
+{
+  "kind": "collectionType",
+  "collectionName": "programme_items",
+  "info": {
+    "singularName": "programme-item",
+    "pluralName": "programme-items",
+    "displayName": "Programme Item"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "attributes": {
+    "title": {
+      "type": "string",
+      "required": true
+    },
+    "start_time": {
+      "type": "string",
+      "required": true
+    },
+    "end_time": {
+      "type": "string",
+      "required": true
+    },
+    "description": {
+      "type": "richtext"
+    },
+    "category": {
+      "type": "enumeration",
+      "enum": ["introduction", "finance", "recherche", "temoignages", "actions", "pause", "cloture"]
+    },
+    "order": {
+      "type": "integer"
+    },
+    "edition": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::edition.edition",
+      "inversedBy": "programme_items"
+    },
+    "intervenants": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::intervenant.intervenant",
+      "inversedBy": "programme_items"
+    }
+  }
+}

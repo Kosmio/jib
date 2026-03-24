@@ -1,0 +1,26 @@
+{
+  "collectionName": "components_edition_lieux",
+  "info": {
+    "displayName": "Lieu",
+    "icon": "pin-map"
+  },
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "address": {
+      "type": "text",
+      "required": true
+    },
+    "description": {
+      "type": "text"
+    },
+    "map_url": {
+      "type": "string"
+    },
+    "time_slot": {
+      "type": "string"
+    }
+  }
+}

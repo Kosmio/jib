@@ -1,3 +1,5 @@
+import type { Edition, Intervenant, Partenaire, ProgrammeItem, Responses } from "./types";
+
 export const buildImageUrl = (baseUrl: string) =>
   `${import.meta.env.REACT_STRAPI_URL}${baseUrl}`;
 
@@ -12,3 +14,53 @@ const clientFetch = (url: string, targetUrl: string) =>
 
 export const clientBuildImageUrl = (url: string, baseUrl: string) =>
   `${url}${baseUrl}`;
+
+// --- Editions ---
+
+export const getEditions = (params?: {
+  status?: string;
+  year?: number;
+}): Promise<Responses<Edition>> => {
+  const query = new URLSearchParams();
+  query.set("populate[0]", "image");
+  query.set("populate[1]", "lieux");
+  query.set("populate[2]", "partenaires.logo");
+  query.set("sort", "date:asc");
+  if (params?.status) query.set("filters[status][$eq]", params.status);
+  if (params?.year) query.set("filters[year][$eq]", String(params.year));
+  return strapiFetch(`/editions?${query.toString()}`);
+};
+
+export const getEditionBySlug = (
+  slug: string
+): Promise<Responses<Edition>> =>
+  strapiFetch(
+    `/editions?filters[slug][$eq]=${slug}&populate[0]=image&populate[1]=lieux&populate[2]=programme_items.intervenants.photo&populate[3]=partenaires.logo&populate[4]=gallery`
+  );
+
+// --- Intervenants ---
+
+export const getIntervenants = (): Promise<Responses<Intervenant>> =>
+  strapiFetch("/intervenants?populate[0]=photo&sort=name:asc");
+
+// --- Partenaires ---
+
+export const getPartenaires = (params?: {
+  is_global?: boolean;
+}): Promise<Responses<Partenaire>> => {
+  const query = new URLSearchParams();
+  query.set("populate[0]", "logo");
+  query.set("sort", "name:asc");
+  if (params?.is_global !== undefined)
+    query.set("filters[is_global][$eq]", String(params.is_global));
+  return strapiFetch(`/partenaires?${query.toString()}`);
+};
+
+// --- Programme Items ---
+
+export const getProgrammeItems = (
+  editionDocumentId: string
+): Promise<Responses<ProgrammeItem>> =>
+  strapiFetch(
+    `/programme-items?filters[edition][documentId][$eq]=${editionDocumentId}&populate[0]=intervenants.photo&sort=order:asc`
+  );

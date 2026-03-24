@@ -6,16 +6,73 @@ import ContactForm from "../react-components/ContactForm";
 const strapiUrl = import.meta.env.REACT_STRAPI_URL || import.meta.env.STRAPI_URL || "";
 ---
 
-<Layout title="Contact" description="Contactez-nous pour toute question ou projet">
+<Layout title="Contact — Journées de l'Innovation Filière Bois" description="Contactez l'équipe Xylofutur pour toute question sur les Journées de l'Innovation de la Filière Bois.">
   <Hero
     title="Contactez-nous"
-    subtitle="Une question, une idée de projet ? Nous serions ravis d'échanger avec vous."
+    subtitle="Une question, un projet, envie de participer ? L'équipe Xylofutur est à votre écoute."
     compact
   />
 
   <section class="py-16 md:py-24 bg-white">
-    <div class="max-w-2xl mx-auto px-6">
-      <ContactForm client:visible strapiUrl={strapiUrl} />
+    <div class="max-w-5xl mx-auto px-6">
+      <div class="grid md:grid-cols-5 gap-12">
+        <!-- Formulaire -->
+        <div class="md:col-span-3">
+          <h2 class="text-xl font-bold text-gray-900 mb-6">Envoyez-nous un message</h2>
+          <ContactForm client:visible strapiUrl={strapiUrl} />
+        </div>
+
+        <!-- Sidebar -->
+        <div class="md:col-span-2 space-y-8">
+          <!-- RDV -->
+          <div class="bg-surface rounded-xl p-6 border border-gray-100">
+            <h3 class="font-semibold text-gray-900 mb-3">Prendre rendez-vous</h3>
+            <p class="text-sm text-muted mb-4">
+              Réservez un créneau directement avec l'équipe Xylofutur.
+            </p>
+            <a
+              href="https://outlook.office.com/book/RDVXylofutur@xylofutur.fr/"
+              target="_blank"
+              rel="noopener"
+              class="inline-flex items-center gap-2 px-5 py-2.5 bg-primary hover:bg-primary-dark text-white font-medium text-sm rounded-lg transition-colors"
+            >
+              Réserver un RDV
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+              </svg>
+            </a>
+          </div>
+
+          <!-- Contacts directs -->
+          <div class="bg-surface rounded-xl p-6 border border-gray-100">
+            <h3 class="font-semibold text-gray-900 mb-4">Contacts directs</h3>
+            <div class="space-y-4">
+              {[
+                { name: "Charlotte Perrier", role: "Directrice du pôle", email: "charlotte.perrier@xylofutur.fr", phone: "06 51 26 80 20" },
+                { name: "Apolline Oswald", role: "Responsable Équipe Projet", email: "apolline.oswald@xylofutur.fr", phone: "06 41 33 27 22" },
+                { name: "Damien Alonso", role: "Chargé de communication", email: "damien.alonso@xylofutur.fr", phone: "06 02 46 24 90" },
+              ].map((contact) => (
+                <div class="text-sm">
+                  <p class="font-medium text-gray-900">{contact.name}</p>
+                  <p class="text-xs text-muted">{contact.role}</p>
+                  <a href={`mailto:${contact.email}`} class="text-xs text-primary hover:text-primary-dark transition-colors">{contact.email}</a>
+                  <p class="text-xs text-muted">{contact.phone}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <!-- Lien site -->
+          <div class="text-sm text-muted">
+            <a href="https://xylofutur.fr" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-primary hover:text-primary-dark transition-colors font-medium">
+              xylofutur.fr
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+              </svg>
+            </a>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 </Layout>

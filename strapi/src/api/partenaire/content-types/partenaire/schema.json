@@ -1,0 +1,48 @@
+{
+  "kind": "collectionType",
+  "collectionName": "partenaires",
+  "info": {
+    "singularName": "partenaire",
+    "pluralName": "partenaires",
+    "displayName": "Partenaire"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "name"
+    },
+    "logo": {
+      "type": "media",
+      "multiple": false,
+      "allowedTypes": ["images"]
+    },
+    "description": {
+      "type": "text"
+    },
+    "website": {
+      "type": "string"
+    },
+    "category": {
+      "type": "enumeration",
+      "enum": ["soutien", "coorganisateur", "institutionnel", "prive"],
+      "required": true
+    },
+    "is_global": {
+      "type": "boolean",
+      "default": false
+    },
+    "editions": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::edition.edition",
+      "mappedBy": "partenaires"
+    }
+  }
+}

@@ -1,42 +1,254 @@
 ---
 import Layout from "../layouts/Layout.astro";
+import { getEditions, buildImageUrl } from "../lib/strapi";
+import { regionLabels } from "../lib/types";
+
+let editions = { data: [] } as Awaited<ReturnType<typeof getEditions>>;
+try {
+  editions = await getEditions();
+} catch {}
+const nextEdition = editions?.data?.find((e) => e.status === "open" || e.status === "upcoming");
+
+const statusLabels: Record<string, string> = {
+  upcoming: "À venir",
+  open: "Inscriptions ouvertes",
+  full: "Complet",
+  past: "Passée",
+};
+
+const statusColors: Record<string, string> = {
+  upcoming: "bg-white/20 text-white",
+  open: "bg-accent text-white",
+  full: "bg-white/20 text-white",
+  past: "bg-white/10 text-white/70",
+};
 ---
 
 <Layout title="Journées de l'Innovation Filière Bois" description="Site des Journées de l'Innovation de la Filière Bois — événements régionaux portés par Xylofutur et les Fibois">
   <!-- Hero -->
-  <section class="relative bg-gradient-to-br from-primary-dark via-primary to-primary-light pt-36 pb-24 md:pt-44 md:pb-32 overflow-hidden">
-    <div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PHBhdGggZD0iTTM2IDM0djItSDJ2LTJoMzR6bTAtMzBWMkgyVjBoMzR6TTAgMjZ2LTJoMTh2Mkgwem0wLTEwdi0yaDEydjJIMHoiLz48L2c+PC9nPjwvc3ZnPg==')] opacity-50"></div>
-    <div class="relative max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center gap-10 md:gap-16">
-      <div class="flex-1 text-center md:text-left">
-        <h1 class="text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight">
-          Les Journées de l'Innovation de la Filière Bois
-        </h1>
-        <p class="mt-4 text-lg md:text-xl text-emerald-100 max-w-xl">
-          Innover n'est plus une option — rejoignez le mouvement. Des événements régionaux pour connecter, structurer et valoriser l'innovation.
-        </p>
-        <div class="mt-8">
-          <a
-            href="/contact"
-            class="inline-flex items-center gap-2 px-8 py-3.5 bg-accent hover:bg-accent-dark text-white font-semibold rounded-lg transition-colors shadow-lg shadow-accent/25"
-          >
-            Nous contacter
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
-            </svg>
-          </a>
+  <section class="relative min-h-[80vh] bg-wood overflow-hidden flex items-center">
+    <!-- Wood texture overlay -->
+    <div class="absolute inset-0 opacity-[0.08]" style="background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIj48ZmlsdGVyIGlkPSJuIj48ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iLjY1IiBudW1PY3RhdmVzPSI0IiBzdGl0Y2hUaWxlcz0ic3RpdGNoIi8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjIwMCIgaGVpZ2h0PSIyMDAiIGZpbHRlcj0idXJsKCNuKSIgb3BhY2l0eT0iMSIvPjwvc3ZnPg==');"></div>
+
+    <!-- Network nodes SVG — France map shape (shifted right) -->
+    <div class="absolute inset-0 overflow-hidden">
+      <svg class="hero-network absolute inset-0 w-full h-full" viewBox="0 0 1280 720" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+        <!-- France outline (border connections) — offset +300px right -->
+        <g stroke="#F6C453" stroke-width="1.2" opacity="0.20">
+          <line x1="940" y1="105" x2="900" y2="85" class="hero-line hero-line-1" />
+          <line x1="900" y1="85" x2="860" y2="185" class="hero-line hero-line-2" />
+          <line x1="860" y1="185" x2="670" y2="225" class="hero-line hero-line-3" />
+          <line x1="670" y1="225" x2="740" y2="265" class="hero-line hero-line-4" />
+          <line x1="740" y1="265" x2="730" y2="340" class="hero-line hero-line-5" />
+          <line x1="730" y1="340" x2="750" y2="470" class="hero-line hero-line-6" />
+          <line x1="750" y1="470" x2="735" y2="545" class="hero-line hero-line-7" />
+          <line x1="735" y1="545" x2="855" y2="555" class="hero-line hero-line-8" />
+          <line x1="855" y1="555" x2="900" y2="600" class="hero-line hero-line-9" />
+          <line x1="900" y1="600" x2="960" y2="570" class="hero-line hero-line-10" />
+          <line x1="960" y1="570" x2="1030" y2="565" class="hero-line hero-line-11" />
+          <line x1="1030" y1="565" x2="1120" y2="520" class="hero-line hero-line-1" />
+          <line x1="1120" y1="520" x2="1060" y2="435" class="hero-line hero-line-2" />
+          <line x1="1060" y1="435" x2="1030" y2="300" class="hero-line hero-line-3" />
+          <line x1="1030" y1="300" x2="1135" y2="200" class="hero-line hero-line-4" />
+          <line x1="1135" y1="200" x2="1080" y2="160" class="hero-line hero-line-5" />
+          <line x1="1080" y1="160" x2="940" y2="105" class="hero-line hero-line-6" />
+        </g>
+        <!-- Interior network connections -->
+        <g stroke="#F6C453" stroke-width="0.8" opacity="0.14">
+          <line x1="930" y1="220" x2="860" y2="185" class="hero-line hero-line-7" />
+          <line x1="930" y1="220" x2="940" y2="105" class="hero-line hero-line-8" />
+          <line x1="930" y1="220" x2="820" y2="310" class="hero-line hero-line-9" />
+          <line x1="930" y1="220" x2="1030" y2="300" class="hero-line hero-line-10" />
+          <line x1="930" y1="220" x2="925" y2="405" class="hero-line hero-line-11" />
+          <line x1="1010" y1="395" x2="1030" y2="300" class="hero-line hero-line-1" />
+          <line x1="1010" y1="395" x2="925" y2="405" class="hero-line hero-line-2" />
+          <line x1="1010" y1="395" x2="1060" y2="435" class="hero-line hero-line-3" />
+          <line x1="1010" y1="395" x2="1030" y2="565" class="hero-line hero-line-4" />
+          <line x1="740" y1="265" x2="820" y2="310" class="hero-line hero-line-5" />
+          <line x1="820" y1="310" x2="840" y2="405" class="hero-line hero-line-6" />
+          <line x1="840" y1="405" x2="925" y2="405" class="hero-line hero-line-7" />
+          <line x1="840" y1="405" x2="750" y2="470" class="hero-line hero-line-8" />
+          <line x1="925" y1="405" x2="855" y2="555" class="hero-line hero-line-9" />
+          <line x1="730" y1="340" x2="820" y2="310" class="hero-line hero-line-10" />
+          <line x1="1135" y1="200" x2="1030" y2="300" class="hero-line hero-line-11" />
+          <line x1="960" y1="570" x2="855" y2="555" class="hero-line hero-line-1" />
+        </g>
+        <!-- City nodes — outline -->
+        <g>
+          <circle cx="940" cy="105" r="5" fill="#F6C453" opacity="0.4" class="hero-node hero-node-1" />
+          <circle cx="900" cy="85" r="4" fill="#F6C453" opacity="0.3" class="hero-node hero-node-2" />
+          <circle cx="860" cy="185" r="5" fill="#F6C453" opacity="0.35" class="hero-node hero-node-3" />
+          <circle cx="670" cy="225" r="4" fill="#F6C453" opacity="0.3" class="hero-node hero-node-4" />
+          <circle cx="740" cy="265" r="4" fill="#F6C453" opacity="0.3" class="hero-node hero-node-5" />
+          <circle cx="730" cy="340" r="5" fill="#F6C453" opacity="0.35" class="hero-node hero-node-6" />
+          <circle cx="750" cy="470" r="5" fill="#F6C453" opacity="0.35" class="hero-node hero-node-7" />
+          <circle cx="735" cy="545" r="4" fill="#F6C453" opacity="0.3" class="hero-node hero-node-8" />
+          <circle cx="855" cy="555" r="5" fill="#F6C453" opacity="0.35" class="hero-node hero-node-1" />
+          <circle cx="900" cy="600" r="4" fill="#F6C453" opacity="0.3" class="hero-node hero-node-2" />
+          <circle cx="960" cy="570" r="4" fill="#F6C453" opacity="0.3" class="hero-node hero-node-3" />
+          <circle cx="1030" cy="565" r="5" fill="#F6C453" opacity="0.35" class="hero-node hero-node-4" />
+          <circle cx="1120" cy="520" r="4" fill="#F6C453" opacity="0.3" class="hero-node hero-node-5" />
+          <circle cx="1060" cy="435" r="4" fill="#F6C453" opacity="0.3" class="hero-node hero-node-6" />
+          <circle cx="1030" cy="300" r="5" fill="#F6C453" opacity="0.35" class="hero-node hero-node-7" />
+          <circle cx="1135" cy="200" r="5" fill="#F6C453" opacity="0.35" class="hero-node hero-node-8" />
+          <circle cx="1080" cy="160" r="4" fill="#F6C453" opacity="0.3" class="hero-node hero-node-1" />
+        </g>
+        <!-- City nodes — interior hubs -->
+        <g>
+          <circle cx="930" cy="220" r="8" fill="#F6C453" opacity="0.5" class="hero-node hero-node-2" />
+          <circle cx="1010" cy="395" r="7" fill="#F6C453" opacity="0.45" class="hero-node hero-node-3" />
+          <circle cx="820" cy="310" r="5" fill="#F6C453" opacity="0.35" class="hero-node hero-node-4" />
+          <circle cx="840" cy="405" r="5" fill="#F6C453" opacity="0.35" class="hero-node hero-node-5" />
+          <circle cx="925" cy="405" r="6" fill="#F6C453" opacity="0.4" class="hero-node hero-node-6" />
+        </g>
+      </svg>
+    </div>
+
+    <!-- Radial gradient overlay -->
+    <div class="absolute inset-0" style="background: radial-gradient(circle at 60% 50%, rgba(246,196,83,0.12), transparent 50%);"></div>
+
+    <!-- Content -->
+    <div class="relative w-full max-w-[1280px] mx-auto px-6 md:px-16 pt-28 pb-16 md:pt-32 md:pb-20">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
+
+        <!-- Left: editorial content (cols 1-7) -->
+        <div class="lg:col-span-7 text-center lg:text-left">
+          <!-- Badge -->
+          <span class="inline-block bg-gold text-wood-dark text-xs font-semibold uppercase tracking-wider px-4 py-1.5 rounded-full mb-6">
+            Programme {nextEdition?.year || new Date().getFullYear()}
+          </span>
+
+          <!-- Title -->
+          <h1 class="font-heading text-4xl md:text-5xl lg:text-[3.75rem] font-semibold text-white leading-[1.05] tracking-[0.02em]">
+            La Journée de l'<span class="text-gold">Innovation</span> de la Filière Bois
+          </h1>
+
+          <!-- Subtitle -->
+          <p class="mt-6 text-lg md:text-xl text-white/80 max-w-[520px] mx-auto lg:mx-0 leading-relaxed">
+            Une dynamique collective pour connecter les acteurs, structurer des projets et accélérer les innovations de la filière bois.
+          </p>
+
+          <!-- Date/Lieu card -->
+          {nextEdition && (
+            <div class="mt-8 inline-flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 border border-white/20 rounded-xl px-5 py-4 sm:px-6 backdrop-blur-sm bg-white/5">
+              <div class="flex items-center gap-3 text-white">
+                <svg class="w-5 h-5 text-gold shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+                <span class="text-base md:text-xl font-medium">
+                  {regionLabels[nextEdition.region] || nextEdition.region}
+                </span>
+              </div>
+              <div class="hidden sm:block w-px h-8 bg-white/20"></div>
+              <div class="sm:hidden w-full h-px bg-white/15"></div>
+              <div class="flex items-center gap-3 text-white">
+                <svg class="w-5 h-5 text-gold shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+                <span class="text-base md:text-xl font-medium capitalize">
+                  {new Date(nextEdition.date).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+                </span>
+              </div>
+            </div>
+          )}
+
+          <!-- CTAs -->
+          <div class="mt-8 flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+            {nextEdition?.inscription_url && nextEdition.status === "open" ? (
+              <a
+                href={nextEdition.inscription_url}
+                target="_blank"
+                rel="noopener"
+                class="hero-cta inline-flex items-center justify-center gap-2 px-6 py-3 md:px-7 md:py-4 bg-gold hover:bg-gold-light text-wood-dark font-semibold text-base md:text-lg rounded-xl transition-all duration-200 shadow-lg shadow-gold/25"
+              >
+                S'inscrire à la journée
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
+                </svg>
+              </a>
+            ) : (
+              <a
+                href="/editions"
+                class="hero-cta inline-flex items-center justify-center gap-2 px-6 py-3 md:px-7 md:py-4 bg-gold hover:bg-gold-light text-wood-dark font-semibold text-base md:text-lg rounded-xl transition-all duration-200 shadow-lg shadow-gold/25"
+              >
+                Découvrir les éditions
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
+                </svg>
+              </a>
+            )}
+            {nextEdition && (
+              <a
+                href={`/editions/${nextEdition.slug}`}
+                class="inline-flex items-center justify-center gap-2 px-6 py-3 md:px-7 md:py-4 border-2 border-white/25 hover:border-white/40 text-white font-medium text-base md:text-lg rounded-xl transition-all duration-200"
+              >
+                Découvrir le programme
+              </a>
+            )}
+          </div>
+
+          <!-- Social proof -->
+          <div class="mt-10 flex flex-wrap items-center gap-6 justify-center lg:justify-start text-sm text-white/60">
+            <div class="flex items-center gap-2">
+              <span class="text-gold font-semibold text-base">150+</span> participants
+            </div>
+            <div class="w-1 h-1 rounded-full bg-white/30"></div>
+            <div class="flex items-center gap-2">
+              <span class="text-gold font-semibold text-base">12</span> pitchs innovation
+            </div>
+            <div class="w-1 h-1 rounded-full bg-white/30"></div>
+            <div class="flex items-center gap-2">
+              <span class="text-gold font-semibold text-base">8</span> financeurs présents
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: image composition (cols 8-12) -->
+        <div class="lg:col-span-5 hidden lg:flex flex-col items-center gap-8">
+          <div class="hero-card relative w-56 h-40 rounded-2xl overflow-hidden border-[3px] border-white/30 shadow-2xl rotate-[-2deg] hover:rotate-0 transition-transform duration-500">
+            <div class="absolute inset-0 bg-gradient-to-br from-primary/60 to-wood-dark/80"></div>
+            <div class="absolute inset-0 flex items-center justify-center">
+              <svg class="w-16 h-16 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+            </div>
+            <p class="absolute bottom-3 left-0 right-0 text-center text-white/70 text-xs font-medium uppercase tracking-wider">Ressource</p>
+          </div>
+
+          <div class="hero-card relative w-56 h-40 rounded-2xl overflow-hidden border-[3px] border-white/30 shadow-2xl rotate-[2deg] hover:rotate-0 transition-transform duration-500" style="animation-delay: 0.2s;">
+            <div class="absolute inset-0 bg-gradient-to-br from-gold/50 to-wood/80"></div>
+            <div class="absolute inset-0 flex items-center justify-center">
+              <svg class="w-16 h-16 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+              </svg>
+            </div>
+            <p class="absolute bottom-3 left-0 right-0 text-center text-white/70 text-xs font-medium uppercase tracking-wider">Innovation</p>
+          </div>
+
+          <div class="hero-card relative w-56 h-40 rounded-2xl overflow-hidden border-[3px] border-white/30 shadow-2xl rotate-[-1deg] hover:rotate-0 transition-transform duration-500" style="animation-delay: 0.4s;">
+            <div class="absolute inset-0 bg-gradient-to-br from-wood-light/60 to-wood-dark/90"></div>
+            <div class="absolute inset-0 flex items-center justify-center">
+              <svg class="w-16 h-16 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+              </svg>
+            </div>
+            <p class="absolute bottom-3 left-0 right-0 text-center text-white/70 text-xs font-medium uppercase tracking-wider">Transformation</p>
+          </div>
         </div>
       </div>
-      <div class="flex-shrink-0">
-        <img
-          src="/assets/logo-xylo.png"
-          alt="Xylofutur"
-          class="w-48 md:w-64 lg:w-72 drop-shadow-2xl"
-        />
-      </div>
+    </div>
+
+    <!-- Scroll indicator -->
+    <div class="absolute bottom-6 left-1/2 -translate-x-1/2 animate-bounce">
+      <svg class="w-6 h-6 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
+      </svg>
     </div>
   </section>
 
-  <!-- Features -->
+  <!-- Pourquoi ces événements -->
   <section id="content" class="py-20 md:py-28 bg-white">
     <div class="max-w-6xl mx-auto px-6">
       <div class="text-center mb-16">
@@ -79,22 +291,98 @@ import Layout from "../layouts/Layout.astro";
           <p class="text-sm text-muted leading-relaxed">BpiFrance, ADNormandie, Forinvest... les financeurs présentent leurs dispositifs.</p>
         </div>
       </div>
+
+      <div class="mt-10 text-center">
+        <a href="/pourquoi" class="text-sm font-medium text-primary hover:text-primary-dark transition-colors">
+          En savoir plus &rarr;
+        </a>
+      </div>
     </div>
   </section>
 
-  <!-- CTA -->
-  <section class="py-20 md:py-28 bg-surface">
-    <div class="max-w-3xl mx-auto px-6 text-center">
-      <h2 class="text-3xl md:text-4xl font-bold text-gray-900">Un projet, une question ?</h2>
-      <p class="mt-4 text-muted text-lg">
-        Contactez l'équipe Xylofutur pour en savoir plus sur les Journées de l'Innovation ou pour vous inscrire aux prochaines éditions.
+  <!-- Éditions -->
+  {editions?.data?.length > 0 && (
+    <section class="py-20 md:py-28 bg-surface">
+      <div class="max-w-6xl mx-auto px-6">
+        <div class="flex items-end justify-between mb-12">
+          <div>
+            <h2 class="text-3xl md:text-4xl font-bold text-gray-900">Les éditions</h2>
+            <p class="mt-3 text-muted">Retrouvez les Journées de l'Innovation, région par région.</p>
+          </div>
+          <a href="/editions" class="hidden sm:inline-flex items-center gap-1 text-sm font-medium text-primary hover:text-primary-dark transition-colors">
+            Tout voir
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/>
+            </svg>
+          </a>
+        </div>
+
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
+          {editions.data.slice(0, 6).map((edition) => (
+            <a href={`/editions/${edition.slug}`} class="group block rounded-xl border border-gray-100 bg-white overflow-hidden hover:shadow-lg transition-shadow">
+              {edition.image ? (
+                <div class="aspect-video bg-surface overflow-hidden">
+                  <img
+                    src={buildImageUrl(edition.image.url)}
+                    alt={edition.title}
+                    class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                </div>
+              ) : (
+                <div class="aspect-video bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center">
+                  <span class="text-3xl font-bold text-primary/20">{regionLabels[edition.region] || edition.region}</span>
+                </div>
+              )}
+              <div class="p-5">
+                <h3 class="font-semibold text-gray-900 group-hover:text-primary transition-colors">{edition.title}</h3>
+                <p class="mt-1 text-sm text-muted">
+                  {new Date(edition.date).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })} — {edition.city}
+                </p>
+              </div>
+            </a>
+          ))}
+        </div>
+
+        <div class="mt-10 text-center sm:hidden">
+          <a href="/editions" class="inline-flex items-center gap-1 text-sm font-medium text-primary">
+            Voir toutes les éditions &rarr;
+          </a>
+        </div>
+      </div>
+    </section>
+  )}
+
+  <!-- Dynamique collective -->
+  <section class="py-20 md:py-28 bg-white">
+    <div class="max-w-4xl mx-auto px-6 text-center">
+      <h2 class="text-3xl md:text-4xl font-bold text-gray-900">Une dynamique collective</h2>
+      <p class="mt-4 text-muted text-lg max-w-2xl mx-auto">
+        Ensemble, nous portons une ambition commune : <strong class="text-gray-900">connecter</strong> les écosystèmes, <strong class="text-gray-900">structurer</strong> les projets d'innovation et <strong class="text-gray-900">valoriser</strong> les solutions qui créent de la valeur pour notre filière et nos territoires.
       </p>
       <div class="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
-        <a href="/contact" class="inline-flex items-center justify-center px-7 py-3 bg-primary hover:bg-primary-dark text-white font-semibold text-sm rounded-lg transition-colors shadow-sm">
+        <a href="/a-propos" class="inline-flex items-center justify-center px-7 py-3 bg-primary hover:bg-primary-dark text-white font-semibold text-sm rounded-lg transition-colors shadow-sm">
+          Qui sommes-nous ?
+        </a>
+        <a href="/contact" class="inline-flex items-center justify-center px-7 py-3 border-2 border-gray-200 text-gray-700 hover:border-gray-300 font-semibold text-sm rounded-lg transition-colors">
           Nous contacter
         </a>
-        <a href="https://outlook.office.com/book/RDVXylofutur@xylofutur.fr/" target="_blank" rel="noopener" class="inline-flex items-center justify-center px-7 py-3 border-2 border-gray-200 text-gray-700 hover:border-gray-300 font-semibold text-sm rounded-lg transition-colors">
-          Prendre RDV
+      </div>
+    </div>
+  </section>
+
+  <!-- Et pour la suite ? -->
+  <section class="py-20 md:py-28 bg-surface">
+    <div class="max-w-3xl mx-auto px-6 text-center">
+      <h2 class="text-3xl md:text-4xl font-bold text-gray-900">Et pour la suite ?</h2>
+      <p class="mt-4 text-muted text-lg">
+        La tournée continue ! Région Sud, Nouvelle-Aquitaine, Auvergne-Rhône-Alpes... Inscrivez-vous à la newsletter pour être informé des prochaines éditions.
+      </p>
+      <div class="mt-6">
+        <a href="https://outlook.office.com/book/RDVXylofutur@xylofutur.fr/" target="_blank" rel="noopener" class="inline-flex items-center gap-2 px-7 py-3 bg-accent hover:bg-accent-dark text-white font-semibold text-sm rounded-lg transition-colors">
+          Prendre RDV avec l'équipe
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+          </svg>
         </a>
       </div>
     </div>

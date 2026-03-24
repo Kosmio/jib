@@ -1,0 +1,101 @@
+{
+  "kind": "collectionType",
+  "collectionName": "editions",
+  "info": {
+    "singularName": "edition",
+    "pluralName": "editions",
+    "displayName": "Edition"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "attributes": {
+    "title": {
+      "type": "string",
+      "required": true
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "title"
+    },
+    "year": {
+      "type": "integer",
+      "required": true
+    },
+    "region": {
+      "type": "enumeration",
+      "enum": [
+        "normandie",
+        "region-sud",
+        "nouvelle-aquitaine",
+        "auvergne-rhone-alpes",
+        "ile-de-france",
+        "bretagne",
+        "occitanie",
+        "grand-est",
+        "hauts-de-france",
+        "pays-de-la-loire",
+        "bourgogne-franche-comte",
+        "centre-val-de-loire",
+        "corse"
+      ],
+      "required": true
+    },
+    "date": {
+      "type": "date",
+      "required": true
+    },
+    "city": {
+      "type": "string",
+      "required": true
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": ["upcoming", "open", "full", "past"],
+      "default": "upcoming",
+      "required": true
+    },
+    "description": {
+      "type": "richtext"
+    },
+    "inscription_url": {
+      "type": "string"
+    },
+    "image": {
+      "type": "media",
+      "multiple": false,
+      "allowedTypes": ["images"]
+    },
+    "lieux": {
+      "type": "component",
+      "component": "edition.lieu",
+      "repeatable": true
+    },
+    "programme_items": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::programme-item.programme-item",
+      "mappedBy": "edition"
+    },
+    "partenaires": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::partenaire.partenaire",
+      "inversedBy": "editions"
+    },
+    "gallery": {
+      "type": "media",
+      "multiple": true,
+      "allowedTypes": ["images"]
+    },
+    "video_urls": {
+      "type": "text"
+    },
+    "summary": {
+      "type": "richtext"
+    },
+    "testimonials": {
+      "type": "richtext"
+    }
+  }
+}

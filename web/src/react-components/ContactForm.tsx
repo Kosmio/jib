@@ -84,7 +84,7 @@ export default function ContactForm({ strapiUrl }: Props) {
             required
             value={formData.name}
             onChange={handleChange}
-            className="w-full px-4 py-3 bg-[#f8fafc] border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#1e40af]/20 focus:border-[#1e40af] outline-none transition-colors"
+            className="w-full px-4 py-3 bg-[#f8fafc] border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#00B194]/20 focus:border-[#00B194] outline-none transition-colors"
             placeholder="Votre nom"
           />
         </div>
@@ -99,7 +99,7 @@ export default function ContactForm({ strapiUrl }: Props) {
             required
             value={formData.email}
             onChange={handleChange}
-            className="w-full px-4 py-3 bg-[#f8fafc] border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#1e40af]/20 focus:border-[#1e40af] outline-none transition-colors"
+            className="w-full px-4 py-3 bg-[#f8fafc] border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#00B194]/20 focus:border-[#00B194] outline-none transition-colors"
             placeholder="votre@email.com"
           />
         </div>
@@ -114,7 +114,7 @@ export default function ContactForm({ strapiUrl }: Props) {
           name="subject"
           value={formData.subject}
           onChange={handleChange}
-          className="w-full px-4 py-3 bg-[#f8fafc] border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#1e40af]/20 focus:border-[#1e40af] outline-none transition-colors"
+          className="w-full px-4 py-3 bg-[#f8fafc] border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#00B194]/20 focus:border-[#00B194] outline-none transition-colors"
           placeholder="L'objet de votre message"
         />
       </div>
@@ -129,7 +129,7 @@ export default function ContactForm({ strapiUrl }: Props) {
           rows={6}
           value={formData.message}
           onChange={handleChange}
-          className="w-full px-4 py-3 bg-[#f8fafc] border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#1e40af]/20 focus:border-[#1e40af] outline-none transition-colors resize-vertical"
+          className="w-full px-4 py-3 bg-[#f8fafc] border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#00B194]/20 focus:border-[#00B194] outline-none transition-colors resize-vertical"
           placeholder="Décrivez votre projet ou votre question..."
         />
       </div>
@@ -168,7 +168,7 @@ export default function ContactForm({ strapiUrl }: Props) {
         className={`w-full sm:w-auto px-8 py-3 rounded-lg font-semibold text-sm text-white transition-colors ${
           status === "loading"
             ? "bg-gray-400 cursor-not-allowed"
-            : "bg-[#1e40af] hover:bg-[#1e3a8a]"
+            : "bg-[#00B194] hover:bg-[#009B81]"
         }`}
       >
         {status === "loading" ? "Envoi en cours..." : "Envoyer le message"}

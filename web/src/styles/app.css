@@ -15,11 +15,75 @@ a, button, [type="submit"], [role="button"] {
   --color-muted: #5D6C73;
   --color-text: #1F2D3D;
 
+  --color-wood: #8B5A2B;
+  --color-wood-dark: #6B4423;
+  --color-wood-light: #A06B35;
+  --color-gold: #F6C453;
+  --color-gold-dark: #E0AB38;
+  --color-gold-light: #FFD978;
+
   --font-sans: "Inter", system-ui, sans-serif;
+  --font-heading: "Sora", system-ui, sans-serif;
 
   --breakpoint-sm: 480px;
   --breakpoint-md: 768px;
   --breakpoint-lg: 1024px;
   --breakpoint-xl: 1280px;
   --breakpoint-2xl: 1440px;
+}
+
+/* Hero network nodes pulse animation */
+@keyframes hero-pulse {
+  0%, 100% { opacity: 0.3; r: 5; }
+  50% { opacity: 0.7; r: 8; }
+}
+
+@keyframes hero-line-fade {
+  0%, 100% { opacity: 0.1; }
+  50% { opacity: 0.25; }
+}
+
+@keyframes hero-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.hero-node { animation: hero-pulse 4s ease-in-out infinite; }
+.hero-node-1 { animation-delay: 0s; }
+.hero-node-2 { animation-delay: 0.5s; }
+.hero-node-3 { animation-delay: 1s; }
+.hero-node-4 { animation-delay: 1.5s; }
+.hero-node-5 { animation-delay: 2s; }
+.hero-node-6 { animation-delay: 2.5s; }
+.hero-node-7 { animation-delay: 3s; }
+.hero-node-8 { animation-delay: 3.5s; }
+
+.hero-line { animation: hero-line-fade 5s ease-in-out infinite; }
+.hero-line-1 { animation-delay: 0s; }
+.hero-line-2 { animation-delay: 0.4s; }
+.hero-line-3 { animation-delay: 0.8s; }
+.hero-line-4 { animation-delay: 1.2s; }
+.hero-line-5 { animation-delay: 1.6s; }
+.hero-line-6 { animation-delay: 2.0s; }
+.hero-line-7 { animation-delay: 2.4s; }
+.hero-line-8 { animation-delay: 2.8s; }
+.hero-line-9 { animation-delay: 3.2s; }
+.hero-line-10 { animation-delay: 3.6s; }
+.hero-line-11 { animation-delay: 4.0s; }
+
+.hero-card {
+  animation: hero-float 6s ease-in-out infinite;
+}
+.hero-card:nth-child(2) { animation-delay: 2s; }
+.hero-card:nth-child(3) { animation-delay: 4s; }
+
+.hero-cta:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(246, 196, 83, 0.35);
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .hero-node, .hero-line, .hero-card { animation: none; }
+  .hero-cta:hover { transform: none; }
 }
