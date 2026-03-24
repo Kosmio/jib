@@ -1,6 +1,7 @@
 # ---> Build stage
 FROM node:20-alpine as build
 
+ENV CI=true
 RUN corepack enable && corepack prepare pnpm@latest --activate
 RUN mkdir -p /app
 

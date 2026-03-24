@@ -1,6 +1,7 @@
 # ---> Build stage
 FROM node:20-bullseye AS node-build
 
+ENV CI=true
 RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /usr/src/app
 COPY ./web /usr/src/app/
