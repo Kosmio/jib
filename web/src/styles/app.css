@@ -4,26 +4,34 @@ a, button, [type="submit"], [role="button"] {
   cursor: pointer;
 }
 
+h1, h2 {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+}
+
 @theme {
-  --color-primary: #00B194;
-  --color-primary-light: #33C4AD;
-  --color-primary-dark: #009B81;
-  --color-accent: #BA8748;
-  --color-accent-dark: #A07339;
-  --color-surface: #F3E3CF;
-  --color-surface-alt: #D9CEC0;
-  --color-muted: #5D6C73;
-  --color-text: #1F2D3D;
+  /* Charte Xylofutur — Pantone officiel */
+  --color-primary: #00B388;       /* PANTONE 339 C — vert émeraude */
+  --color-primary-light: #33C4A3;
+  --color-primary-dark: #009B76;
+  --color-accent: #AD8B5E;        /* PANTONE 876 C — bronze */
+  --color-accent-dark: #8F7048;
+  --color-surface: #F5F0EB;       /* beige clair neutre */
+  --color-surface-alt: #E8DFD4;
+  --color-muted: #54585A;         /* PANTONE 432 C — charcoal */
+  --color-text: #2E3133;
 
   --color-wood: #8B5A2B;
   --color-wood-dark: #6B4423;
   --color-wood-light: #A06B35;
-  --color-gold: #F6C453;
-  --color-gold-dark: #E0AB38;
-  --color-gold-light: #FFD978;
+  --color-gold: #F0AB00;          /* PANTONE 143 C — jaune doré */
+  --color-gold-dark: #D49800;
+  --color-gold-light: #FFBE33;
 
-  --font-sans: "Inter", system-ui, sans-serif;
-  --font-heading: "Sora", system-ui, sans-serif;
+  /* Helvetica LT STD n'est pas disponible en web — Source Sans 3 est le plus proche de Myriad Pro */
+  --font-sans: "Source Sans 3", "Helvetica Neue", system-ui, sans-serif;
+  --font-heading: "Sora", "Helvetica Neue", system-ui, sans-serif;
+  --font-display: "Audiowide", "Impact", system-ui, sans-serif;
 
   --breakpoint-sm: 480px;
   --breakpoint-md: 768px;
@@ -32,15 +40,15 @@ a, button, [type="submit"], [role="button"] {
   --breakpoint-2xl: 1440px;
 }
 
-/* Hero network nodes pulse animation */
-@keyframes hero-pulse {
-  0%, 100% { opacity: 0.3; r: 5; }
-  50% { opacity: 0.7; r: 8; }
+/* Hero network nodes — static by default, gentle pulse for edition cities only */
+@keyframes hero-pulse-subtle {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.85; }
 }
 
 @keyframes hero-line-fade {
   0%, 100% { opacity: 0.1; }
-  50% { opacity: 0.25; }
+  50% { opacity: 0.2; }
 }
 
 @keyframes hero-float {
@@ -48,28 +56,29 @@ a, button, [type="submit"], [role="button"] {
   50% { transform: translateY(-8px); }
 }
 
-.hero-node { animation: hero-pulse 4s ease-in-out infinite; }
-.hero-node-1 { animation-delay: 0s; }
-.hero-node-2 { animation-delay: 0.5s; }
-.hero-node-3 { animation-delay: 1s; }
-.hero-node-4 { animation-delay: 1.5s; }
-.hero-node-5 { animation-delay: 2s; }
-.hero-node-6 { animation-delay: 2.5s; }
-.hero-node-7 { animation-delay: 3s; }
-.hero-node-8 { animation-delay: 3.5s; }
+/* Static nodes — no animation */
+.hero-node { transition: opacity 0.3s; }
 
-.hero-line { animation: hero-line-fade 5s ease-in-out infinite; }
+/* Only edition city nodes pulse — subtle glow */
+.hero-node-edition { animation: hero-pulse-subtle 5s ease-in-out infinite; }
+.hero-node-edition-1 { animation-delay: 0s; }
+.hero-node-edition-2 { animation-delay: 1s; }
+.hero-node-edition-3 { animation-delay: 2s; }
+.hero-node-edition-4 { animation-delay: 3s; }
+.hero-node-edition-5 { animation-delay: 4s; }
+
+.hero-line { animation: hero-line-fade 6s ease-in-out infinite; }
 .hero-line-1 { animation-delay: 0s; }
-.hero-line-2 { animation-delay: 0.4s; }
-.hero-line-3 { animation-delay: 0.8s; }
-.hero-line-4 { animation-delay: 1.2s; }
-.hero-line-5 { animation-delay: 1.6s; }
-.hero-line-6 { animation-delay: 2.0s; }
-.hero-line-7 { animation-delay: 2.4s; }
-.hero-line-8 { animation-delay: 2.8s; }
-.hero-line-9 { animation-delay: 3.2s; }
-.hero-line-10 { animation-delay: 3.6s; }
-.hero-line-11 { animation-delay: 4.0s; }
+.hero-line-2 { animation-delay: 0.5s; }
+.hero-line-3 { animation-delay: 1s; }
+.hero-line-4 { animation-delay: 1.5s; }
+.hero-line-5 { animation-delay: 2s; }
+.hero-line-6 { animation-delay: 2.5s; }
+.hero-line-7 { animation-delay: 3s; }
+.hero-line-8 { animation-delay: 3.5s; }
+.hero-line-9 { animation-delay: 4s; }
+.hero-line-10 { animation-delay: 4.5s; }
+.hero-line-11 { animation-delay: 5s; }
 
 .hero-card {
   animation: hero-float 6s ease-in-out infinite;
@@ -79,7 +88,7 @@ a, button, [type="submit"], [role="button"] {
 
 .hero-cta:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(246, 196, 83, 0.35);
+  box-shadow: 0 8px 25px rgba(240, 171, 0, 0.35);
 }
 
 /* Reduced motion preference */

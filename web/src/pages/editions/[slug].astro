@@ -12,10 +12,10 @@ if (!edition) {
 }
 
 const statusLabels: Record<string, string> = {
-  upcoming: "À venir",
-  open: "Inscriptions ouvertes",
-  full: "Complet",
-  past: "Passée",
+  "a-venir": "À venir",
+  "inscriptions-ouvertes": "Inscriptions ouvertes",
+  "complet": "Complet",
+  "passee": "Passée",
 };
 
 const categoryLabels: Record<string, string> = {
@@ -41,6 +41,14 @@ const categoryColors: Record<string, string> = {
 const programmeItems = (edition.programme_items || []).sort(
   (a, b) => (a.order ?? 999) - (b.order ?? 999)
 );
+
+const intervenantCategoryLabels: Record<string, string> = {
+  entrepreneur: "Entrepreneur",
+  chercheur: "Recherche",
+  financeur: "Financement",
+  institutionnel: "Institutionnel",
+  organisateur: "Organisateur",
+};
 ---
 
 <Layout title={`${edition.title} — Journées de l'Innovation`} description={`Journée de l'Innovation de la Filière Bois en ${regionLabels[edition.region] || edition.region} — ${edition.city}, ${new Date(edition.date).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}`}>
@@ -53,7 +61,7 @@ const programmeItems = (edition.programme_items || []).sort(
     <div class="absolute inset-0 overflow-hidden">
       <svg class="hero-network absolute inset-0 w-full h-full" viewBox="0 0 1280 720" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
         <!-- France outline -->
-        <g stroke="#F6C453" stroke-width="1.2" opacity="0.18">
+        <g stroke="#F0AB00" stroke-width="1.2" opacity="0.18">
           <line x1="940" y1="105" x2="900" y2="85" class="hero-line hero-line-1" />
           <line x1="900" y1="85" x2="860" y2="185" class="hero-line hero-line-2" />
           <line x1="860" y1="185" x2="670" y2="225" class="hero-line hero-line-3" />
@@ -72,7 +80,7 @@ const programmeItems = (edition.programme_items || []).sort(
           <line x1="1080" y1="160" x2="940" y2="105" class="hero-line hero-line-5" />
         </g>
         <!-- Interior connections -->
-        <g stroke="#F6C453" stroke-width="0.8" opacity="0.12">
+        <g stroke="#F0AB00" stroke-width="0.8" opacity="0.12">
           <line x1="930" y1="220" x2="860" y2="185" class="hero-line hero-line-6" />
           <line x1="930" y1="220" x2="940" y2="105" class="hero-line hero-line-7" />
           <line x1="930" y1="220" x2="820" y2="310" class="hero-line hero-line-8" />
@@ -87,34 +95,34 @@ const programmeItems = (edition.programme_items || []).sort(
         </g>
         <!-- City nodes -->
         <g>
-          <circle cx="940" cy="105" r="4" fill="#F6C453" opacity="0.35" class="hero-node hero-node-1" />
-          <circle cx="900" cy="85" r="3" fill="#F6C453" opacity="0.25" class="hero-node hero-node-2" />
-          <circle cx="860" cy="185" r="4" fill="#F6C453" opacity="0.3" class="hero-node hero-node-3" />
-          <circle cx="670" cy="225" r="3" fill="#F6C453" opacity="0.25" class="hero-node hero-node-4" />
-          <circle cx="740" cy="265" r="3" fill="#F6C453" opacity="0.25" class="hero-node hero-node-5" />
-          <circle cx="730" cy="340" r="4" fill="#F6C453" opacity="0.3" class="hero-node hero-node-6" />
-          <circle cx="750" cy="470" r="4" fill="#F6C453" opacity="0.3" class="hero-node hero-node-7" />
-          <circle cx="735" cy="545" r="3" fill="#F6C453" opacity="0.25" class="hero-node hero-node-8" />
-          <circle cx="855" cy="555" r="4" fill="#F6C453" opacity="0.3" class="hero-node hero-node-1" />
-          <circle cx="900" cy="600" r="3" fill="#F6C453" opacity="0.25" class="hero-node hero-node-2" />
-          <circle cx="1030" cy="565" r="4" fill="#F6C453" opacity="0.3" class="hero-node hero-node-3" />
-          <circle cx="1120" cy="520" r="3" fill="#F6C453" opacity="0.25" class="hero-node hero-node-4" />
-          <circle cx="1060" cy="435" r="3" fill="#F6C453" opacity="0.25" class="hero-node hero-node-5" />
-          <circle cx="1030" cy="300" r="4" fill="#F6C453" opacity="0.3" class="hero-node hero-node-6" />
-          <circle cx="1135" cy="200" r="4" fill="#F6C453" opacity="0.3" class="hero-node hero-node-7" />
-          <circle cx="1080" cy="160" r="3" fill="#F6C453" opacity="0.25" class="hero-node hero-node-8" />
+          <circle cx="940" cy="105" r="4" fill="#F0AB00" opacity="0.35" class="hero-node hero-node-1" />
+          <circle cx="900" cy="85" r="3" fill="#F0AB00" opacity="0.25" class="hero-node hero-node-2" />
+          <circle cx="860" cy="185" r="4" fill="#F0AB00" opacity="0.3" class="hero-node hero-node-3" />
+          <circle cx="670" cy="225" r="3" fill="#F0AB00" opacity="0.25" class="hero-node hero-node-4" />
+          <circle cx="740" cy="265" r="3" fill="#F0AB00" opacity="0.25" class="hero-node hero-node-5" />
+          <circle cx="730" cy="340" r="4" fill="#F0AB00" opacity="0.3" class="hero-node hero-node-6" />
+          <circle cx="750" cy="470" r="4" fill="#F0AB00" opacity="0.3" class="hero-node hero-node-7" />
+          <circle cx="735" cy="545" r="3" fill="#F0AB00" opacity="0.25" class="hero-node hero-node-8" />
+          <circle cx="855" cy="555" r="4" fill="#F0AB00" opacity="0.3" class="hero-node hero-node-1" />
+          <circle cx="900" cy="600" r="3" fill="#F0AB00" opacity="0.25" class="hero-node hero-node-2" />
+          <circle cx="1030" cy="565" r="4" fill="#F0AB00" opacity="0.3" class="hero-node hero-node-3" />
+          <circle cx="1120" cy="520" r="3" fill="#F0AB00" opacity="0.25" class="hero-node hero-node-4" />
+          <circle cx="1060" cy="435" r="3" fill="#F0AB00" opacity="0.25" class="hero-node hero-node-5" />
+          <circle cx="1030" cy="300" r="4" fill="#F0AB00" opacity="0.3" class="hero-node hero-node-6" />
+          <circle cx="1135" cy="200" r="4" fill="#F0AB00" opacity="0.3" class="hero-node hero-node-7" />
+          <circle cx="1080" cy="160" r="3" fill="#F0AB00" opacity="0.25" class="hero-node hero-node-8" />
           <!-- Interior hubs -->
-          <circle cx="930" cy="220" r="7" fill="#F6C453" opacity="0.45" class="hero-node hero-node-1" />
-          <circle cx="1010" cy="395" r="6" fill="#F6C453" opacity="0.4" class="hero-node hero-node-2" />
-          <circle cx="820" cy="310" r="4" fill="#F6C453" opacity="0.3" class="hero-node hero-node-3" />
-          <circle cx="840" cy="405" r="4" fill="#F6C453" opacity="0.3" class="hero-node hero-node-4" />
-          <circle cx="925" cy="405" r="5" fill="#F6C453" opacity="0.35" class="hero-node hero-node-5" />
+          <circle cx="930" cy="220" r="7" fill="#F0AB00" opacity="0.45" class="hero-node hero-node-1" />
+          <circle cx="1010" cy="395" r="6" fill="#F0AB00" opacity="0.4" class="hero-node hero-node-2" />
+          <circle cx="820" cy="310" r="4" fill="#F0AB00" opacity="0.3" class="hero-node hero-node-3" />
+          <circle cx="840" cy="405" r="4" fill="#F0AB00" opacity="0.3" class="hero-node hero-node-4" />
+          <circle cx="925" cy="405" r="5" fill="#F0AB00" opacity="0.35" class="hero-node hero-node-5" />
         </g>
       </svg>
     </div>
 
     <!-- Radial glow -->
-    <div class="absolute inset-0" style="background: radial-gradient(circle at 50% 40%, rgba(246,196,83,0.10), transparent 55%);"></div>
+    <div class="absolute inset-0" style="background: radial-gradient(circle at 50% 40%, rgba(240,171,0,0.10), transparent 55%);"></div>
 
     <!-- Content -->
     <div class="relative w-full max-w-[1280px] mx-auto px-6 md:px-16 pt-28 pb-16 md:pt-32 md:pb-20">
@@ -124,7 +132,7 @@ const programmeItems = (edition.programme_items || []).sort(
         <div class="lg:col-span-7 text-center lg:text-left">
           <!-- Status badge -->
           <span class="inline-block bg-gold text-wood-dark text-xs font-semibold uppercase tracking-wider px-4 py-1.5 rounded-full mb-6">
-            {statusLabels[edition.status] || edition.status}
+            {statusLabels[edition.edition_status] || edition.edition_status}
           </span>
 
           <!-- Title -->
@@ -162,7 +170,7 @@ const programmeItems = (edition.programme_items || []).sort(
 
           <!-- CTAs -->
           <div class="mt-8 flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-            {edition.inscription_url && edition.status !== "past" && edition.status !== "full" && (
+            {edition.inscription_url && edition.edition_status !== "passee" && edition.edition_status !== "complet" && (
               <a
                 href={edition.inscription_url}
                 target="_blank"
@@ -281,7 +289,12 @@ const programmeItems = (edition.programme_items || []).sort(
                 </div>
                 {item.intervenants && item.intervenants.length > 0 && (
                   <p class="mt-1 text-sm text-muted">
-                    {item.intervenants.map((i) => `${i.name} (${i.organization})`).join(", ")}
+                    {item.intervenants.map((i, idx) => (
+                      <>
+                        {idx > 0 && ", "}
+                        <a href={`/intervenants/${i.slug}`} class="text-primary-dark hover:text-primary underline-offset-2 hover:underline transition-colors">{i.name}</a>
+                      </>
+                    ))}
                   </p>
                 )}
                 {item.description && (
@@ -340,26 +353,50 @@ const programmeItems = (edition.programme_items || []).sort(
               .flatMap((p) => p.intervenants || [])
               .map((i) => [i.id, i])
           ).values()].map((intervenant) => (
-            <div class="group rounded-xl bg-white border border-gray-100 overflow-hidden hover:shadow-lg transition-shadow">
+            <a href={`/intervenants/${intervenant.slug}`} class="group block rounded-xl bg-white border border-gray-100 overflow-hidden hover:shadow-lg transition-shadow">
               <!-- Header with photo -->
               <div class="bg-gradient-to-br from-wood/10 to-gold/10 p-6 flex items-center gap-4">
                 {intervenant.photo ? (
-                  <img
-                    src={buildImageUrl(intervenant.photo.url)}
-                    alt={intervenant.name}
-                    class="w-20 h-20 rounded-full object-cover flex-shrink-0 border-2 border-white shadow-md"
-                  />
+                  intervenant.type === 'organisation' ? (
+                    <div class="w-20 h-20 rounded-xl bg-white flex items-center justify-center flex-shrink-0 border border-gray-100 shadow-md p-2">
+                      <img
+                        src={buildImageUrl(intervenant.photo.url)}
+                        alt={intervenant.name}
+                        class="w-full h-full object-contain"
+                      />
+                    </div>
+                  ) : (
+                    <img
+                      src={buildImageUrl(intervenant.photo.url)}
+                      alt={intervenant.name}
+                      class="w-20 h-20 rounded-xl object-cover flex-shrink-0 border-2 border-white shadow-md"
+                    />
+                  )
                 ) : (
-                  <div class="w-20 h-20 rounded-full bg-wood/20 flex items-center justify-center flex-shrink-0 border-2 border-white shadow-md">
+                  <div class="w-20 h-20 rounded-xl bg-wood/20 flex items-center justify-center flex-shrink-0 border-2 border-white shadow-md">
                     <span class="text-2xl font-bold text-wood">{intervenant.name.charAt(0)}</span>
                   </div>
                 )}
                 <div class="min-w-0">
-                  <h3 class="font-semibold text-gray-900">{intervenant.name}</h3>
+                  <h3 class="font-semibold text-gray-900 group-hover:text-primary transition-colors">{intervenant.name}</h3>
                   {intervenant.title && (
                     <p class="text-sm text-muted">{intervenant.title}</p>
                   )}
-                  <p class="text-sm text-primary-dark font-medium">{intervenant.organization}</p>
+                  {intervenant.type !== 'organisation' && intervenant.organization !== intervenant.name && (
+                    <p class="text-sm text-primary-dark font-medium">{intervenant.organization}</p>
+                  )}
+                  {intervenant.category && (
+                    <span class:list={[
+                      "mt-1.5 inline-block text-xs font-medium px-2 py-0.5 rounded-full",
+                      intervenant.category === 'entrepreneur' && "bg-amber-100 text-amber-800",
+                      intervenant.category === 'chercheur' && "bg-blue-100 text-blue-800",
+                      intervenant.category === 'financeur' && "bg-emerald-100 text-emerald-800",
+                      intervenant.category === 'institutionnel' && "bg-purple-100 text-purple-800",
+                      intervenant.category === 'organisateur' && "bg-primary/10 text-primary-dark",
+                    ]}>
+                      {intervenantCategoryLabels[intervenant.category]}
+                    </span>
+                  )}
                 </div>
               </div>
               <!-- Content -->
@@ -371,20 +408,15 @@ const programmeItems = (edition.programme_items || []).sort(
                   <div class="mt-3 text-sm text-muted leading-relaxed line-clamp-3" set:html={intervenant.bio} />
                 )}
                 {intervenant.linkedin_url && (
-                  <a
-                    href={intervenant.linkedin_url}
-                    target="_blank"
-                    rel="noopener"
-                    class="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-[#0A66C2] hover:text-[#004182] transition-colors"
-                  >
+                  <span class="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-[#0A66C2]">
                     <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
                     </svg>
                     LinkedIn
-                  </a>
+                  </span>
                 )}
               </div>
-            </div>
+            </a>
           ))}
         </div>
       </div>
@@ -402,7 +434,7 @@ const programmeItems = (edition.programme_items || []).sort(
               href={partenaire.website || "#"}
               target={partenaire.website ? "_blank" : undefined}
               rel={partenaire.website ? "noopener" : undefined}
-              class="flex items-center justify-center h-16 grayscale hover:grayscale-0 transition-all opacity-70 hover:opacity-100"
+              class="flex items-center justify-center h-16 opacity-80 hover:opacity-100 transition-opacity"
               title={partenaire.name}
             >
               {partenaire.logo ? (
@@ -422,7 +454,7 @@ const programmeItems = (edition.programme_items || []).sort(
   )}
 
   <!-- Retours post-event -->
-  {edition.status === "past" && (edition.summary || edition.gallery?.length > 0 || edition.video_urls || edition.testimonials) && (
+  {edition.edition_status === "passee" && (edition.summary || edition.gallery?.length > 0 || edition.video_urls || edition.testimonials) && (
     <section class="py-16 md:py-24 bg-white">
       <div class="max-w-4xl mx-auto px-6">
         <h2 class="text-2xl md:text-3xl font-bold text-gray-900 mb-10">Retour sur l'événement</h2>
@@ -448,23 +480,24 @@ const programmeItems = (edition.programme_items || []).sort(
               {edition.video_urls.split('\n').filter((url: string) => url.trim()).map((url: string) => {
                 const trimmed = url.trim();
                 const youtubeMatch = trimmed.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/);
-                const embedUrl = youtubeMatch
-                  ? `https://www.youtube-nocookie.com/embed/${youtubeMatch[1]}`
-                  : trimmed.includes('vimeo.com')
-                    ? trimmed.replace('vimeo.com/', 'player.vimeo.com/video/')
-                    : null;
-                return embedUrl ? (
-                  <div class="aspect-video rounded-xl overflow-hidden bg-gray-100">
-                    <iframe
-                      src={embedUrl}
-                      title="Vidéo de l'événement"
-                      class="w-full h-full"
-                      frameborder="0"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowfullscreen
-                    ></iframe>
-                  </div>
-                ) : (
+                if (youtubeMatch) {
+                  const videoId = youtubeMatch[1];
+                  const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
+                  const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+                  return (
+                    <a href={watchUrl} target="_blank" rel="noopener" class="group relative aspect-video rounded-xl overflow-hidden bg-gray-100 block">
+                      <img src={thumbnailUrl} alt="Vidéo de l'événement" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+                      <div class="absolute inset-0 bg-black/30 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                        <div class="w-16 h-16 rounded-full bg-red-600 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                          <svg class="w-7 h-7 text-white ml-1" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M8 5v14l11-7z"/>
+                          </svg>
+                        </div>
+                      </div>
+                    </a>
+                  );
+                }
+                return (
                   <a href={trimmed} target="_blank" rel="noopener" class="flex items-center gap-2 text-primary hover:text-primary-dark text-sm font-medium">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>

@@ -129,6 +129,9 @@ module.exports = {
       { api: 'partenaire', actions: ['find', 'findOne'] },
     ]);
 
+    // Set French labels on content types
+    await setFrenchLabels(strapi);
+
     // Seed demo data if no editions exist yet
     await seedData(strapi);
   },
@@ -213,6 +216,108 @@ async function seedData(strapi) {
   }
 
   strapi.log.info('Seed complete!');
+}
+
+// =============================================================================
+// FRENCH LABELS FOR CONTENT-MANAGER
+// =============================================================================
+
+const FRENCH_LABELS = {
+  'api::edition.edition': {
+    title: 'Titre',
+    slug: 'Identifiant URL',
+    year: 'Année',
+    region: 'Région',
+    date: 'Date',
+    city: 'Ville',
+    status: 'Statut',
+    description: 'Description',
+    inscription_url: 'Lien d\'inscription',
+    image: 'Image de couverture',
+    lieux: 'Lieux',
+    programme_items: 'Éléments du programme',
+    partenaires: 'Partenaires',
+    gallery: 'Galerie photos',
+    video_urls: 'URLs des vidéos',
+    summary: 'Bilan / Synthèse',
+    testimonials: 'Témoignages',
+  },
+  'api::intervenant.intervenant': {
+    name: 'Nom',
+    slug: 'Identifiant URL',
+    title: 'Fonction',
+    organization: 'Organisation',
+    bio: 'Biographie',
+    photo: 'Photo',
+    topic: 'Sujet d\'intervention',
+    linkedin_url: 'Profil LinkedIn',
+    programme_items: 'Interventions au programme',
+  },
+  'api::partenaire.partenaire': {
+    name: 'Nom',
+    slug: 'Identifiant URL',
+    logo: 'Logo',
+    description: 'Description',
+    website: 'Site web',
+    category: 'Catégorie',
+    is_global: 'Partenaire national',
+    editions: 'Éditions associées',
+  },
+  'api::programme-item.programme-item': {
+    title: 'Titre',
+    start_time: 'Heure de début',
+    end_time: 'Heure de fin',
+    description: 'Description',
+    category: 'Catégorie',
+    order: 'Ordre d\'affichage',
+    edition: 'Édition',
+    intervenants: 'Intervenants',
+  },
+};
+
+async function setFrenchLabels(strapi) {
+  // Query the core_store for each content type configuration
+  const entries = [];
+  for (const uid of Object.keys(FRENCH_LABELS)) {
+    const storeKey = `plugin_content_manager_configuration_content_types::${uid}`;
+    const entry = await strapi.db.query('strapi::core-store').findOne({
+      where: { key: storeKey },
+    });
+    strapi.log.info(`[FR] Looking for ${storeKey}: ${entry ? 'FOUND' : 'NOT FOUND'}`);
+    if (entry) entries.push(entry);
+  }
+
+  for (const entry of entries) {
+    const uid = entry.key.replace('plugin_content_manager_configuration_content_types::', '');
+    const labels = FRENCH_LABELS[uid];
+    if (!labels) continue;
+
+    let config = typeof entry.value === 'string' ? JSON.parse(entry.value) : entry.value;
+    const metadatas = config.metadatas || {};
+    let changed = false;
+
+    for (const [field, frLabel] of Object.entries(labels)) {
+      if (metadatas[field]) {
+        if (metadatas[field].edit && metadatas[field].edit.label !== frLabel) {
+          metadatas[field].edit.label = frLabel;
+          changed = true;
+        }
+        if (metadatas[field].list && metadatas[field].list.label !== frLabel) {
+          metadatas[field].list.label = frLabel;
+          changed = true;
+        }
+      }
+    }
+
+    if (changed) {
+      config.metadatas = metadatas;
+      await strapi.db.query('strapi::core-store').update({
+        where: { id: entry.id },
+        data: { value: JSON.stringify(config) },
+      });
+      strapi.log.info(`Labels français appliqués pour ${uid}`);
+    }
+  }
 }
 
 // =============================================================================

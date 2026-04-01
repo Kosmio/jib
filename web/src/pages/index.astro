@@ -7,121 +7,186 @@ let editions = { data: [] } as Awaited<ReturnType<typeof getEditions>>;
 try {
   editions = await getEditions();
 } catch {}
-const nextEdition = editions?.data?.find((e) => e.status === "open" || e.status === "upcoming");
+const nextEdition = editions?.data?.find((e) => e.edition_status === "inscriptions-ouvertes" || e.edition_status === "a-venir");
+
+// Mapping régions → coordonnées SVG sur la carte de France (viewBox 0 0 1280 720, offset +300px)
+const regionCoords: Record<string, { x: number; y: number }> = {
+  'hauts-de-france': { x: 940, y: 105 },
+  'normandie': { x: 815, y: 195 },
+  'bretagne': { x: 670, y: 245 },
+  'pays-de-la-loire': { x: 740, y: 310 },
+  'centre-val-de-loire': { x: 850, y: 310 },
+  'ile-de-france': { x: 930, y: 220 },
+  'grand-est': { x: 1100, y: 215 },
+  'bourgogne-franche-comte': { x: 1030, y: 310 },
+  'nouvelle-aquitaine': { x: 770, y: 440 },
+  'auvergne-rhone-alpes': { x: 1010, y: 410 },
+  'occitanie': { x: 870, y: 530 },
+  'region-sud': { x: 1030, y: 530 },
+  'corse': { x: 1150, y: 520 },
+};
+
+// Régions qui ont au moins une édition
+const editionRegions = new Set(editions?.data?.map((e) => e.region) ?? []);
 
 const statusLabels: Record<string, string> = {
-  upcoming: "À venir",
-  open: "Inscriptions ouvertes",
-  full: "Complet",
-  past: "Passée",
+  "a-venir": "À venir",
+  "inscriptions-ouvertes": "Inscriptions ouvertes",
+  "complet": "Complet",
+  "passee": "Passée",
 };
 
 const statusColors: Record<string, string> = {
-  upcoming: "bg-white/20 text-white",
-  open: "bg-accent text-white",
-  full: "bg-white/20 text-white",
-  past: "bg-white/10 text-white/70",
+  "a-venir": "bg-white/20 text-white",
+  "inscriptions-ouvertes": "bg-accent text-white",
+  "complet": "bg-white/20 text-white",
+  "passee": "bg-white/10 text-white/70",
 };
 ---
 
 <Layout title="Journées de l'Innovation Filière Bois" description="Site des Journées de l'Innovation de la Filière Bois — événements régionaux portés par Xylofutur et les Fibois">
   <!-- Hero -->
-  <section class="relative min-h-[80vh] bg-wood overflow-hidden flex items-center">
+  <section class="relative min-h-[75vh] bg-wood overflow-hidden flex items-center">
     <!-- Wood texture overlay -->
     <div class="absolute inset-0 opacity-[0.08]" style="background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIj48ZmlsdGVyIGlkPSJuIj48ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iLjY1IiBudW1PY3RhdmVzPSI0IiBzdGl0Y2hUaWxlcz0ic3RpdGNoIi8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjIwMCIgaGVpZ2h0PSIyMDAiIGZpbHRlcj0idXJsKCNuKSIgb3BhY2l0eT0iMSIvPjwvc3ZnPg==');"></div>
 
     <!-- Network nodes SVG — France map shape (shifted right) -->
     <div class="absolute inset-0 overflow-hidden">
       <svg class="hero-network absolute inset-0 w-full h-full" viewBox="0 0 1280 720" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
-        <!-- France outline (border connections) — offset +300px right -->
-        <g stroke="#F6C453" stroke-width="1.2" opacity="0.20">
+        <!-- France outline (border connections) -->
+        <g stroke="#F0AB00" stroke-width="1" opacity="0.16">
           <line x1="940" y1="105" x2="900" y2="85" class="hero-line hero-line-1" />
-          <line x1="900" y1="85" x2="860" y2="185" class="hero-line hero-line-2" />
-          <line x1="860" y1="185" x2="670" y2="225" class="hero-line hero-line-3" />
-          <line x1="670" y1="225" x2="740" y2="265" class="hero-line hero-line-4" />
-          <line x1="740" y1="265" x2="730" y2="340" class="hero-line hero-line-5" />
-          <line x1="730" y1="340" x2="750" y2="470" class="hero-line hero-line-6" />
-          <line x1="750" y1="470" x2="735" y2="545" class="hero-line hero-line-7" />
-          <line x1="735" y1="545" x2="855" y2="555" class="hero-line hero-line-8" />
-          <line x1="855" y1="555" x2="900" y2="600" class="hero-line hero-line-9" />
-          <line x1="900" y1="600" x2="960" y2="570" class="hero-line hero-line-10" />
-          <line x1="960" y1="570" x2="1030" y2="565" class="hero-line hero-line-11" />
-          <line x1="1030" y1="565" x2="1120" y2="520" class="hero-line hero-line-1" />
-          <line x1="1120" y1="520" x2="1060" y2="435" class="hero-line hero-line-2" />
-          <line x1="1060" y1="435" x2="1030" y2="300" class="hero-line hero-line-3" />
-          <line x1="1030" y1="300" x2="1135" y2="200" class="hero-line hero-line-4" />
-          <line x1="1135" y1="200" x2="1080" y2="160" class="hero-line hero-line-5" />
-          <line x1="1080" y1="160" x2="940" y2="105" class="hero-line hero-line-6" />
+          <line x1="900" y1="85" x2="860" y2="150" class="hero-line hero-line-2" />
+          <line x1="860" y1="150" x2="815" y2="195" class="hero-line hero-line-3" />
+          <line x1="815" y1="195" x2="670" y2="245" class="hero-line hero-line-4" />
+          <line x1="670" y1="245" x2="700" y2="275" class="hero-line hero-line-5" />
+          <line x1="700" y1="275" x2="740" y2="310" class="hero-line hero-line-6" />
+          <line x1="740" y1="310" x2="720" y2="370" class="hero-line hero-line-7" />
+          <line x1="720" y1="370" x2="770" y2="440" class="hero-line hero-line-8" />
+          <line x1="770" y1="440" x2="750" y2="500" class="hero-line hero-line-9" />
+          <line x1="750" y1="500" x2="780" y2="560" class="hero-line hero-line-10" />
+          <line x1="780" y1="560" x2="870" y2="530" class="hero-line hero-line-11" />
+          <line x1="870" y1="530" x2="920" y2="590" class="hero-line hero-line-1" />
+          <line x1="920" y1="590" x2="970" y2="570" class="hero-line hero-line-2" />
+          <line x1="970" y1="570" x2="1030" y2="530" class="hero-line hero-line-3" />
+          <line x1="1030" y1="530" x2="1080" y2="490" class="hero-line hero-line-4" />
+          <line x1="1080" y1="490" x2="1060" y2="435" class="hero-line hero-line-5" />
+          <line x1="1060" y1="435" x2="1085" y2="360" class="hero-line hero-line-6" />
+          <line x1="1085" y1="360" x2="1050" y2="290" class="hero-line hero-line-7" />
+          <line x1="1050" y1="290" x2="1100" y2="215" class="hero-line hero-line-8" />
+          <line x1="1100" y1="215" x2="1080" y2="160" class="hero-line hero-line-9" />
+          <line x1="1080" y1="160" x2="1000" y2="130" class="hero-line hero-line-10" />
+          <line x1="1000" y1="130" x2="940" y2="105" class="hero-line hero-line-11" />
         </g>
         <!-- Interior network connections -->
-        <g stroke="#F6C453" stroke-width="0.8" opacity="0.14">
-          <line x1="930" y1="220" x2="860" y2="185" class="hero-line hero-line-7" />
-          <line x1="930" y1="220" x2="940" y2="105" class="hero-line hero-line-8" />
-          <line x1="930" y1="220" x2="820" y2="310" class="hero-line hero-line-9" />
-          <line x1="930" y1="220" x2="1030" y2="300" class="hero-line hero-line-10" />
-          <line x1="930" y1="220" x2="925" y2="405" class="hero-line hero-line-11" />
-          <line x1="1010" y1="395" x2="1030" y2="300" class="hero-line hero-line-1" />
-          <line x1="1010" y1="395" x2="925" y2="405" class="hero-line hero-line-2" />
-          <line x1="1010" y1="395" x2="1060" y2="435" class="hero-line hero-line-3" />
-          <line x1="1010" y1="395" x2="1030" y2="565" class="hero-line hero-line-4" />
-          <line x1="740" y1="265" x2="820" y2="310" class="hero-line hero-line-5" />
-          <line x1="820" y1="310" x2="840" y2="405" class="hero-line hero-line-6" />
-          <line x1="840" y1="405" x2="925" y2="405" class="hero-line hero-line-7" />
-          <line x1="840" y1="405" x2="750" y2="470" class="hero-line hero-line-8" />
-          <line x1="925" y1="405" x2="855" y2="555" class="hero-line hero-line-9" />
-          <line x1="730" y1="340" x2="820" y2="310" class="hero-line hero-line-10" />
-          <line x1="1135" y1="200" x2="1030" y2="300" class="hero-line hero-line-11" />
-          <line x1="960" y1="570" x2="855" y2="555" class="hero-line hero-line-1" />
+        <g stroke="#F0AB00" stroke-width="0.6" opacity="0.10">
+          <!-- Paris hub connections -->
+          <line x1="930" y1="220" x2="940" y2="105" class="hero-line hero-line-1" />
+          <line x1="930" y1="220" x2="815" y2="195" class="hero-line hero-line-2" />
+          <line x1="930" y1="220" x2="1100" y2="215" class="hero-line hero-line-3" />
+          <line x1="930" y1="220" x2="850" y2="310" class="hero-line hero-line-4" />
+          <line x1="930" y1="220" x2="1030" y2="310" class="hero-line hero-line-5" />
+          <line x1="930" y1="220" x2="1010" y2="410" class="hero-line hero-line-6" />
+          <!-- Regional connections -->
+          <line x1="670" y1="245" x2="740" y2="310" class="hero-line hero-line-7" />
+          <line x1="740" y1="310" x2="850" y2="310" class="hero-line hero-line-8" />
+          <line x1="850" y1="310" x2="1030" y2="310" class="hero-line hero-line-9" />
+          <line x1="770" y1="440" x2="870" y2="530" class="hero-line hero-line-10" />
+          <line x1="870" y1="530" x2="1030" y2="530" class="hero-line hero-line-11" />
+          <line x1="1010" y1="410" x2="1030" y2="530" class="hero-line hero-line-1" />
+          <line x1="1010" y1="410" x2="1030" y2="310" class="hero-line hero-line-2" />
+          <line x1="1010" y1="410" x2="870" y2="530" class="hero-line hero-line-3" />
+          <line x1="770" y1="440" x2="1010" y2="410" class="hero-line hero-line-4" />
+          <line x1="740" y1="310" x2="770" y2="440" class="hero-line hero-line-5" />
+          <line x1="850" y1="310" x2="770" y2="440" class="hero-line hero-line-6" />
+          <line x1="1100" y1="215" x2="1030" y2="310" class="hero-line hero-line-7" />
+          <line x1="1030" y1="310" x2="1060" y2="435" class="hero-line hero-line-8" />
+          <!-- Extra minor connections -->
+          <line x1="815" y1="195" x2="740" y2="310" class="hero-line hero-line-9" />
+          <line x1="850" y1="310" x2="1010" y2="410" class="hero-line hero-line-10" />
+          <line x1="670" y1="245" x2="815" y2="195" class="hero-line hero-line-11" />
         </g>
-        <!-- City nodes — outline -->
-        <g>
-          <circle cx="940" cy="105" r="5" fill="#F6C453" opacity="0.4" class="hero-node hero-node-1" />
-          <circle cx="900" cy="85" r="4" fill="#F6C453" opacity="0.3" class="hero-node hero-node-2" />
-          <circle cx="860" cy="185" r="5" fill="#F6C453" opacity="0.35" class="hero-node hero-node-3" />
-          <circle cx="670" cy="225" r="4" fill="#F6C453" opacity="0.3" class="hero-node hero-node-4" />
-          <circle cx="740" cy="265" r="4" fill="#F6C453" opacity="0.3" class="hero-node hero-node-5" />
-          <circle cx="730" cy="340" r="5" fill="#F6C453" opacity="0.35" class="hero-node hero-node-6" />
-          <circle cx="750" cy="470" r="5" fill="#F6C453" opacity="0.35" class="hero-node hero-node-7" />
-          <circle cx="735" cy="545" r="4" fill="#F6C453" opacity="0.3" class="hero-node hero-node-8" />
-          <circle cx="855" cy="555" r="5" fill="#F6C453" opacity="0.35" class="hero-node hero-node-1" />
-          <circle cx="900" cy="600" r="4" fill="#F6C453" opacity="0.3" class="hero-node hero-node-2" />
-          <circle cx="960" cy="570" r="4" fill="#F6C453" opacity="0.3" class="hero-node hero-node-3" />
-          <circle cx="1030" cy="565" r="5" fill="#F6C453" opacity="0.35" class="hero-node hero-node-4" />
-          <circle cx="1120" cy="520" r="4" fill="#F6C453" opacity="0.3" class="hero-node hero-node-5" />
-          <circle cx="1060" cy="435" r="4" fill="#F6C453" opacity="0.3" class="hero-node hero-node-6" />
-          <circle cx="1030" cy="300" r="5" fill="#F6C453" opacity="0.35" class="hero-node hero-node-7" />
-          <circle cx="1135" cy="200" r="5" fill="#F6C453" opacity="0.35" class="hero-node hero-node-8" />
-          <circle cx="1080" cy="160" r="4" fill="#F6C453" opacity="0.3" class="hero-node hero-node-1" />
+
+        <!-- Decorative dots — small, static, scattered across France -->
+        <g fill="#F0AB00">
+          <!-- Outline border dots -->
+          <circle cx="900" cy="85" r="1.5" opacity="0.2" class="hero-node" />
+          <circle cx="860" cy="150" r="1.5" opacity="0.2" class="hero-node" />
+          <circle cx="700" cy="275" r="1.5" opacity="0.2" class="hero-node" />
+          <circle cx="720" cy="370" r="1.5" opacity="0.18" class="hero-node" />
+          <circle cx="750" cy="500" r="1.5" opacity="0.18" class="hero-node" />
+          <circle cx="780" cy="560" r="1.5" opacity="0.18" class="hero-node" />
+          <circle cx="920" cy="590" r="1.5" opacity="0.2" class="hero-node" />
+          <circle cx="970" cy="570" r="1.5" opacity="0.2" class="hero-node" />
+          <circle cx="1080" cy="490" r="1.5" opacity="0.18" class="hero-node" />
+          <circle cx="1085" cy="360" r="1.5" opacity="0.18" class="hero-node" />
+          <circle cx="1050" cy="290" r="1.5" opacity="0.2" class="hero-node" />
+          <circle cx="1080" cy="160" r="1.5" opacity="0.2" class="hero-node" />
+          <circle cx="1000" cy="130" r="1.5" opacity="0.2" class="hero-node" />
+          <!-- Interior scattered dots — small towns -->
+          <circle cx="880" cy="130" r="1" opacity="0.15" class="hero-node" />
+          <circle cx="960" cy="155" r="1" opacity="0.15" class="hero-node" />
+          <circle cx="780" cy="220" r="1" opacity="0.12" class="hero-node" />
+          <circle cx="870" cy="240" r="1" opacity="0.15" class="hero-node" />
+          <circle cx="990" cy="180" r="1" opacity="0.12" class="hero-node" />
+          <circle cx="1040" cy="230" r="1" opacity="0.12" class="hero-node" />
+          <circle cx="1070" cy="270" r="1" opacity="0.12" class="hero-node" />
+          <circle cx="980" cy="270" r="1" opacity="0.12" class="hero-node" />
+          <circle cx="900" cy="290" r="1" opacity="0.12" class="hero-node" />
+          <circle cx="790" cy="280" r="1" opacity="0.12" class="hero-node" />
+          <circle cx="710" cy="330" r="1" opacity="0.12" class="hero-node" />
+          <circle cx="800" cy="360" r="1" opacity="0.12" class="hero-node" />
+          <circle cx="880" cy="350" r="1" opacity="0.12" class="hero-node" />
+          <circle cx="950" cy="340" r="1" opacity="0.12" class="hero-node" />
+          <circle cx="1060" cy="340" r="1" opacity="0.12" class="hero-node" />
+          <circle cx="960" cy="450" r="1" opacity="0.12" class="hero-node" />
+          <circle cx="830" cy="470" r="1" opacity="0.12" class="hero-node" />
+          <circle cx="900" cy="480" r="1" opacity="0.12" class="hero-node" />
+          <circle cx="1040" cy="460" r="1" opacity="0.12" class="hero-node" />
+          <circle cx="790" cy="520" r="1" opacity="0.12" class="hero-node" />
+          <circle cx="930" cy="540" r="1" opacity="0.12" class="hero-node" />
+          <circle cx="980" cy="500" r="1" opacity="0.12" class="hero-node" />
+          <circle cx="1060" cy="510" r="1" opacity="0.12" class="hero-node" />
+          <circle cx="850" cy="420" r="1" opacity="0.12" class="hero-node" />
+          <circle cx="760" cy="390" r="1" opacity="0.12" class="hero-node" />
+          <circle cx="920" cy="370" r="1" opacity="0.12" class="hero-node" />
         </g>
-        <!-- City nodes — interior hubs -->
-        <g>
-          <circle cx="930" cy="220" r="8" fill="#F6C453" opacity="0.5" class="hero-node hero-node-2" />
-          <circle cx="1010" cy="395" r="7" fill="#F6C453" opacity="0.45" class="hero-node hero-node-3" />
-          <circle cx="820" cy="310" r="5" fill="#F6C453" opacity="0.35" class="hero-node hero-node-4" />
-          <circle cx="840" cy="405" r="5" fill="#F6C453" opacity="0.35" class="hero-node hero-node-5" />
-          <circle cx="925" cy="405" r="6" fill="#F6C453" opacity="0.4" class="hero-node hero-node-6" />
+
+        <!-- Regional capital nodes — edition cities pulse, others static -->
+        <g fill="#F0AB00">
+          {Object.entries(regionCoords).map(([region, coords], i) => {
+            const hasEdition = editionRegions.has(region);
+            const r = hasEdition ? 3.5 : 2;
+            const opacity = hasEdition ? 0.6 : 0.25;
+            const cls = hasEdition
+              ? `hero-node hero-node-edition hero-node-edition-${(i % 5) + 1}`
+              : 'hero-node';
+            return (
+              <circle
+                cx={coords.x}
+                cy={coords.y}
+                r={r}
+                opacity={opacity}
+                class={cls}
+              />
+            );
+          })}
         </g>
       </svg>
     </div>
 
     <!-- Radial gradient overlay -->
-    <div class="absolute inset-0" style="background: radial-gradient(circle at 60% 50%, rgba(246,196,83,0.12), transparent 50%);"></div>
+    <div class="absolute inset-0" style="background: radial-gradient(circle at 60% 50%, rgba(240,171,0,0.12), transparent 50%);"></div>
 
     <!-- Content -->
     <div class="relative w-full max-w-[1280px] mx-auto px-6 md:px-16 pt-28 pb-16 md:pt-32 md:pb-20">
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-center">
+      <div class="flex flex-col lg:flex-row items-center lg:items-start gap-10 lg:gap-16">
+      <div class="max-w-3xl mx-auto lg:mx-0 text-center lg:text-left flex-1">
 
-        <!-- Left: editorial content (cols 1-7) -->
-        <div class="lg:col-span-7 text-center lg:text-left">
-          <!-- Badge -->
-          <span class="inline-block bg-gold text-wood-dark text-xs font-semibold uppercase tracking-wider px-4 py-1.5 rounded-full mb-6">
-            Programme {nextEdition?.year || new Date().getFullYear()}
-          </span>
+        <!-- Logo JIB blanc -->
+        <img src="/assets/logo-jib-blanc.svg" alt="Journées de l'Innovation Filière Bois" class="h-16 md:h-20 lg:h-24 mb-6 mx-auto lg:mx-0" />
 
-          <!-- Title -->
-          <h1 class="font-heading text-4xl md:text-5xl lg:text-[3.75rem] font-semibold text-white leading-[1.05] tracking-[0.02em]">
-            La Journée de l'<span class="text-gold">Innovation</span> de la Filière Bois
-          </h1>
+        <h1 class="sr-only">La Journée de l'Innovation de la Filière Bois</h1>
 
           <!-- Subtitle -->
           <p class="mt-6 text-lg md:text-xl text-white/80 max-w-[520px] mx-auto lg:mx-0 leading-relaxed">
@@ -155,7 +220,7 @@ const statusColors: Record<string, string> = {
 
           <!-- CTAs -->
           <div class="mt-8 flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-            {nextEdition?.inscription_url && nextEdition.status === "open" ? (
+            {nextEdition?.inscription_url && nextEdition.edition_status === "inscriptions-ouvertes" ? (
               <a
                 href={nextEdition.inscription_url}
                 target="_blank"
@@ -202,41 +267,24 @@ const statusColors: Record<string, string> = {
               <span class="text-gold font-semibold text-base">8</span> financeurs présents
             </div>
           </div>
-        </div>
+      </div>
 
-        <!-- Right: image composition (cols 8-12) -->
-        <div class="lg:col-span-5 hidden lg:flex flex-col items-center gap-8">
-          <div class="hero-card relative w-56 h-40 rounded-2xl overflow-hidden border-[3px] border-white/30 shadow-2xl rotate-[-2deg] hover:rotate-0 transition-transform duration-500">
-            <div class="absolute inset-0 bg-gradient-to-br from-primary/60 to-wood-dark/80"></div>
-            <div class="absolute inset-0 flex items-center justify-center">
-              <svg class="w-16 h-16 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-              </svg>
-            </div>
-            <p class="absolute bottom-3 left-0 right-0 text-center text-white/70 text-xs font-medium uppercase tracking-wider">Ressource</p>
+      <!-- Image de la prochaine édition — cliquable -->
+      {nextEdition?.image && (
+        <a
+          href={`/editions/${nextEdition.slug}`}
+          class="hidden lg:block flex-shrink-0 group"
+        >
+          <div class="relative rounded-2xl overflow-hidden border-[3px] border-white/25 shadow-2xl max-w-sm transition-transform duration-300 group-hover:scale-[1.03]">
+            <img
+              src={buildImageUrl(nextEdition.image.url)}
+              alt={nextEdition.title}
+              class="w-full h-auto object-cover"
+            />
+            <div class="absolute inset-0 bg-gradient-to-t from-wood-dark/40 to-transparent"></div>
           </div>
-
-          <div class="hero-card relative w-56 h-40 rounded-2xl overflow-hidden border-[3px] border-white/30 shadow-2xl rotate-[2deg] hover:rotate-0 transition-transform duration-500" style="animation-delay: 0.2s;">
-            <div class="absolute inset-0 bg-gradient-to-br from-gold/50 to-wood/80"></div>
-            <div class="absolute inset-0 flex items-center justify-center">
-              <svg class="w-16 h-16 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
-              </svg>
-            </div>
-            <p class="absolute bottom-3 left-0 right-0 text-center text-white/70 text-xs font-medium uppercase tracking-wider">Innovation</p>
-          </div>
-
-          <div class="hero-card relative w-56 h-40 rounded-2xl overflow-hidden border-[3px] border-white/30 shadow-2xl rotate-[-1deg] hover:rotate-0 transition-transform duration-500" style="animation-delay: 0.4s;">
-            <div class="absolute inset-0 bg-gradient-to-br from-wood-light/60 to-wood-dark/90"></div>
-            <div class="absolute inset-0 flex items-center justify-center">
-              <svg class="w-16 h-16 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-              </svg>
-            </div>
-            <p class="absolute bottom-3 left-0 right-0 text-center text-white/70 text-xs font-medium uppercase tracking-wider">Transformation</p>
-          </div>
-        </div>
+        </a>
+      )}
       </div>
     </div>
 
@@ -262,33 +310,33 @@ const statusColors: Record<string, string> = {
 
       <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
         <div class="p-6 rounded-xl bg-surface border border-gray-100">
+          <div class="w-10 h-10 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center mb-4">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+            </svg>
+          </div>
+          <h3 class="font-semibold text-gray-900 mb-2">IA & Digitalisation</h3>
+          <p class="text-sm text-muted leading-relaxed">Comment l'intelligence artificielle et les outils numériques transforment les process de la filière bois.</p>
+        </div>
+
+        <div class="p-6 rounded-xl bg-surface border border-gray-100">
           <div class="w-10 h-10 rounded-lg bg-emerald-100 text-primary flex items-center justify-center mb-4">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
             </svg>
           </div>
-          <h3 class="font-semibold text-gray-900 mb-2">Pitchs innovants</h3>
-          <p class="text-sm text-muted leading-relaxed">Des entrepreneurs partagent leurs solutions concrètes pour la filière bois.</p>
+          <h3 class="font-semibold text-gray-900 mb-2">Economie circulaire</h3>
+          <p class="text-sm text-muted leading-relaxed">Réemploi, recyclage, biosourcé — les modèles circulaires au service de la construction et de l'industrie bois.</p>
         </div>
 
         <div class="p-6 rounded-xl bg-surface border border-gray-100">
-          <div class="w-10 h-10 rounded-lg bg-amber-100 text-accent-dark flex items-center justify-center mb-4">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/>
-            </svg>
-          </div>
-          <h3 class="font-semibold text-gray-900 mb-2">Recherche appliquée</h3>
-          <p class="text-sm text-muted leading-relaxed">Les laboratoires présentent leurs travaux et les applications pour la filière.</p>
-        </div>
-
-        <div class="p-6 rounded-xl bg-surface border border-gray-100">
-          <div class="w-10 h-10 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center mb-4">
+          <div class="w-10 h-10 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center mb-4">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
             </svg>
           </div>
-          <h3 class="font-semibold text-gray-900 mb-2">Financement</h3>
-          <p class="text-sm text-muted leading-relaxed">BpiFrance, ADNormandie, Forinvest... les financeurs présentent leurs dispositifs.</p>
+          <h3 class="font-semibold text-gray-900 mb-2">Financement de l'innovation</h3>
+          <p class="text-sm text-muted leading-relaxed">BpiFrance, business angels, aides régionales — les dispositifs pour financer vos projets innovants.</p>
         </div>
       </div>
 
@@ -321,7 +369,7 @@ const statusColors: Record<string, string> = {
           {editions.data.slice(0, 6).map((edition) => (
             <a href={`/editions/${edition.slug}`} class="group block rounded-xl border border-gray-100 bg-white overflow-hidden hover:shadow-lg transition-shadow">
               {edition.image ? (
-                <div class="aspect-video bg-surface overflow-hidden">
+                <div class="aspect-square bg-surface overflow-hidden">
                   <img
                     src={buildImageUrl(edition.image.url)}
                     alt={edition.title}
@@ -329,7 +377,7 @@ const statusColors: Record<string, string> = {
                   />
                 </div>
               ) : (
-                <div class="aspect-video bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center">
+                <div class="aspect-square bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center">
                   <span class="text-3xl font-bold text-primary/20">{regionLabels[edition.region] || edition.region}</span>
                 </div>
               )}
@@ -365,6 +413,21 @@ const statusColors: Record<string, string> = {
         </a>
         <a href="/contact" class="inline-flex items-center justify-center px-7 py-3 border-2 border-gray-200 text-gray-700 hover:border-gray-300 font-semibold text-sm rounded-lg transition-colors">
           Nous contacter
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Partenaires — bandeau défilant -->
+  <section class="py-12 bg-white border-t border-gray-100">
+    <div class="max-w-6xl mx-auto px-6">
+      <p class="text-center text-sm font-medium text-muted mb-8 uppercase tracking-wider">Avec le soutien de</p>
+      <div class="flex flex-wrap items-center justify-center gap-10 md:gap-14">
+        <a href="https://www.codifab.fr" target="_blank" rel="noopener" class="h-12 hover:opacity-80 transition-opacity" title="Codifab">
+          <img src="/assets/logo-codifab.svg" alt="Codifab" class="h-full w-auto object-contain" />
+        </a>
+        <a href="https://www.xylofutur.fr" target="_blank" rel="noopener" class="h-10 hover:opacity-80 transition-opacity" title="Xylofutur">
+          <img src="/assets/logo-xylofutur.png" alt="Xylofutur" class="h-full w-auto object-contain" />
         </a>
       </div>
     </div>

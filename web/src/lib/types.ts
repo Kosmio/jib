@@ -45,12 +45,18 @@ export interface Lieu {
 export interface Intervenant extends Entity {
   name: string;
   slug: string;
+  type: 'personne' | 'organisation';
   title: string | null;
   organization: string;
   bio: string | null;
+  long_description: string | null;
   photo: Image | null;
   topic: string | null;
   linkedin_url: string | null;
+  website: string | null;
+  video_url: string | null;
+  category: 'entrepreneur' | 'chercheur' | 'financeur' | 'institutionnel' | 'organisateur' | null;
+  partenaire?: Partenaire | null;
   programme_items?: ProgrammeItem[];
 }
 
@@ -60,9 +66,11 @@ export interface Partenaire extends Entity {
   logo: Image | null;
   description: string | null;
   website: string | null;
-  category: 'soutien' | 'coorganisateur' | 'institutionnel' | 'prive';
+  linkedin_url: string | null;
+  category: 'soutien' | 'co-organisateur' | 'institutionnel' | 'privé';
   is_global: boolean;
   editions?: Edition[];
+  intervenants?: Intervenant[];
 }
 
 export interface ProgrammeItem extends Entity {
@@ -105,7 +113,7 @@ export interface Edition extends Entity {
   region: Region;
   date: string;
   city: string;
-  status: 'upcoming' | 'open' | 'full' | 'past';
+  edition_status: 'a-venir' | 'inscriptions-ouvertes' | 'complet' | 'passee';
   description: string | null;
   inscription_url: string | null;
   image: Image | null;

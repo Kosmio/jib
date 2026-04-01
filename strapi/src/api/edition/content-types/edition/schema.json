@@ -4,7 +4,8 @@
   "info": {
     "singularName": "edition",
     "pluralName": "editions",
-    "displayName": "Edition"
+    "displayName": "Édition",
+    "description": "Les éditions régionales des Journées de l'Innovation Filière Bois"
   },
   "options": {
     "draftAndPublish": true
@@ -49,10 +50,10 @@
       "type": "string",
       "required": true
     },
-    "status": {
+    "edition_status": {
       "type": "enumeration",
-      "enum": ["upcoming", "open", "full", "past"],
-      "default": "upcoming",
+      "enum": ["a-venir", "inscriptions-ouvertes", "complet", "passee"],
+      "default": "a-venir",
       "required": true
     },
     "description": {

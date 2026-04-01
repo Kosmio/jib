@@ -10,17 +10,17 @@ try {
 } catch {}
 
 const statusLabels: Record<string, string> = {
-  upcoming: "À venir",
-  open: "Inscriptions ouvertes",
-  full: "Complet",
-  past: "Passée",
+  "a-venir": "À venir",
+  "inscriptions-ouvertes": "Inscriptions ouvertes",
+  "complet": "Complet",
+  "passee": "Passée",
 };
 
 const statusColors: Record<string, string> = {
-  upcoming: "bg-gray-100 text-gray-700",
-  open: "bg-primary/10 text-primary-dark",
-  full: "bg-accent/10 text-accent-dark",
-  past: "bg-surface-alt text-muted",
+  "a-venir": "bg-gray-100 text-gray-700",
+  "inscriptions-ouvertes": "bg-primary/10 text-primary-dark",
+  "complet": "bg-accent/10 text-accent-dark",
+  "passee": "bg-surface-alt text-muted",
 };
 
 // Region enum slug → display label + map coordinates (viewBox 630x651)
@@ -40,22 +40,41 @@ const regionData: Record<string, { label: string; x: number; y: number }> = {
   "corse": { label: "Corse", x: 530, y: 510 },
 };
 
-const editionsWithCoords = editions?.data?.map((edition) => {
+// Deduplicate by region for map: show most relevant edition per region
+const statusPriority: Record<string, number> = { "inscriptions-ouvertes": 0, "a-venir": 1, "complet": 2, "passee": 3 };
+const regionMap = new Map<string, typeof editions.data[0]>();
+for (const edition of (editions?.data || [])) {
+  const existing = regionMap.get(edition.region);
+  if (!existing || (statusPriority[edition.edition_status] ?? 9) < (statusPriority[existing.edition_status] ?? 9)
+    || ((statusPriority[edition.edition_status] ?? 9) === (statusPriority[existing.edition_status] ?? 9) && edition.year > existing.year)) {
+    regionMap.set(edition.region, edition);
+  }
+}
+
+const editionsWithCoords = [...regionMap.values()].map((edition) => {
   const rd = regionData[edition.region];
   return {
     ...edition,
     regionLabel: rd?.label || edition.region,
     coords: rd ? { x: rd.x, y: rd.y } : null,
-    isOpen: edition.status === 'open',
-    isPast: edition.status === 'past',
-    color: edition.status === 'open' ? '#F6C453' : edition.status === 'past' ? '#BA8748' : '#00B194',
-    statusText: edition.status === 'open'
+    isOpen: edition.edition_status === 'inscriptions-ouvertes',
+    isPast: edition.edition_status === 'passee',
+    color: edition.edition_status === 'inscriptions-ouvertes' ? '#F0AB00' : edition.edition_status === 'passee' ? '#BA8748' : '#00B194',
+    statusText: edition.edition_status === 'inscriptions-ouvertes'
       ? 'Inscriptions ouvertes'
-      : edition.status === 'past'
+      : edition.edition_status === 'passee'
         ? 'Passée'
         : new Date(edition.date).toLocaleDateString("fr-FR", { month: "long", year: "numeric" }),
   };
 }).filter((e) => e.coords) || [];
+
+// Sort editions: open first, then upcoming, then past (most recent first within each group)
+const sortedEditions = [...(editions?.data || [])].sort((a, b) => {
+  const pa = statusPriority[a.edition_status] ?? 9;
+  const pb = statusPriority[b.edition_status] ?? 9;
+  if (pa !== pb) return pa - pb;
+  return new Date(b.date).getTime() - new Date(a.date).getTime();
+});
 ---
 
 <Layout title="Les éditions — Journées de l'Innovation Filière Bois" description="Retrouvez toutes les éditions des Journées de l'Innovation de la Filière Bois, par région et par année.">
@@ -104,12 +123,12 @@ const editionsWithCoords = editions?.data?.map((edition) => {
   <!-- Liste des éditions -->
   <section class="py-16 md:py-24 bg-white">
     <div class="max-w-6xl mx-auto px-6">
-      {editions?.data?.length > 0 ? (
+      {sortedEditions.length > 0 ? (
         <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
-          {editions.data.map((edition) => (
+          {sortedEditions.map((edition) => (
             <a href={`/editions/${edition.slug}`} class="group block rounded-xl border border-gray-100 overflow-hidden hover:shadow-lg transition-shadow">
               {edition.image ? (
-                <div class="aspect-video bg-surface overflow-hidden">
+                <div class="aspect-square bg-surface overflow-hidden">
                   <img
                     src={buildImageUrl(edition.image.url)}
                     alt={edition.title}
@@ -117,14 +136,14 @@ const editionsWithCoords = editions?.data?.map((edition) => {
                   />
                 </div>
               ) : (
-                <div class="aspect-video bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center">
+                <div class="aspect-square bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center">
                   <span class="text-4xl font-bold text-primary/20">{regionLabels[edition.region] || edition.region}</span>
                 </div>
               )}
               <div class="p-5">
                 <div class="flex items-center gap-2 mb-3">
-                  <span class={`text-xs font-medium px-2.5 py-1 rounded-full ${statusColors[edition.status] || statusColors.upcoming}`}>
-                    {statusLabels[edition.status] || edition.status}
+                  <span class={`text-xs font-medium px-2.5 py-1 rounded-full ${statusColors[edition.edition_status] || statusColors["a-venir"]}`}>
+                    {statusLabels[edition.edition_status] || edition.edition_status}
                   </span>
                   <span class="text-xs text-muted">{edition.year}</span>
                 </div>
