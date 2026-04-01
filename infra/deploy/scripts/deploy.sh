@@ -156,7 +156,7 @@ case "$ACTION" in
     if [[ -n "$SKIP_SERVICES" ]]; then
       NO_DEPS="--no-deps"
     fi
-    compose_cmd up -d --force-recreate $NO_DEPS $SERVICES ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
+    compose_cmd up -d $NO_DEPS $SERVICES ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
     echo "Services started. Use './deploy.sh $ENVIRONMENT ps' to see status."
     ;;
 
