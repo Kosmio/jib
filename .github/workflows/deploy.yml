@@ -127,6 +127,8 @@ jobs:
           echo "⚠️  Resetting database for ${{ inputs.environment }}..."
           ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} << 'ENDSSH'
             set -e
+            echo "Stopping Strapi before DB reset..."
+            docker stop jib-strapi 2>/dev/null || true
             echo "Dropping and recreating public schema..."
             docker exec jib-postgres psql -U strapi -d strapi -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
             echo "Database reset complete. Strapi will re-seed on next start."
