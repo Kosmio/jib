@@ -5,8 +5,8 @@
 // =============================================================================
 
 const SEED_PARTENAIRES = [
-  { name: 'Xylofutur', description: 'Pôle de Compétitivité de la filière forêt-bois. Accompagne les acteurs de son écosystème dans leurs projets d\'innovation.', website: 'https://xylofutur.fr', category: 'coorganisateur', is_global: true },
-  { name: 'Fibois Normandie', description: 'Association interprofessionnelle de la filière forêt-bois en Normandie réunissant plus de cent acteurs de la filière.', website: 'https://www.fibois-normandie.fr', category: 'coorganisateur', is_global: false },
+  { name: 'Xylofutur', description: 'Pôle de Compétitivité de la filière forêt-bois. Accompagne les acteurs de son écosystème dans leurs projets d\'innovation.', website: 'https://xylofutur.fr', category: 'co-organisateur', is_global: true },
+  { name: 'Fibois Normandie', description: 'Association interprofessionnelle de la filière forêt-bois en Normandie réunissant plus de cent acteurs de la filière.', website: 'https://www.fibois-normandie.fr', category: 'co-organisateur', is_global: false },
   { name: 'CODIFAB', description: 'Développement des Industries Françaises de l\'Ameublement et du Bois. Soutien financier des Journées de l\'Innovation.', category: 'soutien', is_global: true },
   { name: 'PUI Normandie', description: 'Pôle Universitaire d\'Innovation — fabrique d\'innovations fédérant les acteurs de l\'Enseignement supérieur et de la Recherche en Normandie.', category: 'institutionnel', is_global: false },
   { name: 'Normandie Incubation', description: 'Incubateur de la Recherche Publique depuis plus de 25 ans, accompagne les entrepreneurs dans la création de leurs startups.', category: 'institutionnel', is_global: false },
