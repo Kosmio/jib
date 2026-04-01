@@ -1,10 +1,13 @@
 import type { Edition, Intervenant, Partenaire, ProgrammeItem, Responses } from "./types";
 
+const strapiUrl = import.meta.env.STRAPI_URL || process.env.STRAPI_URL;
+const reactStrapiUrl = import.meta.env.REACT_STRAPI_URL || process.env.REACT_STRAPI_URL;
+
 export const buildImageUrl = (baseUrl: string) =>
-  `${process.env.REACT_STRAPI_URL}${baseUrl}`;
+  `${reactStrapiUrl}${baseUrl}`;
 
 const strapiFetch = (targetUrl: string) =>
-  fetch(`${process.env.STRAPI_URL}/api${targetUrl}`).then((res) =>
+  fetch(`${strapiUrl}/api${targetUrl}`).then((res) =>
     res.json()
   );
 

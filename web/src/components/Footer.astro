@@ -1,7 +1,7 @@
 ---
-const strapiUrl = process.env.REACT_STRAPI_URL || process.env.STRAPI_URL || "";
-const strapiPublicUrl = process.env.REACT_STRAPI_URL || "";
-const cookieConsent = process.env.PUBLIC_COOKIE_CONSENT === "true";
+const strapiUrl = import.meta.env.REACT_STRAPI_URL || process.env.REACT_STRAPI_URL || import.meta.env.STRAPI_URL || process.env.STRAPI_URL || "";
+const strapiPublicUrl = import.meta.env.REACT_STRAPI_URL || process.env.REACT_STRAPI_URL || "";
+const cookieConsent = (import.meta.env.PUBLIC_COOKIE_CONSENT || process.env.PUBLIC_COOKIE_CONSENT) === "true";
 ---
 
 <footer class="bg-gray-900 text-gray-300">
