@@ -19,6 +19,11 @@ on:
         required: false
         type: boolean
         default: false
+      reset_db:
+        description: 'Reset database before deploy (DROP + re-seed)'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   deploy:
@@ -115,6 +120,17 @@ jobs:
             DOCKER_COMPOSE_ENV_FILE="$ENV_FILE.merged" scripts/deploy.sh ${{ inputs.environment }} pull 2>&1
             rm -f "$ENV_FILE.merged"
           EOF
+
+      - name: Reset database
+        if: ${{ !inputs.dry_run && inputs.reset_db }}
+        run: |
+          echo "⚠️  Resetting database for ${{ inputs.environment }}..."
+          ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} << 'ENDSSH'
+            set -e
+            echo "Dropping and recreating public schema..."
+            docker exec jib-postgres psql -U strapi -d strapi -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+            echo "Database reset complete. Strapi will re-seed on next start."
+          ENDSSH
 
       - name: Deploy application
         if: ${{ !inputs.dry_run }}
