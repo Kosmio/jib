@@ -9,13 +9,13 @@ try {
 } catch {}
 
 const categoryLabels: Record<string, string> = {
-  soutien: "Soutien national",
-  coorganisateur: "Co-organisateurs",
-  institutionnel: "Partenaires institutionnels",
-  prive: "Partenaires privés",
+  "soutien": "Soutien national",
+  "co-organisateur": "Co-organisateurs",
+  "institutionnel": "Partenaires institutionnels",
+  "privé": "Partenaires privés",
 };
 
-const categoryOrder = ["soutien", "coorganisateur", "institutionnel", "prive"];
+const categoryOrder = ["soutien", "co-organisateur", "institutionnel", "privé"];
 
 const grouped = categoryOrder.reduce((acc, cat) => {
   const items = partenaires?.data?.filter((p) => p.category === cat) || [];
