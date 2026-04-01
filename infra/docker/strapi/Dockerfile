@@ -1,5 +1,5 @@
 # ---> Build stage
-FROM node:20-alpine as build
+FROM node:22-alpine as build
 
 ENV CI=true
 RUN corepack enable && corepack prepare pnpm@latest --activate
@@ -18,7 +18,7 @@ RUN pnpm install
 # For production build
 ENV NODE_ENV=${NODE_ENV}
 
-FROM node:20-alpine
+FROM node:22-alpine
 
 RUN corepack enable && corepack prepare pnpm@latest --activate
 

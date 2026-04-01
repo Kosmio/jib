@@ -1,5 +1,6 @@
 ---
 const strapiUrl = import.meta.env.REACT_STRAPI_URL || import.meta.env.STRAPI_URL || "";
+const strapiPublicUrl = import.meta.env.REACT_STRAPI_URL || "";
 const cookieConsent = import.meta.env.PUBLIC_COOKIE_CONSENT === "true";
 ---
 
@@ -82,9 +83,11 @@ const cookieConsent = import.meta.env.PUBLIC_COOKIE_CONSENT === "true";
             Gestion des cookies
           </button>
         )}
-        <a href={`${strapiUrl}/admin`} target="_blank" rel="noopener" class="hover:text-gray-300 transition-colors">
-          Administration
-        </a>
+        {strapiPublicUrl && (
+          <a href={`${strapiPublicUrl}/admin`} target="_blank" rel="noopener" class="hover:text-gray-300 transition-colors">
+            Administration
+          </a>
+        )}
       </div>
     </div>
   </div>
