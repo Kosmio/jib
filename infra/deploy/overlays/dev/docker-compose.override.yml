@@ -1,14 +1,13 @@
 # Development environment overlay
 # Uses built Docker images, restart policies
-# Traefik handles TLS termination with Let's Encrypt
+# Relies on existing coolify-proxy (Traefik) for TLS termination
 # Single domain: Strapi served under /strapi path, Astro catches everything else
 
 services:
+  # Disable the built-in traefik — we use coolify-proxy instead
   traefik:
-    ports:
-      - "80:80"
-      - "443:443"
-    restart: unless-stopped
+    profiles:
+      - disabled
 
   postgres:
     volumes:
@@ -20,25 +19,38 @@ services:
   strapi:
     labels:
       traefik.enable: "true"
-      traefik.http.routers.strapi.rule: "Host(`${HOST_NAME}`) && PathPrefix(`/strapi`)"
-      traefik.http.routers.strapi.entrypoints: websecure
-      traefik.http.routers.strapi.tls.certresolver: letsencrypt-resolver
-      traefik.http.routers.strapi.middlewares: strip-strapi
-      traefik.http.middlewares.strip-strapi.stripprefix.prefixes: "/strapi"
-      traefik.http.services.strapi.loadbalancer.server.port: "1337"
+      traefik.docker.network: coolify
+      traefik.http.routers.jib-dev-strapi.rule: "Host(`${HOST_NAME}`) && PathPrefix(`/strapi`)"
+      traefik.http.routers.jib-dev-strapi.entrypoints: https
+      traefik.http.routers.jib-dev-strapi.tls: "true"
+      traefik.http.routers.jib-dev-strapi.tls.certresolver: letsencrypt
+      traefik.http.routers.jib-dev-strapi.middlewares: jib-dev-strip-strapi
+      traefik.http.middlewares.jib-dev-strip-strapi.stripprefix.prefixes: "/strapi"
+      traefik.http.services.jib-dev-strapi.loadbalancer.server.port: "1337"
+    networks:
+      - net
+      - coolify
     restart: unless-stopped
 
   web:
     labels:
       traefik.enable: "true"
-      traefik.http.routers.web.rule: "Host(`${HOST_NAME}`)"
-      traefik.http.routers.web.entrypoints: websecure
-      traefik.http.routers.web.tls.certresolver: letsencrypt-resolver
-      traefik.http.services.web.loadbalancer.server.port: "80"
+      traefik.docker.network: coolify
+      traefik.http.routers.jib-dev-web.rule: "Host(`${HOST_NAME}`)"
+      traefik.http.routers.jib-dev-web.entrypoints: https
+      traefik.http.routers.jib-dev-web.tls: "true"
+      traefik.http.routers.jib-dev-web.tls.certresolver: letsencrypt
+      traefik.http.routers.jib-dev-web.priority: "1"
+      traefik.http.services.jib-dev-web.loadbalancer.server.port: "80"
+    networks:
+      - net
+      - coolify
     restart: unless-stopped
+
+networks:
+  coolify:
+    external: true
 
 volumes:
   postgres-data:
     name: jib-postgres-data
-  traefik-certificates:
-    name: jib-traefik-certificates
