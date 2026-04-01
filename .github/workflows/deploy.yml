@@ -145,6 +145,17 @@ jobs:
             rm -f "$SECRETS_FILE" "$ENV_FILE.merged"
           ENDSSH
 
+      - name: Verify container environment
+        if: ${{ !inputs.dry_run }}
+        run: |
+          echo "Verifying container environment variables..."
+          ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} << 'ENDSSH'
+            echo "=== jib-web env ==="
+            docker exec jib-web env | grep -E "^(STRAPI_URL|REACT_STRAPI_URL|PUBLIC_)" | sort
+            echo "=== jib-web curl test ==="
+            docker exec jib-web wget -q -O - http://localhost:80/ 2>/dev/null | grep -o 'strapiUrl = "[^"]*"' | head -1 || echo "Could not extract strapiUrl"
+          ENDSSH
+
       - name: Deployment summary
         if: ${{ !inputs.dry_run }}
         run: |
