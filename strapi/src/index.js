@@ -27,14 +27,11 @@ const SEED_PARTENAIRES = [
   { name: 'CSF Bois', logo_file: 'logos/csf-bois.png', description: 'Comité Stratégique de Filière Bois. Instance de concertation entre l\'État et les professionnels pour renforcer la compétitivité et l\'innovation d\'une filière générant 50 milliards d\'euros de chiffre d\'affaires annuel.', website: 'https://csfbois.wixsite.com/website', category: 'institutionnel', is_global: true },
   { name: 'France Douglas', logo_file: 'logos/france-douglas.png', description: 'Association nationale qui fédère les acteurs de la filière Douglas en France — 420 000 hectares plantés, deuxième essence résineuse du pays — pour promouvoir ce bois durable et performant.', website: 'https://www.france-douglas.com', category: 'institutionnel', is_global: true },
   { name: 'FCBA Innovathèque', logo_file: 'logos/fcba-innovatheque.png', description: 'Matériauthèque du FCBA regroupant plus de 2 300 références de matériaux innovants pour la construction et l\'ameublement.', website: 'https://www.innovatheque.fr', category: 'institutionnel', is_global: true },
-  { name: 'INRAE Innovation', logo_file: 'logos/inrae.jpg', description: 'Filiale de transfert et de valorisation de l\'INRAE. Accompagne les entreprises dans l\'innovation par le transfert de technologies issues de la recherche agronomique.', website: 'https://www.inrae.fr', category: 'institutionnel', is_global: true },
 
   // --- Institutionnels régionaux (Normandie) ---
   { name: 'PUI Normandie', logo_file: 'logos/pui-normandie.jpg', description: 'Pôle Universitaire d\'Innovation de Normandie. Fabrique d\'innovations fédérant les acteurs de l\'enseignement supérieur et de la recherche pour accélérer le transfert technologique vers les entreprises du territoire.', website: 'https://www.normandie-univ.fr/p-u-i-normandie/', category: 'institutionnel', is_global: false },
   { name: 'Normandie Incubation', logo_file: 'logos/normandie-incubation.png', description: 'Incubateur de la recherche publique normande depuis plus de 25 ans. A accompagné 263 projets et contribué à la création de 200 entreprises innovantes sur le territoire.', website: 'https://www.normandie-incubation.com', category: 'institutionnel', is_global: false },
   { name: 'ADN Normandie', logo_file: 'logos/adn-normandie.png', description: 'Agence de Développement de la Normandie. 56 agents au service de l\'attractivité et du développement économique régional, guichet unique pour l\'accompagnement des entreprises et le financement de l\'innovation.', website: 'https://www.adnormandie.fr', linkedin_url: 'https://www.linkedin.com/company/adn-normandie/', category: 'institutionnel', is_global: false },
-  { name: 'Université de Rouen Normandie', description: 'Université pluridisciplinaire accueillant 35 000 étudiants. Le Campus Sciences et Ingénierie de la Technopole du Madrillet héberge la matinée de l\'édition Normandie.', website: 'https://www.univ-rouen.fr', category: 'institutionnel', is_global: false },
-  { name: 'PPLA', logo_file: 'logos/ppla.png', description: 'Pacte Bois et Biosourcés en Normandie, porté par Fibois Normandie. Rassemble plus de 30 signataires engagés à augmenter la part de matériaux bois et biosourcés dans la construction régionale.', website: 'https://www.fibois-normandie.fr', category: 'institutionnel', is_global: false },
 
   // --- Partenaires privés ---
   { name: 'CBS-CBT', logo_file: 'logos/cbs-cbt.png', description: 'Groupe franco-suisse d\'ingénierie bois fondé en 1991. Spécialiste des structures bois innovantes et de la préfabrication, avec des bureaux à Paris, Lausanne et un atelier en Savoie.', website: 'https://cbs-cbt.com', category: 'privé', is_global: true },
@@ -169,6 +166,7 @@ const SEED_EDITIONS = [
       { name: 'Technopole du Madrillet', address: 'UFR des Sciences et Techniques de l\'université de Rouen Normandie\nAvenue de l\'Université\nSaint-Étienne-du-Rouvray\nCampus Sciences et Ingénierie Rouen Normandie', time_slot: 'Matin (9h00 - 13h00)' },
       { name: 'Le Kaléidoscope', address: '29 Rue Victor Hugo\n76140 Le Petit-Quevilly', time_slot: 'Après-midi (14h30 - 17h00)' },
     ],
+    partenaire_names: ['Xylofutur', 'Fibois Normandie', 'PUI Normandie', 'Normandie Incubation', 'CODIFAB', 'UICB', 'UMB-FFB'],
   },
   {
     title: 'Région Sud',
@@ -314,15 +312,11 @@ async function seedData(strapi) {
 
     // Link only the partenaires explicitly listed for this edition
     let editionPartenaires = [];
-    if (edData.title === 'Normandie') {
-      // Normandie gets ALL partenaires (global + regional)
-      editionPartenaires = Object.values(partenaireMap).map((p) => ({ documentId: p.documentId }));
-    } else if (partenaire_names && partenaire_names.length > 0) {
+    if (partenaire_names && partenaire_names.length > 0) {
       editionPartenaires = partenaire_names
         .filter((name) => partenaireMap[name])
         .map((name) => ({ documentId: partenaireMap[name].documentId }));
     }
-    // Editions without partenaire_names (future) get no partenaires
 
     const edition = await strapi.documents('api::edition.edition').create({
       data: {
