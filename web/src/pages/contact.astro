@@ -3,7 +3,7 @@ import Layout from "../layouts/Layout.astro";
 import Hero from "../components/Hero.astro";
 import ContactForm from "../react-components/ContactForm";
 
-const strapiUrl = process.env.REACT_STRAPI_URL || process.env.STRAPI_URL || "";
+const strapiUrl = import.meta.env.REACT_STRAPI_URL || import.meta.env.STRAPI_URL || "";
 ---
 
 <Layout title="Contact — Journées de l'Innovation Filière Bois" description="Contactez l'équipe Xylofutur pour toute question sur les Journées de l'Innovation de la Filière Bois.">
