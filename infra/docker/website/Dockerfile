@@ -10,7 +10,11 @@ COPY ./web /usr/src/app/
 RUN pnpm install --frozen-lockfile
 
 # Build needs env vars for Astro config (site URL for sitemap)
+# Placeholder values ensure Vite compiles import.meta.env.X → process.env.X
+# instead of inlining undefined. Actual values are provided at runtime via Docker.
 ENV NODE_ENV=production
+ENV STRAPI_URL=http://placeholder:1337
+ENV REACT_STRAPI_URL=http://placeholder:1337
 RUN pnpm build
 
 # ---> Serve stage
