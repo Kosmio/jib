@@ -25,7 +25,7 @@ const SEED_PARTENAIRES = [
   { name: 'UICB', logo_file: 'logos/uicb.png', description: 'Union des Industriels et Constructeurs Bois (anciennement Union des Industries de la Construction et du Commerce du Bois). Représente ~500 entreprises, plus de 50 000 emplois et 7 milliards d\'euros de chiffre d\'affaires.', website: 'https://www.uicb.pro', category: 'institutionnel', is_global: true },
   { name: 'UMB-FFB', logo_file: 'logos/umb-ffb.png', description: 'Union des Métiers du Bois de la Fédération Française du Bâtiment. Fédère plus de 9 000 entreprises et 100 000 salariés spécialisés dans la charpente, la menuiserie et la construction bois.', website: 'https://umb.ffbatiment.fr', category: 'institutionnel', is_global: true },
   { name: 'CSF Bois', logo_file: 'logos/csf-bois.png', description: 'Comité Stratégique de Filière Bois. Instance de concertation entre l\'État et les professionnels pour renforcer la compétitivité et l\'innovation d\'une filière générant 50 milliards d\'euros de chiffre d\'affaires annuel.', website: 'https://csfbois.wixsite.com/website', category: 'institutionnel', is_global: true },
-  { name: 'France Douglas', description: 'Association nationale qui fédère les acteurs de la filière Douglas en France — 420 000 hectares plantés, deuxième essence résineuse du pays — pour promouvoir ce bois durable et performant.', website: 'https://www.france-douglas.com', category: 'institutionnel', is_global: true },
+  { name: 'France Douglas', logo_file: 'logos/france-douglas.png', description: 'Association nationale qui fédère les acteurs de la filière Douglas en France — 420 000 hectares plantés, deuxième essence résineuse du pays — pour promouvoir ce bois durable et performant.', website: 'https://www.france-douglas.com', category: 'institutionnel', is_global: true },
   { name: 'FCBA Innovathèque', logo_file: 'logos/fcba-innovatheque.png', description: 'Matériauthèque du FCBA regroupant plus de 2 300 références de matériaux innovants pour la construction et l\'ameublement.', website: 'https://www.innovatheque.fr', category: 'institutionnel', is_global: true },
   { name: 'INRAE Innovation', logo_file: 'logos/inrae.jpg', description: 'Filiale de transfert et de valorisation de l\'INRAE. Accompagne les entreprises dans l\'innovation par le transfert de technologies issues de la recherche agronomique.', website: 'https://www.inrae.fr', category: 'institutionnel', is_global: true },
 
@@ -78,6 +78,25 @@ const SEED_INTERVENANTS = [
   { name: 'THN', type: 'organisation', photo_file: 'photos/thn.jpg', organization: 'Territoire & Habitat Normand', category: 'institutionnel', topic: 'Feuille de route dédiée à l\'innovation dans l\'habitat normand.', bio: 'Collectif normand qui élabore et porte une feuille de route dédiée à l\'innovation dans l\'habitat, fédérant les acteurs publics et privés du territoire pour transformer les pratiques constructives.' },
   { name: 'CAP', type: 'organisation', organization: 'Concevoir Autrement en Paille', category: 'institutionnel', topic: 'Boîte à outils pour structurer et diffuser les savoir-faire liés à la paille.', bio: 'Initiative collective qui structure et diffuse les savoir-faire liés à la construction en paille, à travers une boîte à outils pratique destinée aux professionnels du bâtiment.' },
   { name: 'FCBA', type: 'organisation', photo_file: 'photos/fcba.png', organization: 'FCBA', category: 'institutionnel', topic: 'La certification CTB Composants et Systèmes Bois au service de l\'innovation.', bio: 'Institut technologique Forêt Cellulose Bois-construction Ameublement. 350 experts au service de la R&D, de la certification et du conseil pour les entreprises de la filière.', website: 'https://www.fcba.fr', partenaire_name: 'FCBA' },
+
+  // =====================================================================
+  // Intervenants Paris 2025
+  // =====================================================================
+  { name: 'Arnaud Groff', type: 'personne', photo_file: 'photos/arnaud-groff.jpg', organization: 'Indépendant', title: 'Expert en management de l\'innovation', category: 'entrepreneur', topic: 'Les 4 sources d\'innovation et comment innover concrètement.', bio: 'Entrepreneur, consultant et enseignant-chercheur, expert reconnu en management de l\'innovation. Parcours de PSA à la direction du mastère spécialisé à Toulouse Business School. A accompagné plus de 500 entreprises dans leurs démarches d\'innovation. Auteur de « Innovez autrement, disnovez ».' },
+  { name: 'Stefano Millefiorini', type: 'personne', photo_file: 'photos/stefano-millefiorini.png', organization: 'Soprema-Pavatex', title: 'Prescripteur Isolation Durable', category: 'entrepreneur', topic: 'Retour d\'une démarche d\'innovation dans l\'isolation en fibre de bois.', bio: 'Prescripteur Isolation Durable chez Soprema-Pavatex, spécialiste des solutions d\'isolation biosourcées en fibre de bois.', partenaire_name: 'Soprema-Pavatex' },
+  { name: 'Gaétan Miguet', type: 'personne', photo_file: 'photos/gaetan-miguet.png', organization: 'CBS-CBT', title: 'Responsable R&D — Ingénieur structure bois', category: 'entrepreneur', topic: 'Retour d\'une démarche d\'innovation en ingénierie structure bois.', bio: 'Responsable R&D et ingénieur structure bois chez CBS-CBT, groupe franco-suisse d\'ingénierie bois spécialisé dans les structures innovantes et la préfabrication.', partenaire_name: 'CBS-CBT' },
+  { name: 'Yann Raoult', type: 'personne', photo_file: 'photos/yann-raoult.png', organization: 'WAYS', title: 'Président & Co-fondateur', category: 'entrepreneur', topic: 'Retour d\'une démarche d\'innovation chez WAYS.', bio: 'Président et co-fondateur de WAYS, entreprise engagée dans l\'innovation au service de la filière bois.', partenaire_name: 'WAYS' },
+  { name: 'Cyril Durand', type: 'personne', photo_file: 'photos/cyril-durand.png', organization: 'Open Kairos', title: 'Co-fondateur d\'Océan Bleu et de l\'Entrepriserie', category: 'entrepreneur', topic: 'Atelier Océan Bleu — Stratégie et innovation.', bio: 'Co-fondateur d\'Océan Bleu et de l\'Entrepriserie. Conférencier expert en stratégie et innovation, accompagne les entreprises dans la création de nouveaux marchés.', partenaire_name: 'Open Kairos' },
+  { name: 'Maud Chemin', type: 'personne', photo_file: 'photos/maud-chemin.png', organization: 'FCBA', title: 'Chargée Innovation et Transfert de Technologie', category: 'institutionnel', topic: 'L\'Innovathèque comme support au transfert technologique.', bio: 'Chargée Innovation et Transfert de Technologie au FCBA, anime l\'Innovathèque pour faciliter le transfert technologique vers les entreprises de la filière.', partenaire_name: 'FCBA' },
+  { name: 'Thomas Vigier', type: 'personne', organization: 'Indépendant', title: 'Ingénieur en Obsolescence et Pérennité Programmée', category: 'chercheur', topic: 'L\'innovation sur le système productif de la filière — l\'obsolescence comme source d\'innovation.', bio: 'Ingénieur spécialisé en obsolescence et pérennité programmée. Explore comment les pannes et l\'obsolescence des outils peuvent devenir une source d\'innovation avec des gains économiques, écologiques et de souveraineté.' },
+  { name: 'Lucas De Pedro', type: 'personne', organization: 'Xylofutur', title: 'Chef de projet innovation & industrie', category: 'organisateur', topic: 'Atelier : Savoir parler de votre innovation.', bio: 'Chef de projet innovation et industrie chez Xylofutur, accompagne les entreprises dans la valorisation et la communication de leurs projets innovants.', partenaire_name: 'Xylofutur' },
+  { name: 'Apolline Oswald', type: 'personne', organization: 'Xylofutur', title: 'Responsable de l\'équipe Projets', category: 'organisateur', topic: 'Atelier : Capter et créer de la valeur.', bio: 'Responsable de l\'équipe Projets chez Xylofutur, coordonne les projets collaboratifs d\'innovation de la filière forêt-bois.', partenaire_name: 'Xylofutur' },
+
+  // --- Intervenants Partenaires Paris 2025 (slot 12h-12h30) ---
+  { name: 'Céline Beaujolin', type: 'personne', organization: 'Partenaire filière bois', category: 'institutionnel', topic: 'Enjeux d\'innovation dans la filière bois.', bio: 'Intervenante partenaire lors de la 2e édition parisienne des Journées de l\'Innovation Filière Bois.' },
+  { name: 'Jean-Luc Dunoyer', type: 'personne', organization: 'Partenaire filière bois', category: 'institutionnel', topic: 'Enjeux d\'innovation dans la filière bois.', bio: 'Intervenant partenaire lors de la 2e édition parisienne des Journées de l\'Innovation Filière Bois.' },
+  { name: 'Mathieu Ruillet', type: 'personne', organization: 'Partenaire filière bois', category: 'institutionnel', topic: 'Enjeux d\'innovation dans la filière bois.', bio: 'Intervenant partenaire lors de la 2e édition parisienne des Journées de l\'Innovation Filière Bois.' },
+  { name: 'Dominique Cotineau', type: 'personne', organization: 'Partenaire filière bois', category: 'institutionnel', topic: 'Enjeux d\'innovation dans la filière bois.', bio: 'Intervenant partenaire lors de la 2e édition parisienne des Journées de l\'Innovation Filière Bois.' },
 ];
 
 const SEED_PROGRAMME = [
@@ -95,7 +114,45 @@ const SEED_PROGRAMME = [
   { title: 'Célébration des 2 ans du Pacte Bois et Biosourcés en Normandie', start_time: '17h00', end_time: '', category: null, order: 12, intervenants: [] },
 ];
 
+const SEED_PROGRAMME_PARIS_2025 = [
+  { title: 'S\'inspirer : Conférence — Les 4 sources d\'innovation', start_time: '9h30', end_time: '11h00', category: 'introduction', order: 1, intervenants: ['Arnaud Groff'] },
+  { title: 'Partager : Retours d\'une démarche d\'innovation', start_time: '11h00', end_time: '12h00', category: 'temoignages', order: 2, intervenants: ['Stefano Millefiorini', 'Gaétan Miguet', 'Yann Raoult'] },
+  { title: 'Se projeter : Interventions Partenaires — Quels sont les enjeux d\'innovation dans la filière ?', start_time: '12h00', end_time: '12h30', category: 'finance', order: 3, intervenants: ['Céline Beaujolin', 'Jean-Luc Dunoyer', 'Mathieu Ruillet', 'Dominique Cotineau'] },
+  { title: 'Cocktail déjeunatoire & networking', start_time: '12h30', end_time: '14h00', category: 'pause', order: 4, intervenants: [] },
+  { title: 'Atelier : Cycle Expérience Client', start_time: '14h00', end_time: '16h30', category: 'actions', order: 5, intervenants: ['Arnaud Groff'] },
+  { title: 'Atelier : Océan Bleu — Stratégie et innovation', start_time: '14h00', end_time: '16h30', category: 'actions', order: 6, intervenants: ['Cyril Durand'] },
+  { title: 'Atelier : L\'Innovathèque comme support au transfert technologique', start_time: '14h00', end_time: '16h30', category: 'actions', order: 7, intervenants: ['Maud Chemin'] },
+  { title: 'Atelier : L\'innovation sur le système productif de la filière', start_time: '14h00', end_time: '16h30', category: 'actions', order: 8, intervenants: ['Thomas Vigier'] },
+  { title: 'Atelier : Savoir parler de votre innovation', start_time: '14h00', end_time: '16h30', category: 'actions', order: 9, intervenants: ['Lucas De Pedro'] },
+  { title: 'Atelier : Capter et créer de la valeur', start_time: '14h00', end_time: '16h30', category: 'actions', order: 10, intervenants: ['Apolline Oswald'] },
+  { title: 'Restitution des ateliers et clôture', start_time: '16h30', end_time: '17h00', category: 'cloture', order: 11, intervenants: [] },
+];
+
 const SEED_EDITIONS = [
+  // --- Éditions passées ---
+  {
+    title: 'Paris 2024',
+    year: 2024,
+    region: 'ile-de-france',
+    date: '2024-11-07',
+    city: 'Paris',
+    edition_status: 'passee',
+    description: 'Première édition de la Journée de l\'Innovation de la Filière Forêt-Bois. Une journée riche en échanges sur les dernières avancées dans la construction, la bioéconomie, l\'économie circulaire, la gestion forestière et le changement climatique. Conférences, tribunes de start-up et tables rondes.',
+    lieux: [
+      { name: 'Auditorium Bpifrance', address: '8 Boulevard Haussmann\n75009 Paris', time_slot: 'Journée (9h00 - 17h00)' },
+    ],
+  },
+  {
+    title: 'Paris 2025',
+    year: 2025,
+    region: 'ile-de-france',
+    date: '2025-12-03',
+    city: 'Paris',
+    edition_status: 'passee',
+    description: 'Deuxième édition parisienne des Journées de l\'Innovation Filière Bois. Une journée 100 % dédiée à l\'innovation dans la filière bois mêlant inspiration, partage d\'expériences et ateliers pratiques, aux côtés d\'experts et d\'acteurs engagés de la filière.',
+    lieux: [],
+  },
+  // --- Tournée 2026 ---
   {
     title: 'Normandie',
     year: 2026,
@@ -279,9 +336,14 @@ async function seedData(strapi) {
       });
     }
 
-    // 4. Create programme items for Normandie edition
-    if (edData.title === 'Normandie') {
-      for (const prog of SEED_PROGRAMME) {
+    // 4. Create programme items for editions with programme data
+    const programmeMap = {
+      'Normandie': SEED_PROGRAMME,
+      'Paris 2025': SEED_PROGRAMME_PARIS_2025,
+    };
+    const editionProgramme = programmeMap[edData.title];
+    if (editionProgramme) {
+      for (const prog of editionProgramme) {
         const { intervenants: intervenantNames, ...progFields } = prog;
         const linkedIntervenants = intervenantNames
           .map((name) => intervenantMap[name])
@@ -297,7 +359,7 @@ async function seedData(strapi) {
           status: 'published',
         });
       }
-      strapi.log.info(`Seeded ${SEED_PROGRAMME.length} programme items for Normandie.`);
+      strapi.log.info(`Seeded ${editionProgramme.length} programme items for ${edData.title}.`);
     }
 
     strapi.log.info(`Seeded edition: ${edData.title}`);
