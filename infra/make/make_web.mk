@@ -26,5 +26,5 @@ docker-jib-web-build:
 		-f ${JIB_WEB_DOCKERFILE} -t ${JIB_WEB_IMG} .
 
 docker-jib-web-stage:
-	@docker tag ${JIB_WEB_IMG} ${CI_REGISTRY_URL}/${JIB_WEB_IMG}
-	@docker push ${CI_REGISTRY_URL}/${JIB_WEB_IMG}
+	@docker tag ${JIB_WEB_IMG} ${DOCKER_REGISTRY_REPOSITORY}${JIB_WEB_IMG}
+	@docker push ${DOCKER_REGISTRY_REPOSITORY}${JIB_WEB_IMG}

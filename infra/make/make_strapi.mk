@@ -23,8 +23,9 @@ docker-jib-strapi-lint:
 
 docker-jib-strapi-build:
 	@docker build --no-cache=true \
+		--build-arg ADMIN_URL=${ADMIN_URL} \
 		-f ${JIB_STRAPI_DOCKERFILE} -t ${JIB_STRAPI_IMG} .
 
 docker-jib-strapi-stage:
-	@docker tag ${JIB_STRAPI_IMG} ${CI_REGISTRY_URL}/${JIB_STRAPI_IMG}
-	@docker push ${CI_REGISTRY_URL}/${JIB_STRAPI_IMG}
+	@docker tag ${JIB_STRAPI_IMG} ${DOCKER_REGISTRY_REPOSITORY}${JIB_STRAPI_IMG}
+	@docker push ${DOCKER_REGISTRY_REPOSITORY}${JIB_STRAPI_IMG}

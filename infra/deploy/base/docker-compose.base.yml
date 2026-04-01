@@ -2,7 +2,34 @@
 # This file defines all services without environment-specific configuration.
 # Use overlays to customize for local/dev/prod environments.
 
+x-common-labels: &common-labels
+  traefik.docker.network: ${DOCKER_NETWORK}
+
 services:
+  # =============================================================================
+  # REVERSE PROXY
+  # =============================================================================
+  traefik:
+    image: traefik:${TRAEFIK_VERSION:-v3.6.1}
+    container_name: jib-traefik
+    command:
+      - "--accesslog=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entryPoints.web.address=:80"
+      - "--entryPoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entryPoints.web.http.redirections.entryPoint.scheme=https"
+      - "--entryPoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt-resolver.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt-resolver.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt-resolver.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.letsencrypt-resolver.acme.storage=/letsencrypt/acme.json"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik-certificates:/letsencrypt
+    networks:
+      - net
+
   # =============================================================================
   # DATABASE
   # =============================================================================
@@ -24,10 +51,13 @@ services:
     image: ${DOCKER_REGISTRY_REPOSITORY}jib-strapi:${JIB_VERSION}
     platform: linux/amd64
     container_name: jib-strapi
+    labels:
+      <<: *common-labels
     environment:
       HOST: 0.0.0.0
       PORT: 1337
       BASE_URL: ${STRAPI_BASE_URL}
+      ADMIN_URL: ${STRAPI_ADMIN_URL:-/admin}
       APP_KEYS: ${STRAPI_APP_KEYS}
       API_TOKEN_SALT: ${STRAPI_API_TOKEN_SALT}
       ADMIN_JWT_SECRET: ${STRAPI_ADMIN_JWT_SECRET}
@@ -55,6 +85,8 @@ services:
     image: ${DOCKER_REGISTRY_REPOSITORY}jib-web:${JIB_VERSION}
     platform: linux/amd64
     container_name: jib-web
+    labels:
+      <<: *common-labels
     environment:
       STRAPI_URL: ${STRAPI_INTERNAL_URL}
       REACT_STRAPI_URL: ${STRAPI_PUBLIC_URL}
@@ -72,3 +104,4 @@ networks:
 
 volumes:
   postgres-data:
+  traefik-certificates:

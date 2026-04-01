@@ -28,7 +28,10 @@ jobs:
       - name: Build and push Strapi
         run: |
           VERSION=$(cat VERSION)
-          docker build --no-cache -f infra/docker/strapi/Dockerfile -t ghcr.io/kosmio/jib-strapi:${VERSION} .
+          docker build --no-cache \
+            --build-arg ADMIN_URL=/strapi/admin \
+            -f infra/docker/strapi/Dockerfile \
+            -t ghcr.io/kosmio/jib-strapi:${VERSION} .
           docker push ghcr.io/kosmio/jib-strapi:${VERSION}
 
   docker-web:
