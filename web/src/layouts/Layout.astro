@@ -24,7 +24,7 @@ const ogImageUrl = ogImage ? new URL(ogImage, siteUrl).href : `${siteUrl}/assets
     <meta name="description" content={description} />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/png" href="/favicon.png" />
-    {import.meta.env.PUBLIC_COOKIE_CONSENT === "true" && (
+    {process.env.PUBLIC_COOKIE_CONSENT === "true" && (
       <link
         rel="stylesheet"
         type="text/css"
@@ -75,8 +75,8 @@ const ogImageUrl = ogImage ? new URL(ogImage, siteUrl).href : `${siteUrl}/assets
     {jsonLd && (
       <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
     )}
-    {import.meta.env.PUBLIC_MATOMO_URL && import.meta.env.PUBLIC_MATOMO_SITE_ID && (
-      <script define:vars={{ matomoUrl: import.meta.env.PUBLIC_MATOMO_URL, matomoSiteId: import.meta.env.PUBLIC_MATOMO_SITE_ID }}>
+    {process.env.PUBLIC_MATOMO_URL && process.env.PUBLIC_MATOMO_SITE_ID && (
+      <script define:vars={{ matomoUrl: process.env.PUBLIC_MATOMO_URL, matomoSiteId: process.env.PUBLIC_MATOMO_SITE_ID }}>
         var _paq = window._paq = window._paq || [];
         _paq.push(['disableCookies']);
         _paq.push(['trackPageView']);
@@ -97,7 +97,7 @@ const ogImageUrl = ogImage ? new URL(ogImage, siteUrl).href : `${siteUrl}/assets
       <slot />
     </main>
     <Footer />
-    {import.meta.env.PUBLIC_COOKIE_CONSENT === "true" && (
+    {process.env.PUBLIC_COOKIE_CONSENT === "true" && (
       <script defer src="/assets/cookieconsent.js"></script>
     )}
   </body>

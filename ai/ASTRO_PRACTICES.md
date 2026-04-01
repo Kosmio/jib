@@ -116,7 +116,7 @@ React components must be explicitly hydrated with a client directive:
 
 **Rules:**
 - Default to `client:visible` unless the component must be interactive immediately
-- Pass all data React components need as props — they cannot access `import.meta.env` server vars
+- Pass all data React components need as props — they cannot access `process.env` server vars
 - Keep React components focused on interactivity; rendering logic that doesn't need state belongs in Astro
 
 ---
@@ -130,8 +130,8 @@ There are two fetch paths, because server and browser have different access:
 **Server-side** (used in `.astro` frontmatter):
 ```ts
 const strapiFetch = (targetUrl: string) =>
-  fetch(`${import.meta.env.STRAPI_URL}/api${targetUrl}`, {
-    headers: { Authorization: `Bearer ${import.meta.env.STRAPI_KEY}` },
+  fetch(`${process.env.STRAPI_URL}/api${targetUrl}`, {
+    headers: { Authorization: `Bearer ${process.env.STRAPI_KEY}` },
   }).then((res) => res.json());
 ```
 - Uses `STRAPI_URL` (server-only, can be internal Docker hostname)
@@ -274,7 +274,7 @@ For small interactivity (toggles, form submissions), use `<script>` tags in Astr
 For scripts that need server-side values, use `define:vars`:
 
 ```astro
-<script define:vars={{ apiUrl: import.meta.env.STRAPI_URL }}>
+<script define:vars={{ apiUrl: process.env.STRAPI_URL }}>
   fetch(apiUrl + '/api/something');
 </script>
 ```
