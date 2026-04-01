@@ -433,7 +433,8 @@ export interface AdminUser extends Struct.CollectionTypeSchema {
 export interface ApiEditionEdition extends Struct.CollectionTypeSchema {
   collectionName: 'editions';
   info: {
-    displayName: 'Edition';
+    description: "Les \u00E9ditions r\u00E9gionales des Journ\u00E9es de l'Innovation Fili\u00E8re Bois";
+    displayName: '\u00C9dition';
     pluralName: 'editions';
     singularName: 'edition';
   };
@@ -447,6 +448,11 @@ export interface ApiEditionEdition extends Struct.CollectionTypeSchema {
       Schema.Attribute.Private;
     date: Schema.Attribute.Date & Schema.Attribute.Required;
     description: Schema.Attribute.RichText;
+    edition_status: Schema.Attribute.Enumeration<
+      ['a-venir', 'inscriptions-ouvertes', 'complet', 'passee']
+    > &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'a-venir'>;
     gallery: Schema.Attribute.Media<'images', true>;
     image: Schema.Attribute.Media<'images'>;
     inscription_url: Schema.Attribute.String;
@@ -485,9 +491,6 @@ export interface ApiEditionEdition extends Struct.CollectionTypeSchema {
     > &
       Schema.Attribute.Required;
     slug: Schema.Attribute.UID<'title'>;
-    status: Schema.Attribute.Enumeration<['upcoming', 'open', 'full', 'past']> &
-      Schema.Attribute.Required &
-      Schema.Attribute.DefaultTo<'upcoming'>;
     summary: Schema.Attribute.RichText;
     testimonials: Schema.Attribute.RichText;
     title: Schema.Attribute.String & Schema.Attribute.Required;
@@ -511,6 +514,15 @@ export interface ApiIntervenantIntervenant extends Struct.CollectionTypeSchema {
   };
   attributes: {
     bio: Schema.Attribute.RichText;
+    category: Schema.Attribute.Enumeration<
+      [
+        'entrepreneur',
+        'chercheur',
+        'financeur',
+        'institutionnel',
+        'organisateur',
+      ]
+    >;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -521,8 +533,13 @@ export interface ApiIntervenantIntervenant extends Struct.CollectionTypeSchema {
       'api::intervenant.intervenant'
     > &
       Schema.Attribute.Private;
+    long_description: Schema.Attribute.RichText;
     name: Schema.Attribute.String & Schema.Attribute.Required;
     organization: Schema.Attribute.String & Schema.Attribute.Required;
+    partenaire: Schema.Attribute.Relation<
+      'manyToOne',
+      'api::partenaire.partenaire'
+    >;
     photo: Schema.Attribute.Media<'images'>;
     programme_items: Schema.Attribute.Relation<
       'manyToMany',
@@ -532,9 +549,13 @@ export interface ApiIntervenantIntervenant extends Struct.CollectionTypeSchema {
     slug: Schema.Attribute.UID<'name'>;
     title: Schema.Attribute.String;
     topic: Schema.Attribute.String;
+    type: Schema.Attribute.Enumeration<['personne', 'organisation']> &
+      Schema.Attribute.DefaultTo<'personne'>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    video_url: Schema.Attribute.String;
+    website: Schema.Attribute.String;
   };
 }
 
@@ -550,7 +571,7 @@ export interface ApiPartenairePartenaire extends Struct.CollectionTypeSchema {
   };
   attributes: {
     category: Schema.Attribute.Enumeration<
-      ['soutien', 'coorganisateur', 'institutionnel', 'prive']
+      ['soutien', 'co-organisateur', 'institutionnel', 'priv\u00E9']
     > &
       Schema.Attribute.Required;
     createdAt: Schema.Attribute.DateTime;
@@ -558,7 +579,12 @@ export interface ApiPartenairePartenaire extends Struct.CollectionTypeSchema {
       Schema.Attribute.Private;
     description: Schema.Attribute.Text;
     editions: Schema.Attribute.Relation<'manyToMany', 'api::edition.edition'>;
+    intervenants: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::intervenant.intervenant'
+    >;
     is_global: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
+    linkedin_url: Schema.Attribute.String;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
@@ -580,7 +606,8 @@ export interface ApiProgrammeItemProgrammeItem
   extends Struct.CollectionTypeSchema {
   collectionName: 'programme_items';
   info: {
-    displayName: 'Programme Item';
+    description: "Les interventions et moments du programme d'une \u00E9dition";
+    displayName: '\u00C9l\u00E9ment de programme';
     pluralName: 'programme-items';
     singularName: 'programme-item';
   };

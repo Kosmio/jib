@@ -14,6 +14,11 @@
       "type": "string",
       "required": true
     },
+    "type": {
+      "type": "enumeration",
+      "enum": ["personne", "organisation"],
+      "default": "personne"
+    },
     "slug": {
       "type": "uid",
       "targetField": "name"
@@ -38,6 +43,25 @@
     },
     "linkedin_url": {
       "type": "string"
+    },
+    "website": {
+      "type": "string"
+    },
+    "category": {
+      "type": "enumeration",
+      "enum": ["entrepreneur", "chercheur", "financeur", "institutionnel", "organisateur"]
+    },
+    "video_url": {
+      "type": "string"
+    },
+    "long_description": {
+      "type": "richtext"
+    },
+    "partenaire": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::partenaire.partenaire",
+      "inversedBy": "intervenants"
     },
     "programme_items": {
       "type": "relation",

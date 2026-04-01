@@ -4,7 +4,8 @@
   "info": {
     "singularName": "programme-item",
     "pluralName": "programme-items",
-    "displayName": "Programme Item"
+    "displayName": "Élément de programme",
+    "description": "Les interventions et moments du programme d'une édition"
   },
   "options": {
     "draftAndPublish": true

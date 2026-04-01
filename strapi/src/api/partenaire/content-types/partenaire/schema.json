@@ -29,9 +29,12 @@
     "website": {
       "type": "string"
     },
+    "linkedin_url": {
+      "type": "string"
+    },
     "category": {
       "type": "enumeration",
-      "enum": ["soutien", "coorganisateur", "institutionnel", "prive"],
+      "enum": ["soutien", "co-organisateur", "institutionnel", "privé"],
       "required": true
     },
     "is_global": {
@@ -43,6 +46,12 @@
       "relation": "manyToMany",
       "target": "api::edition.edition",
       "mappedBy": "partenaires"
+    },
+    "intervenants": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::intervenant.intervenant",
+      "mappedBy": "partenaire"
     }
   }
 }

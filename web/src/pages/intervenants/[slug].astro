@@ -1,0 +1,199 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { getIntervenantBySlug, buildImageUrl } from "../../lib/strapi";
+
+const { slug } = Astro.params;
+const response = await getIntervenantBySlug(slug!);
+const intervenant = response?.data?.[0];
+
+if (!intervenant) {
+  return Astro.redirect("/404");
+}
+
+const categoryLabels: Record<string, string> = {
+  entrepreneur: "Entrepreneur",
+  chercheur: "Recherche",
+  financeur: "Financement",
+  institutionnel: "Institutionnel",
+  organisateur: "Organisateur",
+};
+
+const categoryColors: Record<string, string> = {
+  entrepreneur: "bg-amber-100 text-amber-800",
+  chercheur: "bg-blue-100 text-blue-800",
+  financeur: "bg-emerald-100 text-emerald-800",
+  institutionnel: "bg-purple-100 text-purple-800",
+  organisateur: "bg-primary/10 text-primary-dark",
+};
+
+// Extract YouTube video ID if present
+let videoId: string | null = null;
+if (intervenant.video_url) {
+  const match = intervenant.video_url.match(
+    /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/
+  );
+  videoId = match ? match[1] : null;
+}
+
+// Editions where this intervenant appears
+const editions = (intervenant.programme_items || [])
+  .filter((pi) => pi.edition)
+  .map((pi) => pi.edition!)
+  .filter((ed, i, arr) => arr.findIndex((e) => e.documentId === ed.documentId) === i);
+---
+
+<Layout
+  title={`${intervenant.name} — Journées de l'Innovation Filière Bois`}
+  description={intervenant.topic || `${intervenant.name}, ${intervenant.title || ''} ${intervenant.organization}`}
+>
+  <section class="py-16 md:py-24 bg-white">
+    <div class="max-w-4xl mx-auto px-6">
+      <!-- Back link -->
+      <a href="javascript:history.back()" class="inline-flex items-center gap-1.5 text-sm text-muted hover:text-gray-900 transition-colors mb-8">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+        Retour
+      </a>
+
+      <!-- Header -->
+      <div class="flex flex-col sm:flex-row items-start gap-6 mb-10">
+        {intervenant.photo ? (
+          intervenant.type === 'organisation' ? (
+            <div class="w-28 h-28 rounded-2xl bg-white flex items-center justify-center flex-shrink-0 border border-gray-100 shadow-lg p-3">
+              <img
+                src={buildImageUrl(intervenant.photo.url)}
+                alt={intervenant.name}
+                class="w-full h-full object-contain"
+              />
+            </div>
+          ) : (
+            <img
+              src={buildImageUrl(intervenant.photo.url)}
+              alt={intervenant.name}
+              class="w-28 h-28 rounded-2xl object-cover flex-shrink-0 shadow-lg"
+            />
+          )
+        ) : (
+          <div class="w-28 h-28 rounded-2xl bg-wood/20 flex items-center justify-center flex-shrink-0 shadow-lg">
+            <span class="text-4xl font-bold text-wood">{intervenant.name.charAt(0)}</span>
+          </div>
+        )}
+
+        <div>
+          <h1 class="text-3xl md:text-4xl font-bold text-gray-900">{intervenant.name}</h1>
+          {intervenant.title && (
+            <p class="mt-1 text-lg text-muted">{intervenant.title}</p>
+          )}
+          <div class="mt-3 flex flex-wrap items-center gap-3">
+            {intervenant.type !== 'organisation' && intervenant.partenaire ? (
+              <a href={intervenant.partenaire.website || '#'} target="_blank" rel="noopener" class="inline-flex items-center gap-2 text-primary-dark font-medium hover:text-primary transition-colors">
+                {intervenant.partenaire.logo && (
+                  <img src={buildImageUrl(intervenant.partenaire.logo.url)} alt={intervenant.partenaire.name} class="h-6 w-auto object-contain" />
+                )}
+                {intervenant.partenaire.name}
+              </a>
+            ) : intervenant.type !== 'organisation' && intervenant.organization && (
+              <span class="text-primary-dark font-medium">{intervenant.organization}</span>
+            )}
+            {intervenant.category && (
+              <span class:list={[
+                "text-xs font-medium px-2.5 py-1 rounded-full",
+                categoryColors[intervenant.category],
+              ]}>
+                {categoryLabels[intervenant.category]}
+              </span>
+            )}
+          </div>
+          <div class="mt-3 flex flex-wrap items-center gap-4">
+            {intervenant.linkedin_url && (
+              <a
+                href={intervenant.linkedin_url}
+                target="_blank"
+                rel="noopener"
+                class="inline-flex items-center gap-1.5 text-sm font-medium text-[#0A66C2] hover:text-[#004182] transition-colors"
+              >
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                </svg>
+                LinkedIn
+              </a>
+            )}
+            {intervenant.website && (
+              <a
+                href={intervenant.website}
+                target="_blank"
+                rel="noopener"
+                class="inline-flex items-center gap-1.5 text-sm font-medium text-primary-dark hover:text-primary transition-colors"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
+                </svg>
+                Site web
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <!-- Topic -->
+      {intervenant.topic && (
+        <div class="mb-8 p-5 rounded-xl bg-surface border border-gray-100">
+          <p class="text-gray-700 font-medium">{intervenant.topic}</p>
+        </div>
+      )}
+
+      <!-- Bio -->
+      {intervenant.bio && (
+        <div class="prose prose-gray max-w-none mb-8" set:html={intervenant.bio} />
+      )}
+
+      <!-- Long description -->
+      {intervenant.long_description && (
+        <div class="prose prose-gray max-w-none mb-8" set:html={intervenant.long_description} />
+      )}
+
+      <!-- Video -->
+      {videoId && (
+        <div class="mb-10">
+          <h2 class="text-xl font-bold text-gray-900 mb-4">Vidéo</h2>
+          <a
+            href={`https://www.youtube.com/watch?v=${videoId}`}
+            target="_blank"
+            rel="noopener"
+            class="group relative aspect-video rounded-xl overflow-hidden bg-gray-100 block"
+          >
+            <img
+              src={`https://img.youtube.com/vi/${videoId}/hqdefault.jpg`}
+              alt="Vidéo"
+              class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              loading="lazy"
+            />
+            <div class="absolute inset-0 bg-black/30 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+              <div class="w-16 h-16 rounded-full bg-red-600 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                <svg class="w-7 h-7 text-white ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+              </div>
+            </div>
+          </a>
+        </div>
+      )}
+
+      <!-- Editions where this person appears -->
+      {editions.length > 0 && (
+        <div>
+          <h2 class="text-xl font-bold text-gray-900 mb-4">Éditions</h2>
+          <div class="flex flex-wrap gap-3">
+            {editions.map((ed) => (
+              <a
+                href={`/editions/${ed.slug}`}
+                class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-surface border border-gray-100 hover:shadow-md transition-shadow text-sm font-medium text-gray-700 hover:text-primary"
+              >
+                {ed.title}
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  </section>
+</Layout>

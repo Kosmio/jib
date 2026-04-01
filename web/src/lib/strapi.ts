@@ -26,7 +26,7 @@ export const getEditions = (params?: {
   query.set("populate[1]", "lieux");
   query.set("populate[2]", "partenaires.logo");
   query.set("sort", "date:asc");
-  if (params?.status) query.set("filters[status][$eq]", params.status);
+  if (params?.status) query.set("filters[edition_status][$eq]", params.status);
   if (params?.year) query.set("filters[year][$eq]", String(params.year));
   return strapiFetch(`/editions?${query.toString()}`);
 };
@@ -41,7 +41,14 @@ export const getEditionBySlug = (
 // --- Intervenants ---
 
 export const getIntervenants = (): Promise<Responses<Intervenant>> =>
-  strapiFetch("/intervenants?populate[0]=photo&sort=name:asc");
+  strapiFetch("/intervenants?populate[0]=photo&populate[1]=partenaire.logo&sort=name:asc");
+
+export const getIntervenantBySlug = (
+  slug: string
+): Promise<Responses<Intervenant>> =>
+  strapiFetch(
+    `/intervenants?filters[slug][$eq]=${slug}&populate[0]=photo&populate[1]=partenaire.logo&populate[2]=programme_items.edition`
+  );
 
 // --- Partenaires ---
 
