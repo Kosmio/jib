@@ -9,12 +9,7 @@ export default defineConfig({
   site: "https://journees-innovation-bois.fr",
   integrations: [react(), sitemap()],
   output: "server",
-  adapter: node({
-    mode: "standalone"
-  }),
-  server: {
-    port: 4321
-  },
+  adapter: node({ mode: "standalone" }),
   vite: {
     plugins: [tailwindcss()],
   },
