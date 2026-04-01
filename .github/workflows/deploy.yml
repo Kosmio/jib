@@ -152,8 +152,13 @@ jobs:
           ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} << 'ENDSSH'
             echo "=== jib-web env ==="
             docker exec jib-web env | grep -E "^(STRAPI_URL|REACT_STRAPI_URL|PUBLIC_)" | sort
-            echo "=== jib-web curl test ==="
-            docker exec jib-web wget -q -O - http://localhost:80/ 2>/dev/null | grep -o 'strapiUrl = "[^"]*"' | head -1 || echo "Could not extract strapiUrl"
+            echo "=== jib-web node test ==="
+            docker exec jib-web node -e "console.log('REACT_STRAPI_URL:', JSON.stringify(process.env.REACT_STRAPI_URL)); console.log('STRAPI_URL:', JSON.stringify(process.env.STRAPI_URL));"
+            echo "=== jib-web compiled code check ==="
+            docker exec jib-web grep -o 'process\.env\.\(REACT_STRAPI_URL\|STRAPI_URL\)' /usr/share/web/html/dist/server/chunks/Layout_*.mjs | head -5 || echo "No process.env references found"
+            docker exec jib-web grep -o 'strapiUrl = [^;]*;' /usr/share/web/html/dist/server/chunks/Layout_*.mjs | head -5 || echo "Could not find strapiUrl assignment"
+            echo "=== jib-web SSR test ==="
+            docker exec jib-web wget -q -O - http://localhost:80/ 2>/dev/null | grep -o 'strapiUrl = "[^"]*"' | head -1 || echo "Could not extract strapiUrl from HTML"
           ENDSSH
 
       - name: Deployment summary
