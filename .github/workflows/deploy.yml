@@ -1,0 +1,162 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+      version:
+        description: 'Version to deploy (e.g., 0.1.0)'
+        required: true
+        type: string
+      dry_run:
+        description: 'Dry run (validate only, no deployment)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  deploy:
+    name: Deploy to ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate inputs
+        run: |
+          echo "Environment: ${{ inputs.environment }}"
+          echo "Version: ${{ inputs.version }}"
+          echo "Dry run: ${{ inputs.dry_run }}"
+
+          if [[ ! "${{ inputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$ ]]; then
+            echo "Error: Invalid version format. Expected: x.y.z or x.y.z-suffix"
+            exit 1
+          fi
+
+      - name: Setup SSH
+        if: ${{ !inputs.dry_run }}
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Configure SSH
+        if: ${{ !inputs.dry_run }}
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+          cat >> ~/.ssh/config << EOF
+          Host ${{ vars.DEPLOY_HOST }}
+            ServerAliveInterval 30
+            ServerAliveCountMax 10
+            TCPKeepAlive yes
+            Compression yes
+          EOF
+
+      - name: Create secrets file
+        if: ${{ !inputs.dry_run }}
+        run: |
+          cat > /tmp/.env.secrets << 'EOF'
+          POSTGRES_PASSWORD=${{ secrets.SECRET_POSTGRES_PASSWORD }}
+          STRAPI_APP_KEYS=${{ secrets.SECRET_STRAPI_APP_KEYS }}
+          STRAPI_API_TOKEN_SALT=${{ secrets.SECRET_STRAPI_API_TOKEN_SALT }}
+          STRAPI_ADMIN_JWT_SECRET=${{ secrets.SECRET_STRAPI_ADMIN_JWT_SECRET }}
+          STRAPI_JWT_SECRET=${{ secrets.SECRET_STRAPI_JWT_SECRET }}
+          ALTCHA_HMAC_KEY=${{ secrets.SECRET_ALTCHA_HMAC_KEY }}
+          EMAIL_API_KEY=${{ secrets.SECRET_EMAIL_API_KEY }}
+          EMAIL_LIST_ID=${{ secrets.SECRET_EMAIL_LIST_ID }}
+          EMAIL_CONTACT_TEMPLATE_ID=${{ secrets.SECRET_EMAIL_CONTACT_TEMPLATE_ID }}
+          PUBLIC_MATOMO_URL=${{ secrets.SECRET_PUBLIC_MATOMO_URL }}
+          PUBLIC_MATOMO_SITE_ID=${{ secrets.SECRET_PUBLIC_MATOMO_SITE_ID }}
+          EOF
+
+      - name: Copy infrastructure files to server
+        if: ${{ !inputs.dry_run }}
+        run: |
+          echo "Copying infrastructure files to ${{ vars.DEPLOY_HOST }}..."
+
+          # Create target directories
+          ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} "mkdir -p ~/jib/infra/deploy"
+
+          # Copy infra files via tar over SSH
+          echo "Copying all infra files..."
+          tar czf - -C infra/deploy base overlays/${{ inputs.environment }} scripts | \
+            ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} "cd ~/jib/infra/deploy && tar xzf -"
+
+          # Copy secrets file
+          echo "Copying secrets..."
+          cat /tmp/.env.secrets | ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} \
+            "cat > ~/jib/infra/deploy/overlays/${{ inputs.environment }}/.env.secrets"
+
+      - name: Pull latest images
+        if: ${{ !inputs.dry_run }}
+        run: |
+          # Login to GHCR on the server
+          echo "${{ secrets.GITHUB_TOKEN }}" | ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} \
+            "docker login ghcr.io -u ${{ github.actor }} --password-stdin"
+
+          # Pull images
+          ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} bash << 'EOF' 2>&1 | cat
+            set -e
+            cd ~/jib/infra/deploy
+            ENV_FILE="overlays/${{ inputs.environment }}/.env.${{ inputs.environment }}"
+            SECRETS_FILE="overlays/${{ inputs.environment }}/.env.secrets"
+            cp "$ENV_FILE" "$ENV_FILE.merged"
+            cat "$SECRETS_FILE" >> "$ENV_FILE.merged"
+            sed -i "s/^JIB_VERSION=.*/JIB_VERSION=${{ inputs.version }}/" "$ENV_FILE.merged"
+            DOCKER_COMPOSE_ENV_FILE="$ENV_FILE.merged" scripts/deploy.sh ${{ inputs.environment }} pull 2>&1
+            rm -f "$ENV_FILE.merged"
+          EOF
+
+      - name: Deploy application
+        if: ${{ !inputs.dry_run }}
+        run: |
+          ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} << 'ENDSSH'
+            set -e
+            cd ~/jib/infra/deploy
+
+            # Merge secrets into environment file
+            ENV_FILE="overlays/${{ inputs.environment }}/.env.${{ inputs.environment }}"
+            SECRETS_FILE="overlays/${{ inputs.environment }}/.env.secrets"
+            cp "$ENV_FILE" "$ENV_FILE.merged"
+            cat "$SECRETS_FILE" >> "$ENV_FILE.merged"
+
+            # Update version
+            sed -i "s/^JIB_VERSION=.*/JIB_VERSION=${{ inputs.version }}/" "$ENV_FILE.merged"
+
+            # Deploy
+            chmod +x scripts/deploy.sh
+            DOCKER_COMPOSE_ENV_FILE="$ENV_FILE.merged" \
+              scripts/deploy.sh ${{ inputs.environment }} up 2>&1
+
+            echo "Checking container status..."
+            docker ps --filter "label=com.docker.compose.project=jib-${{ inputs.environment }}" \
+              --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+
+            # Cleanup secrets
+            rm -f "$SECRETS_FILE" "$ENV_FILE.merged"
+          ENDSSH
+
+      - name: Deployment summary
+        if: ${{ !inputs.dry_run }}
+        run: |
+          echo "======================================"
+          echo "Deployment Complete!"
+          echo "======================================"
+          echo "Environment: ${{ inputs.environment }}"
+          echo "Version: ${{ inputs.version }}"
+          echo "======================================"
+
+      - name: Cleanup on failure
+        if: ${{ failure() && !inputs.dry_run }}
+        run: |
+          echo "Deployment failed. Check logs manually on the server with:"
+          echo "  ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}"
+          echo "  cd ~/jib/infra/deploy && ./scripts/deploy.sh ${{ inputs.environment }} logs"
