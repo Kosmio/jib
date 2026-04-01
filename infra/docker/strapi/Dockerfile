@@ -12,7 +12,7 @@ ENV PATH /app/node_modules/.bin:$PATH
 RUN pnpm install
 
 ARG NODE_ENV=production
-ARG ADMIN_URL=/admin
+ARG ADMIN_URL=/strapi/admin
 ENV NODE_ENV=${NODE_ENV}
 ENV ADMIN_URL=${ADMIN_URL}
 
