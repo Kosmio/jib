@@ -14,6 +14,7 @@ export default function ContactForm({ strapiUrl }: Props) {
     subject: "",
     message: "",
   });
+  const [newsletterConsent, setNewsletterConsent] = useState(false);
 
   useEffect(() => {
     // Load altcha widget client-side only (registers customElements)
@@ -49,12 +50,14 @@ export default function ContactForm({ strapiUrl }: Props) {
         body: JSON.stringify({
           ...formData,
           captchaToken: altchaToken,
+          newsletterConsent,
         }),
       });
 
       if (response.ok) {
         setStatus("success");
         setFormData({ name: "", email: "", subject: "", message: "" });
+        setNewsletterConsent(false);
         setAltchaToken("");
         // Reset the Altcha widget so a new challenge is fetched for the next submit
         (altchaRef.current as any)?.reset?.();
@@ -132,6 +135,19 @@ export default function ContactForm({ strapiUrl }: Props) {
           className="w-full px-4 py-3 bg-[#f8fafc] border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#00B194]/20 focus:border-[#00B194] outline-none transition-colors resize-vertical"
           placeholder="Décrivez votre projet ou votre question..."
         />
+      </div>
+
+      <div className="flex items-start gap-3">
+        <input
+          type="checkbox"
+          id="newsletterConsent"
+          checked={newsletterConsent}
+          onChange={(e) => setNewsletterConsent(e.target.checked)}
+          className="mt-1 h-4 w-4 rounded border-gray-300 text-[#00B194] focus:ring-[#00B194]/20"
+        />
+        <label htmlFor="newsletterConsent" className="text-sm text-gray-600 leading-relaxed cursor-pointer">
+          J'accepte d'être tenu informé des actualités et prochaines éditions
+        </label>
       </div>
 
       <div>

@@ -2,7 +2,7 @@
 
 module.exports = {
   send: async (ctx) => {
-    const { email, message, name, subject, captchaToken } = ctx.request.body;
+    const { email, message, name, subject, captchaToken, newsletterConsent } = ctx.request.body;
 
     if (!email || !message) {
       return ctx.send({ message: 'invalid content' }, 400);
@@ -30,6 +30,22 @@ module.exports = {
         replyTo: { email, name: name || 'Unknown' },
         params: { name, email, subject, message },
       });
+
+      // Subscribe to newsletter if consent was given
+      if (newsletterConsent) {
+        try {
+          const listId = parseInt(strapi.config.get('server.email.listId'));
+          await client.contacts.createContact({
+            email,
+            attributes: { PRENOM: name || '' },
+            listIds: [listId],
+          });
+        } catch (err) {
+          // Don't fail the contact form if newsletter subscription fails
+          console.warn('Newsletter subscription failed for', email, err?.message);
+        }
+      }
+
       ctx.send({ message: 'success' }, 200);
     } catch {
       ctx.send({ message: 'error' }, 500);
