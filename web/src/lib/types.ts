@@ -42,35 +42,45 @@ export interface Lieu {
   time_slot: string | null;
 }
 
+export interface Tag extends Entity {
+  name: string;
+  slug: string;
+  color: string | null;
+}
+
+export interface Organisation extends Entity {
+  name: string;
+  slug: string;
+  logo: Image | null;
+  description: string | null;
+  long_description: string | null;
+  website: string | null;
+  linkedin_url: string | null;
+  tags?: Tag[];
+  intervenants?: Intervenant[];
+  partenariats?: Partenaire[];
+  programme_items?: ProgrammeItem[];
+}
+
 export interface Intervenant extends Entity {
   name: string;
   slug: string;
-  type: 'personne' | 'organisation';
   title: string | null;
-  organization: string;
   bio: string | null;
   long_description: string | null;
   photo: Image | null;
   topic: string | null;
   linkedin_url: string | null;
-  website: string | null;
   video_url: string | null;
-  category: 'entrepreneur' | 'chercheur' | 'financeur' | 'institutionnel' | 'organisateur' | null;
-  partenaire?: Partenaire | null;
+  tags?: Tag[];
+  organisation?: Organisation | null;
   programme_items?: ProgrammeItem[];
 }
 
 export interface Partenaire extends Entity {
-  name: string;
-  slug: string;
-  logo: Image | null;
-  description: string | null;
-  website: string | null;
-  linkedin_url: string | null;
-  category: 'soutien' | 'co-organisateur' | 'institutionnel' | 'privé';
-  is_global: boolean;
+  role: 'soutien' | 'co-organisateur' | 'institutionnel' | 'prive';
+  organisation?: Organisation | null;
   editions?: Edition[];
-  intervenants?: Intervenant[];
 }
 
 export interface ProgrammeItem extends Entity {
@@ -78,10 +88,11 @@ export interface ProgrammeItem extends Entity {
   start_time: string;
   end_time: string;
   description: string | null;
-  category: 'introduction' | 'finance' | 'recherche' | 'temoignages' | 'actions' | 'pause' | 'cloture' | null;
+  tags?: Tag[];
   order: number | null;
   edition?: Edition;
   intervenants?: Intervenant[];
+  organisations?: Organisation[];
 }
 
 export type Region =

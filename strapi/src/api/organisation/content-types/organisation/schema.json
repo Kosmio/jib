@@ -1,0 +1,64 @@
+{
+  "kind": "collectionType",
+  "collectionName": "organisations",
+  "info": {
+    "singularName": "organisation",
+    "pluralName": "organisations",
+    "displayName": "Organisation",
+    "description": "Entreprises, laboratoires, institutions et collectifs qui participent aux journées"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "name"
+    },
+    "logo": {
+      "type": "media",
+      "multiple": false,
+      "allowedTypes": ["images"]
+    },
+    "description": {
+      "type": "text"
+    },
+    "long_description": {
+      "type": "richtext"
+    },
+    "website": {
+      "type": "string"
+    },
+    "linkedin_url": {
+      "type": "string"
+    },
+    "tags": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::tag.tag",
+      "inversedBy": "organisations"
+    },
+    "intervenants": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::intervenant.intervenant",
+      "mappedBy": "organisation"
+    },
+    "partenariats": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::partenaire.partenaire",
+      "mappedBy": "organisation"
+    },
+    "programme_items": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::programme-item.programme-item",
+      "mappedBy": "organisations"
+    }
+  }
+}

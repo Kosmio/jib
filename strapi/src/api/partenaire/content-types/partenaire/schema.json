@@ -4,54 +4,32 @@
   "info": {
     "singularName": "partenaire",
     "pluralName": "partenaires",
-    "displayName": "Partenaire"
+    "displayName": "Partenariat",
+    "description": "Lien de partenariat entre une organisation et les éditions"
   },
   "options": {
     "draftAndPublish": true
   },
   "attributes": {
-    "name": {
-      "type": "string",
-      "required": true
-    },
-    "slug": {
-      "type": "uid",
-      "targetField": "name"
-    },
-    "logo": {
-      "type": "media",
-      "multiple": false,
-      "allowedTypes": ["images"]
-    },
-    "description": {
-      "type": "text"
-    },
-    "website": {
+    "display_name": {
       "type": "string"
     },
-    "linkedin_url": {
-      "type": "string"
-    },
-    "category": {
+    "role": {
       "type": "enumeration",
-      "enum": ["soutien", "co-organisateur", "institutionnel", "privé"],
+      "enum": ["soutien", "co-organisateur", "institutionnel", "prive"],
       "required": true
     },
-    "is_global": {
-      "type": "boolean",
-      "default": false
+    "organisation": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::organisation.organisation",
+      "inversedBy": "partenariats"
     },
     "editions": {
       "type": "relation",
       "relation": "manyToMany",
       "target": "api::edition.edition",
       "mappedBy": "partenaires"
-    },
-    "intervenants": {
-      "type": "relation",
-      "relation": "oneToMany",
-      "target": "api::intervenant.intervenant",
-      "mappedBy": "partenaire"
     }
   }
 }

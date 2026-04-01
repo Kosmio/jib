@@ -20,15 +20,15 @@
       "required": true
     },
     "end_time": {
-      "type": "string",
-      "required": true
+      "type": "string"
     },
     "description": {
       "type": "richtext"
     },
-    "category": {
-      "type": "enumeration",
-      "enum": ["introduction", "finance", "recherche", "temoignages", "actions", "pause", "cloture"]
+    "tags": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::tag.tag"
     },
     "order": {
       "type": "integer"
@@ -43,6 +43,12 @@
       "type": "relation",
       "relation": "manyToMany",
       "target": "api::intervenant.intervenant",
+      "inversedBy": "programme_items"
+    },
+    "organisations": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::organisation.organisation",
       "inversedBy": "programme_items"
     }
   }

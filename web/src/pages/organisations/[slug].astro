@@ -1,0 +1,162 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { getOrganisationBySlug, buildImageUrl } from "../../lib/strapi";
+import { getTagColor, getTagLabel } from "../../lib/tag-colors";
+
+const { slug } = Astro.params;
+const response = await getOrganisationBySlug(slug!);
+const organisation = response?.data?.[0];
+
+if (!organisation) {
+  return Astro.redirect("/404");
+}
+
+// Collect unique editions from partenariats and programme_items
+const editionsFromPartenariats = (organisation.partenariats || [])
+  .flatMap((p) => p.editions || []);
+const editionsFromProgramme = (organisation.programme_items || [])
+  .filter((pi) => pi.edition)
+  .map((pi) => pi.edition!);
+
+const allEditions = [...editionsFromPartenariats, ...editionsFromProgramme]
+  .filter((ed, i, arr) => arr.findIndex((e) => e.documentId === ed.documentId) === i);
+---
+
+<Layout
+  title={`${organisation.name} — Journées de l'Innovation Filière Bois`}
+  description={organisation.description || `${organisation.name} — partenaire des Journées de l'Innovation Filière Bois`}
+>
+  <section class="py-16 md:py-24 bg-white">
+    <div class="max-w-4xl mx-auto px-6">
+      <!-- Back link -->
+      <a href="javascript:history.back()" class="inline-flex items-center gap-1.5 text-sm text-muted hover:text-gray-900 transition-colors mb-8">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+        Retour
+      </a>
+
+      <!-- Header -->
+      <div class="flex flex-col sm:flex-row items-start gap-6 mb-10">
+        {organisation.logo ? (
+          <div class="w-28 h-28 rounded-2xl bg-white flex items-center justify-center flex-shrink-0 border border-gray-100 shadow-lg p-3">
+            <img
+              src={buildImageUrl(organisation.logo.url)}
+              alt={organisation.name}
+              class="w-full h-full object-contain"
+            />
+          </div>
+        ) : (
+          <div class="w-28 h-28 rounded-2xl bg-wood/20 flex items-center justify-center flex-shrink-0 shadow-lg">
+            <span class="text-4xl font-bold text-wood">{organisation.name.charAt(0)}</span>
+          </div>
+        )}
+
+        <div>
+          <h1 class="text-3xl md:text-4xl font-bold text-gray-900">{organisation.name}</h1>
+
+          {organisation.tags && organisation.tags.length > 0 && (
+            <div class="mt-3 flex flex-wrap gap-2">
+              {organisation.tags.map((tag) => (
+                <span class={`text-xs font-medium px-2.5 py-1 rounded-full ${getTagColor(tag.slug)}`}>
+                  {getTagLabel(tag.slug)}
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div class="mt-3 flex flex-wrap items-center gap-4">
+            {organisation.linkedin_url && (
+              <a
+                href={organisation.linkedin_url}
+                target="_blank"
+                rel="noopener"
+                class="inline-flex items-center gap-1.5 text-sm font-medium text-[#0A66C2] hover:text-[#004182] transition-colors"
+              >
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                </svg>
+                LinkedIn
+              </a>
+            )}
+            {organisation.website && (
+              <a
+                href={organisation.website}
+                target="_blank"
+                rel="noopener"
+                class="inline-flex items-center gap-1.5 text-sm font-medium text-primary-dark hover:text-primary transition-colors"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
+                </svg>
+                Site web
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <!-- Description -->
+      {organisation.description && (
+        <div class="mb-8 p-5 rounded-xl bg-surface border border-gray-100">
+          <p class="text-gray-700">{organisation.description}</p>
+        </div>
+      )}
+
+      <!-- Long description -->
+      {organisation.long_description && (
+        <div class="prose prose-gray max-w-none mb-8" set:html={organisation.long_description} />
+      )}
+
+      <!-- Intervenants -->
+      {organisation.intervenants && organisation.intervenants.length > 0 && (
+        <div class="mb-10">
+          <h2 class="text-xl font-bold text-gray-900 mb-6">Intervenants</h2>
+          <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {organisation.intervenants.map((intervenant) => (
+              <a
+                href={`/intervenants/${intervenant.slug}`}
+                class="group flex items-center gap-3 p-4 rounded-xl bg-surface border border-gray-100 hover:shadow-md transition-shadow"
+              >
+                {intervenant.photo ? (
+                  <img
+                    src={buildImageUrl(intervenant.photo.url)}
+                    alt={intervenant.name}
+                    class="w-12 h-12 rounded-xl object-cover flex-shrink-0 border border-white shadow"
+                  />
+                ) : (
+                  <div class="w-12 h-12 rounded-xl bg-wood/20 flex items-center justify-center flex-shrink-0">
+                    <span class="text-lg font-bold text-wood">{intervenant.name.charAt(0)}</span>
+                  </div>
+                )}
+                <div class="min-w-0">
+                  <p class="font-semibold text-gray-900 group-hover:text-primary transition-colors text-sm truncate">{intervenant.name}</p>
+                  {intervenant.title && (
+                    <p class="text-xs text-muted truncate">{intervenant.title}</p>
+                  )}
+                </div>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <!-- Editions -->
+      {allEditions.length > 0 && (
+        <div>
+          <h2 class="text-xl font-bold text-gray-900 mb-4">Éditions</h2>
+          <div class="flex flex-wrap gap-3">
+            {allEditions.map((ed) => (
+              <a
+                href={`/editions/${ed.slug}`}
+                class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-surface border border-gray-100 hover:shadow-md transition-shadow text-sm font-medium text-gray-700 hover:text-primary"
+              >
+                {ed.title}
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  </section>
+</Layout>

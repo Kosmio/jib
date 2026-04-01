@@ -1,0 +1,39 @@
+{
+  "kind": "collectionType",
+  "collectionName": "tags",
+  "info": {
+    "singularName": "tag",
+    "pluralName": "tags",
+    "displayName": "Tag",
+    "description": "Étiquettes thématiques pour catégoriser intervenants et organisations"
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true,
+      "unique": true
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "name"
+    },
+    "color": {
+      "type": "string"
+    },
+    "organisations": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::organisation.organisation",
+      "mappedBy": "tags"
+    },
+    "intervenants": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::intervenant.intervenant",
+      "mappedBy": "tags"
+    }
+  }
+}
