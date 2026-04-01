@@ -141,6 +141,7 @@ const SEED_EDITIONS = [
     lieux: [
       { name: 'Auditorium Bpifrance', address: '8 Boulevard Haussmann\n75009 Paris', time_slot: 'Journée (9h00 - 17h00)' },
     ],
+    partenaire_names: ['Xylofutur', 'CODIFAB', 'France Bois Forêt', 'BPI France', 'FCBA', 'INRAE', 'CSF Bois', 'Forinvest', 'Impulse Partners'],
   },
   {
     title: 'Paris 2025',
@@ -151,6 +152,7 @@ const SEED_EDITIONS = [
     edition_status: 'passee',
     description: 'Deuxième édition parisienne des Journées de l\'Innovation Filière Bois. Une journée 100 % dédiée à l\'innovation dans la filière bois mêlant inspiration, partage d\'expériences et ateliers pratiques, aux côtés d\'experts et d\'acteurs engagés de la filière.',
     lieux: [],
+    partenaire_names: ['Xylofutur', 'CODIFAB', 'France Bois Forêt', 'BPI France', 'FCBA', 'INRAE', 'UICB', 'UMB-FFB', 'CSF Bois', 'France Douglas', 'FCBA Innovathèque', 'CBS-CBT', 'Soprema-Pavatex', 'Impulse Partners', 'Open Kairos', 'Veepee', 'Forinvest', 'Hors-Site', 'SSPM', 'WAYS', 'DHDA'],
   },
   // --- Tournée 2026 ---
   {
@@ -308,14 +310,19 @@ async function seedData(strapi) {
 
   // 3. Create editions with lieux + link partenaires
   for (const edData of SEED_EDITIONS) {
-    const { lieux, image_file, ...edFields } = edData;
+    const { lieux, image_file, partenaire_names, ...edFields } = edData;
 
-    // Normandie gets all partenaires; other editions get global ones only
-    const editionPartenaires = edData.title === 'Normandie'
-      ? Object.values(partenaireMap).map((p) => ({ documentId: p.documentId }))
-      : Object.entries(partenaireMap)
-          .filter(([name]) => SEED_PARTENAIRES.find((p) => p.name === name && p.is_global))
-          .map(([, p]) => ({ documentId: p.documentId }));
+    // Link only the partenaires explicitly listed for this edition
+    let editionPartenaires = [];
+    if (edData.title === 'Normandie') {
+      // Normandie gets ALL partenaires (global + regional)
+      editionPartenaires = Object.values(partenaireMap).map((p) => ({ documentId: p.documentId }));
+    } else if (partenaire_names && partenaire_names.length > 0) {
+      editionPartenaires = partenaire_names
+        .filter((name) => partenaireMap[name])
+        .map((name) => ({ documentId: partenaireMap[name].documentId }));
+    }
+    // Editions without partenaire_names (future) get no partenaires
 
     const edition = await strapi.documents('api::edition.edition').create({
       data: {
