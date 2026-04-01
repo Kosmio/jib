@@ -51,9 +51,10 @@ jobs:
         if: ${{ !inputs.dry_run }}
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H -p 2234 ${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts
           cat >> ~/.ssh/config << EOF
           Host ${{ vars.DEPLOY_HOST }}
+            Port 2234
             ServerAliveInterval 30
             ServerAliveCountMax 10
             TCPKeepAlive yes
@@ -158,5 +159,5 @@ jobs:
         if: ${{ failure() && !inputs.dry_run }}
         run: |
           echo "Deployment failed. Check logs manually on the server with:"
-          echo "  ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}"
+          echo "  ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} -p 2234"
           echo "  cd ~/jib/infra/deploy && ./scripts/deploy.sh ${{ inputs.environment }} logs"
