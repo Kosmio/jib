@@ -32,11 +32,13 @@ services:
       traefik.http.routers.strapi.rule: "Host(`${HOST_NAME}`) && PathPrefix(`/strapi`)"
       traefik.http.routers.strapi.entrypoints: websecure
       traefik.http.routers.strapi.tls.certresolver: letsencrypt-resolver
+      traefik.http.routers.strapi.middlewares: strip-strapi
       # HTTP→HTTPS redirect router
       traefik.http.routers.strapi-http.rule: "Host(`${HOST_NAME}`) && PathPrefix(`/strapi`)"
       traefik.http.routers.strapi-http.entrypoints: web
-      traefik.http.routers.strapi-http.middlewares: redirect-to-https
+      traefik.http.routers.strapi-http.middlewares: strip-strapi,redirect-to-https
       # Middlewares
+      traefik.http.middlewares.strip-strapi.stripprefix.prefixes: "/strapi"
       traefik.http.middlewares.redirect-to-https.redirectscheme.scheme: "https"
       traefik.http.middlewares.redirect-to-https.redirectscheme.permanent: "true"
       traefik.http.services.strapi.loadbalancer.server.port: "1337"
