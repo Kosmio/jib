@@ -71,7 +71,7 @@ jobs:
           STRAPI_JWT_SECRET=${{ secrets.SECRET_STRAPI_JWT_SECRET }}
           ALTCHA_HMAC_KEY=${{ secrets.SECRET_ALTCHA_HMAC_KEY }}
           EMAIL_API_KEY=${{ secrets.SECRET_EMAIL_API_KEY }}
-          EMAIL_LIST_ID=${{ secrets.SECRET_EMAIL_LIST_ID }}
+          EMAIL_LIST_ID=${{ vars.EMAIL_LIST_ID }}
           EMAIL_CONTACT_TEMPLATE_ID=${{ secrets.SECRET_EMAIL_CONTACT_TEMPLATE_ID }}
           PUBLIC_MATOMO_URL=${{ secrets.SECRET_PUBLIC_MATOMO_URL }}
           PUBLIC_MATOMO_SITE_ID=${{ secrets.SECRET_PUBLIC_MATOMO_SITE_ID }}
