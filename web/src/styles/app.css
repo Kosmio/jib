@@ -31,7 +31,7 @@ h1, h2 {
   /* Helvetica LT STD n'est pas disponible en web — Source Sans 3 est le plus proche de Myriad Pro */
   --font-sans: "Source Sans 3", "Helvetica Neue", system-ui, sans-serif;
   --font-heading: "Sora", "Helvetica Neue", system-ui, sans-serif;
-  --font-display: "Audiowide", "Impact", system-ui, sans-serif;
+  --font-display: "Space Grotesk", "Sora", system-ui, sans-serif;
 
   --breakpoint-sm: 480px;
   --breakpoint-md: 768px;

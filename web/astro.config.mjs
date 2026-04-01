@@ -6,7 +6,7 @@ import sitemap from "@astrojs/sitemap";
 
 // https://astro.build/config
 export default defineConfig({
-  site: "https://journees-innovation-bois.fr",
+  site: "https://journees-innovation-bois.xylofutur.fr",
   integrations: [react(), sitemap()],
   output: "server",
   adapter: node({ mode: "standalone" }),

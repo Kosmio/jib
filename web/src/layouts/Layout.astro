@@ -8,11 +8,13 @@ export interface Props {
   description?: string;
   ogImage?: string;
   ogType?: string;
+  jsonLd?: Record<string, unknown>;
 }
 
-const { title, description = "", ogImage, ogType = "website" } = Astro.props;
-const canonicalUrl = new URL(Astro.url.pathname, Astro.site || "https://journees-innovation-bois.fr");
-const ogImageUrl = ogImage || "/assets/logo-jib.svg";
+const { title, description = "", ogImage, ogType = "website", jsonLd } = Astro.props;
+const canonicalUrl = new URL(Astro.url.pathname, Astro.site || "https://journees-innovation-bois.xylofutur.fr");
+const siteUrl = Astro.site?.origin || "https://journees-innovation-bois.xylofutur.fr";
+const ogImageUrl = ogImage ? new URL(ogImage, siteUrl).href : `${siteUrl}/assets/logo-jib.png`;
 ---
 
 <!DOCTYPE html>
@@ -20,7 +22,7 @@ const ogImageUrl = ogImage || "/assets/logo-jib.svg";
   <head>
     <meta charset="UTF-8" />
     <meta name="description" content={description} />
-    <meta name="viewport" content="width=device-width" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     {import.meta.env.PUBLIC_COOKIE_CONSENT === "true" && (
       <link
@@ -32,7 +34,7 @@ const ogImageUrl = ogImage || "/assets/logo-jib.svg";
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Audiowide&family=Source+Sans+3:wght@300;400;500;600;700&family=Sora:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Source+Sans+3:wght@300;400;500;600;700&family=Sora:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
     <meta name="generator" content={Astro.generator} />
@@ -54,6 +56,25 @@ const ogImageUrl = ogImage || "/assets/logo-jib.svg";
     <meta name="twitter:image" content={ogImageUrl} />
 
     <title>{title}</title>
+
+    <!-- Schema.org JSON-LD -->
+    <script type="application/ld+json" set:html={JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Journées de l'Innovation Filière Bois",
+      "url": siteUrl,
+      "description": "Événements régionaux d'innovation de la filière forêt-bois portés par Xylofutur et les Fibois.",
+      "publisher": {
+        "@type": "Organization",
+        "name": "Xylofutur",
+        "url": "https://www.xylofutur.fr",
+        "logo": `${siteUrl}/assets/logo-xylofutur.png`,
+        "description": "Pôle de compétitivité de la filière forêt-bois-papier"
+      }
+    })} />
+    {jsonLd && (
+      <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+    )}
     {import.meta.env.PUBLIC_MATOMO_URL && import.meta.env.PUBLIC_MATOMO_SITE_ID && (
       <script define:vars={{ matomoUrl: import.meta.env.PUBLIC_MATOMO_URL, matomoSiteId: import.meta.env.PUBLIC_MATOMO_SITE_ID }}>
         var _paq = window._paq = window._paq || [];

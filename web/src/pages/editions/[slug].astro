@@ -42,6 +42,35 @@ const programmeItems = (edition.programme_items || []).sort(
   (a, b) => (a.order ?? 999) - (b.order ?? 999)
 );
 
+const siteUrl = Astro.site?.origin || "https://journees-innovation-bois.xylofutur.fr";
+const eventJsonLd: Record<string, unknown> = {
+  "@context": "https://schema.org",
+  "@type": "Event",
+  "name": `Journée de l'Innovation Filière Bois — ${regionLabels[edition.region] || edition.region}`,
+  "description": edition.description || `Journée de l'Innovation de la Filière Bois en ${regionLabels[edition.region] || edition.region}`,
+  "startDate": edition.date,
+  "eventStatus": edition.edition_status === "passee" ? "https://schema.org/EventScheduled" : "https://schema.org/EventScheduled",
+  "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+  "organizer": {
+    "@type": "Organization",
+    "name": "Xylofutur",
+    "url": "https://www.xylofutur.fr"
+  },
+  ...(edition.image?.url && { "image": `${siteUrl}${edition.image.url}` }),
+  ...(edition.lieux?.[0] && {
+    "location": {
+      "@type": "Place",
+      "name": edition.lieux[0].name,
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": edition.city,
+        "addressCountry": "FR"
+      }
+    }
+  }),
+  ...(edition.inscription_url && { "url": edition.inscription_url }),
+};
+
 const intervenantCategoryLabels: Record<string, string> = {
   entrepreneur: "Entrepreneur",
   chercheur: "Recherche",
@@ -51,7 +80,7 @@ const intervenantCategoryLabels: Record<string, string> = {
 };
 ---
 
-<Layout title={`${edition.title} — Journées de l'Innovation`} description={`Journée de l'Innovation de la Filière Bois en ${regionLabels[edition.region] || edition.region} — ${edition.city}, ${new Date(edition.date).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}`}>
+<Layout title={`${edition.title} — Journées de l'Innovation`} description={`Journée de l'Innovation de la Filière Bois en ${regionLabels[edition.region] || edition.region} — ${edition.city}, ${new Date(edition.date).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}`} jsonLd={eventJsonLd}>
   <!-- Hero Landing -->
   <section class="relative min-h-[75vh] bg-wood overflow-hidden flex items-center">
     <!-- Wood texture -->

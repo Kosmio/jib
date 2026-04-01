@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://journees-innovation-bois.xylofutur.fr/sitemap-index.xml
