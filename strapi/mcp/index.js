@@ -169,27 +169,9 @@ function createServer(sessionId) {
     },
     async ({ contentType, data, publish }) => {
       const client = getClient();
-      const body = { data };
-      if (publish) body.data = { ...data, publishedAt: new Date().toISOString() };
+      const body = { data, status: publish ? 'published' : 'draft' };
 
       const result = await client.post(`/${contentType}`, body);
-
-      if (publish && result?.data?.documentId) {
-        try {
-          await client.post(`/${contentType}/${result.data.documentId}/actions/publish`);
-        } catch {
-          return {
-            content: [{
-              type: 'text',
-              text: JSON.stringify({
-                ...result,
-                _note: 'Entry created but auto-publish failed. Use publish_entry to publish it.',
-              }, null, 2),
-            }],
-          };
-        }
-      }
-
       return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
     },
   );
@@ -235,7 +217,7 @@ function createServer(sessionId) {
     },
     async ({ contentType, documentId }) => {
       const client = getClient();
-      const result = await client.post(`/${contentType}/${documentId}/actions/publish`);
+      const result = await client.put(`/${contentType}/${documentId}`, { status: 'published' });
       return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
     },
   );
@@ -250,7 +232,7 @@ function createServer(sessionId) {
     },
     async ({ contentType, documentId }) => {
       const client = getClient();
-      const result = await client.post(`/${contentType}/${documentId}/actions/unpublish`);
+      const result = await client.put(`/${contentType}/${documentId}`, { status: 'draft' });
       return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
     },
   );
@@ -295,7 +277,9 @@ function createServer(sessionId) {
 
 // ── HTTP Server ─────────────────────────────────────────────
 
-const app = createMcpExpressApp();
+const app = createMcpExpressApp({
+  host: '0.0.0.0',
+});
 const transports = {};
 
 // ── Streamable HTTP transport ───────────────────────────────

@@ -45,16 +45,15 @@ Tell the user exactly this:
 
 Once you have the MCP endpoint URL and the token, configure the MCP connection.
 
+The token is passed as a query parameter appended to the URL: `{mcp_endpoint}?token={token}`. If the tool supports custom headers, `Authorization: Bearer {token}` also works as an alternative.
+
 **Claude Desktop** — edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
 ```json
 {
   "mcpServers": {
     "website-cms": {
-      "type": "streamable-http",
-      "url": "{mcp_endpoint}",
-      "headers": {
-        "Authorization": "Bearer {token}"
-      }
+      "type": "http",
+      "url": "{mcp_endpoint}?token={token}"
     }
   }
 }
@@ -65,31 +64,24 @@ Once you have the MCP endpoint URL and the token, configure the MCP connection.
 {
   "mcpServers": {
     "website-cms": {
-      "type": "streamable-http",
-      "url": "{mcp_endpoint}",
-      "headers": {
-        "Authorization": "Bearer {token}"
-      }
+      "type": "http",
+      "url": "{mcp_endpoint}?token={token}"
     }
   }
 }
 ```
 
 **Cursor** — add via Settings → MCP Servers:
-- Type: Streamable HTTP
-- URL: `{mcp_endpoint}`
-- Headers: `Authorization: Bearer {token}`
+- Type: HTTP
+- URL: `{mcp_endpoint}?token={token}`
 
 **Windsurf** — edit `~/.codeium/windsurf/mcp_config.json`:
 ```json
 {
   "mcpServers": {
     "website-cms": {
-      "type": "streamable-http",
-      "url": "{mcp_endpoint}",
-      "headers": {
-        "Authorization": "Bearer {token}"
-      }
+      "type": "http",
+      "url": "{mcp_endpoint}?token={token}"
     }
   }
 }
@@ -97,20 +89,17 @@ Once you have the MCP endpoint URL and the token, configure the MCP connection.
 
 **If you cannot determine the user's tool**, tell them:
 > Add an MCP server in your AI tool's settings with:
-> - **Type**: Streamable HTTP
-> - **URL**: `{mcp_endpoint}`
-> - **Authorization header**: `Bearer {token}`
->
-> If your tool doesn't support custom headers, you can append `?token={token}` to the URL instead.
+> - **Type**: HTTP
+> - **URL**: `{mcp_endpoint}?token={token}`
 
 ### Transport selection
 
 The server supports two MCP transports. Use the one that fits the user's tool:
 
-| Transport | When to use | Endpoint | Auth |
-|---|---|---|---|
-| **Streamable HTTP** (recommended) | Most modern MCP clients (Claude Desktop, Claude Code, Cursor, Windsurf) | `{mcp_endpoint}` (POST/GET/DELETE) | `Authorization: Bearer {token}` header |
-| **Legacy SSE** | Older clients that don't support Streamable HTTP | `GET {website_url}/mcp/sse` to open stream, `POST {website_url}/mcp/messages?sessionId=<id>` to send | `Authorization: Bearer {token}` header, or `?token={token}` on the SSE URL |
+| Transport | When to use | Endpoint |
+|---|---|---|
+| **Streamable HTTP** (recommended) | Most modern MCP clients (Claude Desktop, Claude Code, Cursor, Windsurf) | `{mcp_endpoint}?token={token}` |
+| **Legacy SSE** | Older clients that don't support Streamable HTTP | `GET {website_url}/mcp/sse?token={token}` to open stream, `POST {website_url}/mcp/messages?sessionId=<id>` to send |
 
 Try Streamable HTTP first. Only fall back to SSE if the tool reports an error or explicitly requires SSE.
 

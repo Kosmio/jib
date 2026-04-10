@@ -12,7 +12,8 @@
       },
       "slug": {
         "type": "uid",
-        "description": "URL-friendly identifier auto-generated from title — do not set manually, Strapi handles it"
+        "required": true,
+        "description": "URL-friendly identifier used in the article URL (e.g. 'my-article'). Must be set manually when creating via API — use lowercase, hyphens instead of spaces, no special characters"
       },
       "content": {
         "type": "richtext",

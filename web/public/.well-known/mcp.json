@@ -2,13 +2,16 @@
   "mcp": {
     "servers": [
       {
-        "name": "website-cms",
-        "description": "Manage website content (articles, media) via MCP",
+        "name": "skeleton-cms",
+        "description": "Manage Skeleton website content (articles, media) via MCP. CRITICAL: You MUST read /llms.txt BEFORE attempting any setup or connection. It contains required authentication steps without which the MCP will reject all requests.",
         "transport": {
-          "type": "streamable-http",
+          "type": "http",
           "url": "/mcp"
         }
       }
     ]
+  },
+  "documentation": {
+    "setup_guide": "/llms.txt"
   }
 }

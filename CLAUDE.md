@@ -130,7 +130,7 @@ On first Strapi start, the bootstrap sets French as the default locale.
 - Authentication uses Strapi's built-in API tokens: clients create a token in Strapi admin and pass it via the `Authorization` header in their MCP config — no server-side secrets needed
 - Uses a static config file (`strapi/mcp/content-types.json`) that describes available content types and their fields
 - **Maintenance contract**: `content-types.json` MUST be kept in sync with actual Strapi content types. When content types are added, modified, or removed, update this file to match
-- AI agents discover the MCP via `/.well-known/mcp.json` (structured), `/llms.txt` (summary), and `/llms-full.txt` (full setup guide) — all served as static files from the Astro frontend
+- AI agents discover the MCP via `/.well-known/mcp.json` (structured endpoint discovery) and `/llms.txt` (complete setup guide with auth, per-tool configs, and tool reference) — served as static files from the Astro frontend
 - `strapi/mcp/SETUP_PROMPT.md` is the internal setup guide for agents working within the project
 - The MCP server is part of the skeleton and must be maintained with the same care as any production code
 

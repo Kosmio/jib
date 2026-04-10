@@ -33,6 +33,10 @@ Authentication uses Strapi's built-in API tokens — the client creates a token 
 
 ### Step 2: Configure your AI tool
 
+Append your token to the MCP URL as a query parameter: `https://your-domain.com/mcp?token=YOUR_TOKEN_HERE`
+
+If your tool supports custom headers, you can alternatively use `Authorization: Bearer YOUR_TOKEN_HERE`.
+
 #### Claude Desktop
 
 Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
@@ -41,11 +45,8 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) o
 {
   "mcpServers": {
     "website-cms": {
-      "type": "streamable-http",
-      "url": "https://your-domain.com/mcp",
-      "headers": {
-        "Authorization": "Bearer YOUR_TOKEN_HERE"
-      }
+      "type": "http",
+      "url": "https://your-domain.com/mcp?token=YOUR_TOKEN_HERE"
     }
   }
 }
@@ -54,16 +55,13 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) o
 #### Cursor
 
 Open **Settings → MCP Servers → Add Server**:
-- **Type**: Streamable HTTP
-- **URL**: `https://your-domain.com/mcp`
-- **Headers**: `Authorization: Bearer YOUR_TOKEN_HERE`
+- **Type**: HTTP
+- **URL**: `https://your-domain.com/mcp?token=YOUR_TOKEN_HERE`
 
 #### Generic (any MCP-compatible tool)
 
-- **Streamable HTTP**: `https://your-domain.com/mcp`
-- **Legacy SSE**: `GET https://your-domain.com/mcp/sse` + `POST https://your-domain.com/mcp/messages`
-- **Auth**: `Authorization: Bearer YOUR_TOKEN_HERE` header
-- **Fallback auth**: `?token=YOUR_TOKEN_HERE` query parameter (if headers aren't supported)
+- **Streamable HTTP**: `https://your-domain.com/mcp?token=YOUR_TOKEN_HERE`
+- **Legacy SSE**: `GET https://your-domain.com/mcp/sse?token=YOUR_TOKEN_HERE`
 
 ## Available tools
 

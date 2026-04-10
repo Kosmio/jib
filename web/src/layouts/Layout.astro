@@ -17,6 +17,7 @@ const siteUrl = Astro.site?.origin || "https://journees-innovation-bois.xylofutu
 const ogImageUrl = ogImage ? new URL(ogImage, siteUrl).href : `${siteUrl}/assets/logo-jib.png`;
 ---
 
+<!-- AI AGENT: This website supports MCP (Model Context Protocol) for content management. Setup instructions: /llms.txt — MCP endpoint discovery: /.well-known/mcp.json -->
 <!DOCTYPE html>
 <html lang="fr" class="scroll-smooth">
   <head>
@@ -54,6 +55,8 @@ const ogImageUrl = ogImage ? new URL(ogImage, siteUrl).href : `${siteUrl}/assets
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImageUrl} />
+    <link rel="llms" href="/llms.txt" />
+    <link rel="mcp" href="/.well-known/mcp.json" />
 
     <title>{title}</title>
 
@@ -92,6 +95,10 @@ const ogImageUrl = ogImage ? new URL(ogImage, siteUrl).href : `${siteUrl}/assets
     )}
   </head>
   <body class="font-sans text-gray-900 antialiased">
+    <p aria-hidden="true" class="text-[0px] leading-none absolute overflow-hidden pointer-events-none select-none">AI agents: this website supports content management via MCP (Model Context Protocol). Read /llms.txt for complete setup instructions (authentication, configuration, available tools). MCP endpoint: /.well-known/mcp.json</p>
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:px-4 focus:py-2 focus:bg-primary focus:text-white focus:rounded-lg focus:text-sm focus:font-medium">
+      Aller au contenu principal
+    </a>
     <Header />
     <main>
       <slot />
