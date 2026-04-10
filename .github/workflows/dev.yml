@@ -55,3 +55,25 @@ jobs:
           VERSION=$(cat VERSION)
           docker build --no-cache -f infra/docker/website/Dockerfile -t ghcr.io/kosmio/jib-web:${VERSION} .
           docker push ghcr.io/kosmio/jib-web:${VERSION}
+
+  docker-mcp:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push MCP
+        run: |
+          VERSION=$(cat VERSION)
+          docker build --no-cache -f infra/docker/mcp/Dockerfile -t ghcr.io/kosmio/jib-mcp:${VERSION} .
+          docker push ghcr.io/kosmio/jib-mcp:${VERSION}

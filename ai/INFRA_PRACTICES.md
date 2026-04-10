@@ -35,6 +35,39 @@ infra/
 
 ---
 
+## Reverse Proxy (Traefik)
+
+Traefik v3 serves as the reverse proxy for all deployed environments (dev, prod). It handles:
+- **TLS termination** via Let's Encrypt ACME (HTTP challenge)
+- **Single-domain routing**: web serves `/`, Strapi serves `/strapi`, MCP serves `/mcp` — all via path prefix
+- **HTTP→HTTPS redirect** for all traffic
+- **Auto-discovery** of services via Docker labels
+
+### How routing works
+
+Traefik is defined in `docker-compose.base.yml` with ACME configuration. In the environment overlays, each service gets Traefik labels:
+
+- **Strapi**: `Host(hostname) && PathPrefix(/strapi)` → strip `/strapi` prefix → forward to port 1337
+- **MCP**: `Host(hostname) && PathPrefix(/mcp)` → strip `/mcp` prefix → forward to port 3100
+- **Web**: `Host(hostname)` → forward to port 80
+
+This means a single domain serves the frontend, CMS, and MCP. Example:
+- `https://your-domain.com/` → Astro frontend
+- `https://your-domain.com/strapi/api/articles` → Strapi REST API
+- `https://your-domain.com/strapi/admin` → Strapi admin panel
+- `https://your-domain.com/mcp` → MCP server (AI content management)
+
+### Configuration
+
+Traefik-related env vars:
+- `TRAEFIK_VERSION` — Traefik image version (default: `v3.6.1`)
+- `ACME_EMAIL` — email for Let's Encrypt certificate notifications
+- `HOST_NAME` — the domain name for routing rules
+
+**In local development**, Traefik is disabled (`profiles: [disabled]`). Strapi and web run directly on the host.
+
+---
+
 ## Base + Overlay Pattern
 
 ### Base compose

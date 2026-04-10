@@ -31,3 +31,4 @@ Read these files before writing or reviewing code. They define the project's con
 - Run `/security` to audit for web security vulnerabilities (OWASP, headers, dependencies, input validation)
 - Run `/setup-deploy` to set up deployment infrastructure (secrets, GitHub config, env files)
 - Run `/deploy` to deploy the application to dev or prod via GitHub Actions
+- When modifying Strapi content types, always update `strapi/mcp/content-types.json` to match — see `ai/STRAPI_PRACTICES.md` § MCP Server Maintenance

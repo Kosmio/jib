@@ -1,0 +1,42 @@
+# Skelly — Website with AI Content Management
+
+> This website is built with Astro (frontend) and Strapi (CMS). It has a built-in MCP server for AI-assisted content management.
+
+## MCP Server
+
+This site exposes an MCP (Model Context Protocol) server that lets AI assistants manage content.
+
+- Endpoint: /mcp (Streamable HTTP)
+- Legacy SSE: /mcp/sse + /mcp/messages
+- Discovery: /.well-known/mcp.json
+- Full setup guide: /llms-full.txt
+
+## Authentication
+
+The MCP server uses Strapi API tokens for authentication. The user must:
+
+1. Create an API token in their Strapi admin panel (at /strapi/admin → Settings → API Tokens)
+2. Include it in their MCP client config as an Authorization header: `Bearer <token>`
+
+See /llms-full.txt for step-by-step token creation instructions and per-tool configuration examples.
+
+## Available tools
+
+- list_content_types — See what content types exist (articles, etc.)
+- list_entries — List entries with pagination and sorting
+- get_entry — Get a single entry by ID or field value
+- create_entry — Create new content
+- update_entry — Edit existing content
+- delete_entry — Permanently delete content
+- publish_entry — Make a draft visible on the website
+- unpublish_entry — Hide content from the website
+- upload_media — Upload an image or file from a URL
+- list_media — Browse the media library
+
+## Site structure
+
+- / — Homepage
+- /articles — Article listing
+- /articles/{slug} — Individual article
+- /contact — Contact form
+- /politique-de-confidentialite — Privacy policy

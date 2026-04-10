@@ -1,0 +1,35 @@
+{
+  "articles": {
+    "singularName": "article",
+    "displayName": "Article",
+    "description": "Blog articles published on the website",
+    "draftAndPublish": true,
+    "fields": {
+      "title": {
+        "type": "string",
+        "required": true,
+        "description": "Article title, displayed as the page heading and in article list cards"
+      },
+      "slug": {
+        "type": "uid",
+        "description": "URL-friendly identifier auto-generated from title — do not set manually, Strapi handles it"
+      },
+      "content": {
+        "type": "richtext",
+        "description": "Article body in Markdown, rendered on the article detail page via react-markdown"
+      },
+      "excerpt": {
+        "type": "text",
+        "description": "Short plain-text summary shown in article list cards and used for meta description, keep under 200 chars"
+      },
+      "image": {
+        "type": "media",
+        "description": "Cover image displayed at the top of the article and as thumbnail in lists. Use upload_media first to get a media ID, then pass it here"
+      },
+      "published_date": {
+        "type": "date",
+        "description": "Publication date in YYYY-MM-DD format, displayed on the article page"
+      }
+    }
+  }
+}

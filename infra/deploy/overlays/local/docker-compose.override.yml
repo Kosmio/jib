@@ -18,6 +18,10 @@ services:
     profiles:
       - disabled
 
+  mcp:
+    profiles:
+      - disabled
+
   web:
     profiles:
       - disabled

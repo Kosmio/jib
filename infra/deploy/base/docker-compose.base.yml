@@ -77,6 +77,23 @@ services:
       - net
 
   # =============================================================================
+  # MCP SERVER (AI content management)
+  # =============================================================================
+  mcp:
+    image: ${DOCKER_REGISTRY_REPOSITORY}${PROJECT_SLUG}-mcp:${APP_VERSION}
+    platform: linux/amd64
+    container_name: ${PROJECT_SLUG}-mcp
+    labels:
+      <<: *common-labels
+    environment:
+      STRAPI_URL: ${STRAPI_INTERNAL_URL}
+      MCP_PORT: 3100
+    depends_on:
+      - strapi
+    networks:
+      - net
+
+  # =============================================================================
   # FRONTEND
   # =============================================================================
   web:

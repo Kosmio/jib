@@ -1,0 +1,22 @@
+{
+  "name": "@skeleton/strapi-mcp",
+  "private": true,
+  "version": "0.1.0",
+  "description": "MCP server for managing website content via Strapi",
+  "type": "module",
+  "bin": {
+    "strapi-mcp": "./index.js"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "express": "^5.2.1",
+    "zod": "^3.24.4"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "MIT"
+}

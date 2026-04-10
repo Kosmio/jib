@@ -1,0 +1,170 @@
+# Skelly — Full AI Setup Guide
+
+> This file is the complete setup reference for AI agents connecting to this website's MCP server.
+
+## Quick setup
+
+1. Create an API token in Strapi admin (see below)
+2. Configure your AI tool with the token and MCP endpoint
+3. Restart your AI tool
+4. Call `list_content_types` to verify
+
+## Step 1: Create an API token
+
+Guide the user through these exact steps:
+
+1. Open the admin panel at: {this_site_url}/strapi/admin
+2. Log in with their admin account
+3. Click the gear icon (Settings) in the left sidebar
+4. Under Global Settings, click API Tokens
+5. Click the "Create new API Token" button (top right)
+6. Fill in:
+   - Name: "AI Assistant" (or any name)
+   - Token duration: Unlimited
+   - Token type: Full access
+7. Click Save
+8. Copy the token string immediately — it cannot be viewed again after leaving the page
+
+If the user needs to revoke access later: Settings → API Tokens → click the trash icon on the token.
+
+## Step 2: Configure the MCP connection
+
+The MCP endpoint is: {this_site_url}/mcp
+
+### Claude Desktop
+
+Edit ~/Library/Application Support/Claude/claude_desktop_config.json (macOS) or %APPDATA%\Claude\claude_desktop_config.json (Windows):
+
+```json
+{
+  "mcpServers": {
+    "website-cms": {
+      "type": "streamable-http",
+      "url": "{this_site_url}/mcp",
+      "headers": {
+        "Authorization": "Bearer TOKEN_HERE"
+      }
+    }
+  }
+}
+```
+
+### Claude Code
+
+Create .mcp.json in your project root:
+
+```json
+{
+  "mcpServers": {
+    "website-cms": {
+      "type": "streamable-http",
+      "url": "{this_site_url}/mcp",
+      "headers": {
+        "Authorization": "Bearer TOKEN_HERE"
+      }
+    }
+  }
+}
+```
+
+### Cursor
+
+Settings → MCP Servers → Add Server:
+- Type: Streamable HTTP
+- URL: {this_site_url}/mcp
+- Headers: Authorization: Bearer TOKEN_HERE
+
+### Windsurf
+
+Edit ~/.codeium/windsurf/mcp_config.json:
+
+```json
+{
+  "mcpServers": {
+    "website-cms": {
+      "type": "streamable-http",
+      "url": "{this_site_url}/mcp",
+      "headers": {
+        "Authorization": "Bearer TOKEN_HERE"
+      }
+    }
+  }
+}
+```
+
+### Generic
+
+Any MCP-compatible tool:
+- Streamable HTTP (recommended): {this_site_url}/mcp
+- Legacy SSE: GET {this_site_url}/mcp/sse + POST {this_site_url}/mcp/messages
+- Auth header: Authorization: Bearer TOKEN_HERE
+- Fallback if headers not supported: append ?token=TOKEN_HERE to the URL
+
+## Tools reference
+
+### list_content_types
+List all content types available on the website. Use this first.
+Parameters: none
+
+### list_entries
+List entries of a content type.
+Parameters:
+- contentType (string, required) — plural API name, e.g. "articles"
+- page (number, optional, default 1)
+- pageSize (number, optional, default 25, max 100)
+- sort (string, optional) — e.g. "title:asc", "createdAt:desc"
+- status (string, optional) — "published" or "draft"
+
+### get_entry
+Get a single entry by document ID or by filtering on a field.
+Parameters:
+- contentType (string, required)
+- documentId (string, optional) — the entry's document ID
+- field (string, optional) — field name to filter by, e.g. "slug"
+- value (string, optional) — field value to match
+
+### create_entry
+Create a new entry.
+Parameters:
+- contentType (string, required)
+- data (object, required) — field values
+- publish (boolean, optional, default false) — publish immediately
+
+### update_entry
+Update an existing entry.
+Parameters:
+- contentType (string, required)
+- documentId (string, required)
+- data (object, required) — fields to update
+
+### delete_entry
+Permanently delete an entry. Cannot be undone.
+Parameters:
+- contentType (string, required)
+- documentId (string, required)
+
+### publish_entry
+Publish a draft entry to make it visible on the website.
+Parameters:
+- contentType (string, required)
+- documentId (string, required)
+
+### unpublish_entry
+Unpublish an entry (hides from website, keeps as draft).
+Parameters:
+- contentType (string, required)
+- documentId (string, required)
+
+### upload_media
+Upload an image or file from a URL to the media library.
+Parameters:
+- url (string, required) — public URL of the file
+- fileName (string, optional) — override filename
+- alternativeText (string, optional) — alt text for accessibility
+- caption (string, optional)
+
+### list_media
+List files in the media library.
+Parameters:
+- page (number, optional, default 1)
+- pageSize (number, optional, default 25)

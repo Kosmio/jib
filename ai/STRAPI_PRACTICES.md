@@ -279,3 +279,58 @@ Anti-bot protection uses Altcha, a self-hosted proof-of-work solution (MIT, GDPR
 | Custom route handler | `{noun}.{verb}` | `contact.send`, `newsletter.subscribe` |
 | Env variable | `SCREAMING_SNAKE` | `EMAIL_API_KEY` |
 | Config section | `camelCase` | `server.email.apiKey` |
+
+---
+
+## MCP Server Maintenance
+
+The MCP server (`strapi/mcp/`) exposes Strapi content types as tools for AI agents (Claude, ChatGPT, Gemini, Cursor, etc.), allowing clients to manage their website content through chat.
+
+### The maintenance contract
+
+`strapi/mcp/content-types.json` is the mapping between Strapi schemas and MCP tool descriptions. It defines which content types the MCP knows about, their fields, and human-readable descriptions.
+
+**Any change to `strapi/src/api/*/content-types/*/schema.json` must be reflected in `strapi/mcp/content-types.json`.**
+
+### When adding a new content type
+
+Add an entry to `content-types.json` with:
+- The plural API name as the key (e.g. `"projects"`)
+- `singularName`, `displayName`, `description`
+- `draftAndPublish` flag matching the schema
+- All fields with their `type`, `required` flag, and a `description` written for non-technical users
+
+Example:
+```json
+{
+  "projects": {
+    "singularName": "project",
+    "displayName": "Project",
+    "description": "Portfolio projects showcased on the website",
+    "draftAndPublish": true,
+    "fields": {
+      "title": { "type": "string", "required": true, "description": "Project title" },
+      "slug": { "type": "uid", "description": "URL-friendly identifier (auto-generated from title)" }
+    }
+  }
+}
+```
+
+### When modifying fields
+
+Update the corresponding field entry in `content-types.json`. If a field is renamed, added, or removed in the schema, do the same in the config.
+
+### When removing a content type
+
+Remove its entry from `content-types.json`.
+
+### Field descriptions
+
+Write descriptions that help the AI agent understand the field's purpose and constraints. Include where it's used on the site, any limits, and behavioral notes:
+- Good: `"Short summary shown in article list cards and meta descriptions, plain text, keep under 200 chars"`
+- Good: `"URL-friendly identifier auto-generated from title — do not set manually"`
+- Bad: `"Text field"` (too vague — the agent won't know what it's for)
+
+### Why this matters
+
+The MCP server is part of the skeleton and ships to real projects. If `content-types.json` drifts from the actual schema, the AI agent will give clients wrong information about their content — or fail silently. Treat this file with the same care as the schema itself.

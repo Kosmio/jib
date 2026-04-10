@@ -1,0 +1,14 @@
+{
+  "mcp": {
+    "servers": [
+      {
+        "name": "website-cms",
+        "description": "Manage website content (articles, media) via MCP",
+        "transport": {
+          "type": "streamable-http",
+          "url": "/mcp"
+        }
+      }
+    ]
+  }
+}

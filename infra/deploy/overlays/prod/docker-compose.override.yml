@@ -25,6 +25,24 @@ services:
         limits:
           memory: 2G
 
+  mcp:
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.mcp.rule: "Host(`${HOST_NAME}`) && PathPrefix(`/mcp`)"
+      traefik.http.routers.mcp.entrypoints: websecure
+      traefik.http.routers.mcp.tls.certresolver: letsencrypt-resolver
+      traefik.http.routers.mcp.middlewares: strip-mcp
+      traefik.http.routers.mcp-http.rule: "Host(`${HOST_NAME}`) && PathPrefix(`/mcp`)"
+      traefik.http.routers.mcp-http.entrypoints: web
+      traefik.http.routers.mcp-http.middlewares: strip-mcp,redirect-to-https
+      traefik.http.middlewares.strip-mcp.stripprefix.prefixes: "/mcp"
+      traefik.http.services.mcp.loadbalancer.server.port: "3100"
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
   strapi:
     labels:
       traefik.enable: "true"
