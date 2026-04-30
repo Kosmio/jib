@@ -1093,11 +1093,15 @@ async function setFrenchLabels(strapi) {
  * if the linked file is missing on disk. Does not create or modify entities.
  */
 async function restoreMissingMedia(strapi) {
-  const uploadDir = path.join(__dirname, '..', 'public', 'uploads');
-  const fileExists = (url) => !!url && fs.existsSync(path.join(uploadDir, path.basename(url)));
+  // Force-restore mode: when env var RESTORE_MISSING_MEDIA=true, always re-upload
+  // (used for one-shot recovery after the uploads volume was lost).
+  const force = process.env.RESTORE_MISSING_MEDIA === 'true';
+  if (!force) {
+    strapi.log.info('[restore] RESTORE_MISSING_MEDIA != true, skipping');
+    return;
+  }
 
   let restored = 0;
-  let kept = 0;
   let notFound = 0;
 
   const restoreOne = async (uid, lookupField, lookupValue, mediaField, relPath) => {
@@ -1114,8 +1118,6 @@ async function restoreMissingMedia(strapi) {
     if (!entity) { notFound++; return; }
 
     const media = entity[mediaField];
-    if (media && fileExists(media.url)) { kept++; return; }
-
     if (media) {
       try {
         await strapi.plugins.upload.services.upload.remove(media);
@@ -1131,7 +1133,7 @@ async function restoreMissingMedia(strapi) {
     }
   };
 
-  strapi.log.info('[restore] scanning for missing media...');
+  strapi.log.info('[restore] FORCE mode — re-uploading all seed media...');
 
   for (const o of SEED_ORGANISATIONS) {
     await restoreOne('api::organisation.organisation', 'name', o.name, 'logo', o.logo_file);
@@ -1143,7 +1145,7 @@ async function restoreMissingMedia(strapi) {
     await restoreOne('api::edition.edition', 'title', e.title, 'image', e.image_file);
   }
 
-  strapi.log.info(`[restore] done — restored=${restored} kept=${kept} entities-not-found=${notFound}`);
+  strapi.log.info(`[restore] done — restored=${restored} entities-not-found=${notFound}`);
 }
 
 // =============================================================================
