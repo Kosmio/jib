@@ -156,7 +156,10 @@ case "$ACTION" in
     if [[ -n "$SKIP_SERVICES" ]]; then
       NO_DEPS="--no-deps"
     fi
-    compose_cmd up -d $NO_DEPS $SERVICES ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
+    # Always pull latest images so a re-tagged build (same tag, new content) is picked up.
+    # Without this, `up` keeps the cached image when the tag (e.g. 0.1.0) hasn't changed.
+    compose_cmd pull $SERVICES 2>/dev/null || true
+    compose_cmd up -d --force-recreate $NO_DEPS $SERVICES ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
     echo "Services started. Use './deploy.sh $ENVIRONMENT ps' to see status."
     ;;
 
