@@ -1,0 +1,54 @@
+name: Diagnose Uploads
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H -p 2234 ${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Inspect server
+        run: |
+          ssh -p 2234 kosmio@${{ vars.DEPLOY_HOST }} 'bash -s' <<'ENDSSH'
+          echo "=========================================="
+          echo "DOCKER VOLUMES"
+          echo "=========================================="
+          docker volume ls
+          echo ""
+          echo "=========================================="
+          echo "ALL CONTAINERS (incl. stopped)"
+          echo "=========================================="
+          docker ps -a --filter name=jib --format "table {{.Names}}\t{{.Status}}\t{{.CreatedAt}}\t{{.Image}}"
+          echo ""
+          echo "=========================================="
+          echo "STRAPI UPLOADS — INSIDE RUNNING CONTAINER"
+          echo "=========================================="
+          docker exec jib-strapi sh -c 'ls -la /app/public/uploads 2>/dev/null | head -100; echo ""; echo "Total files:"; ls /app/public/uploads 2>/dev/null | wc -l' || echo "container not running"
+          echo ""
+          echo "=========================================="
+          echo "ANY STOPPED jib-strapi CONTAINERS?"
+          echo "=========================================="
+          for cid in $(docker ps -a -q --filter name=jib-strapi); do
+            echo "--- container $cid ---"
+            docker inspect $cid --format '{{.State.Status}} {{.Created}} {{.Image}}'
+            docker exec $cid sh -c 'ls /app/public/uploads 2>/dev/null | wc -l' 2>/dev/null || \
+              docker cp $cid:/app/public/uploads /tmp/check_$cid 2>/dev/null && \
+              ls /tmp/check_$cid 2>/dev/null | wc -l || echo "  no /uploads or container removed"
+          done
+          echo ""
+          echo "=========================================="
+          echo "DOCKER OVERLAY UPLOADS DIR (any version)"
+          echo "=========================================="
+          sudo find /var/lib/docker/overlay2 -maxdepth 4 -path "*/diff/app/public/uploads" 2>/dev/null | head -10
+          ENDSSH
