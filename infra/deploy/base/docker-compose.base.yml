@@ -80,9 +80,9 @@ services:
   # MCP SERVER (AI content management)
   # =============================================================================
   mcp:
-    image: ${DOCKER_REGISTRY_REPOSITORY}${PROJECT_SLUG}-mcp:${APP_VERSION}
+    image: ${DOCKER_REGISTRY_REPOSITORY}jib-mcp:${JIB_VERSION}
     platform: linux/amd64
-    container_name: ${PROJECT_SLUG}-mcp
+    container_name: jib-mcp
     labels:
       <<: *common-labels
     environment:
