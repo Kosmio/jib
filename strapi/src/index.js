@@ -755,6 +755,9 @@ module.exports = {
 
     // Seed demo data if no editions exist yet
     await seedData(strapi);
+
+    // Re-upload missing media on existing entities (recovery from lost uploads volume)
+    await restoreMissingMedia(strapi);
   },
 };
 
@@ -1075,6 +1078,63 @@ async function setFrenchLabels(strapi) {
       strapi.log.info(`Labels français appliqués pour ${uid}`);
     }
   }
+}
+
+// =============================================================================
+// MEDIA RECOVERY
+// =============================================================================
+
+/**
+ * Walk through seed entities, find them in DB by name, and re-upload media
+ * if the linked file is missing on disk. Does not create or modify entities.
+ */
+async function restoreMissingMedia(strapi) {
+  const uploadDir = path.join(__dirname, '..', 'public', 'uploads');
+  const fileExists = (url) => !!url && fs.existsSync(path.join(uploadDir, path.basename(url)));
+
+  let restored = 0;
+  let kept = 0;
+  let notFound = 0;
+
+  const restoreOne = async (uid, seedItem, mediaField, seedFileKey) => {
+    const relPath = seedItem[seedFileKey];
+    if (!relPath) return;
+
+    const found = await strapi.documents(uid).findMany({
+      filters: { name: seedItem.name },
+      populate: { [mediaField]: true },
+      limit: 1,
+    });
+    const entity = found[0];
+    if (!entity) { notFound++; return; }
+
+    const media = entity[mediaField];
+    if (media && fileExists(media.url)) { kept++; return; }
+
+    if (media) {
+      try {
+        await strapi.plugins.upload.services.upload.remove(media);
+      } catch (e) {
+        strapi.log.warn(`[restore] could not remove dangling media for "${seedItem.name}": ${e.message}`);
+      }
+    }
+    await uploadAndAttach(strapi, relPath, { refId: entity.id, ref: uid, field: mediaField });
+    restored++;
+  };
+
+  strapi.log.info('[restore] scanning for missing media...');
+
+  for (const o of SEED_ORGANISATIONS) {
+    await restoreOne('api::organisation.organisation', o, 'logo', 'logo_file');
+  }
+  for (const i of SEED_INTERVENANTS) {
+    await restoreOne('api::intervenant.intervenant', i, 'photo', 'photo_file');
+  }
+  for (const e of SEED_EDITIONS) {
+    await restoreOne('api::edition.edition', { name: e.title, ...e }, 'image', 'image_file');
+  }
+
+  strapi.log.info(`[restore] done — restored=${restored} kept=${kept} entities-not-found=${notFound}`);
 }
 
 // =============================================================================

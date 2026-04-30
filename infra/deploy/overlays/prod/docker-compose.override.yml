@@ -89,3 +89,5 @@ volumes:
     name: jib-postgres-data
   traefik-certificates:
     name: jib-traefik-certificates
+  strapi-uploads:
+    name: jib-strapi-uploads

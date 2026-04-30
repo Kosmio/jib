@@ -71,6 +71,8 @@ services:
       EMAIL_CONTACT_TO: ${EMAIL_CONTACT_TO:-}
       EMAIL_CONTACT_TEMPLATE_ID: ${EMAIL_CONTACT_TEMPLATE_ID:-}
       ALTCHA_HMAC_KEY: ${ALTCHA_HMAC_KEY:-}
+    volumes:
+      - strapi-uploads:/app/public/uploads
     depends_on:
       - postgres
     networks:
@@ -120,3 +122,4 @@ networks:
 volumes:
   postgres-data:
   traefik-certificates:
+  strapi-uploads:
