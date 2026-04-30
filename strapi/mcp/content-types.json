@@ -198,14 +198,13 @@
       },
       "region": {
         "type": "enumeration",
-        "enum": ["normandie", "region-sud", "nouvelle-aquitaine", "auvergne-rhone-alpes", "ile-de-france", "bretagne", "occitanie", "grand-est", "hauts-de-france", "pays-de-la-loire", "bourgogne-franche-comte", "centre-val-de-loire", "corse"],
+        "enum": ["normandie", "provence-alpes-cote-d-azur", "nouvelle-aquitaine", "auvergne-rhone-alpes", "ile-de-france", "bretagne", "occitanie", "grand-est", "hauts-de-france", "pays-de-la-loire", "bourgogne-franche-comte", "centre-val-de-loire", "corse"],
         "required": true,
         "description": "Région française d'accueil"
       },
       "date": {
         "type": "date",
-        "required": true,
-        "description": "Date de l'édition au format YYYY-MM-DD"
+        "description": "Date de l'édition au format YYYY-MM-DD (optionnel)"
       },
       "city": {
         "type": "string",

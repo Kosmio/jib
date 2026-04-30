@@ -96,14 +96,14 @@ export interface ProgrammeItem extends Entity {
 }
 
 export type Region =
-  | 'normandie' | 'region-sud' | 'nouvelle-aquitaine' | 'auvergne-rhone-alpes'
+  | 'normandie' | 'provence-alpes-cote-d-azur' | 'nouvelle-aquitaine' | 'auvergne-rhone-alpes'
   | 'ile-de-france' | 'bretagne' | 'occitanie' | 'grand-est'
   | 'hauts-de-france' | 'pays-de-la-loire' | 'bourgogne-franche-comte'
   | 'centre-val-de-loire' | 'corse';
 
 export const regionLabels: Record<Region, string> = {
   'normandie': 'Normandie',
-  'region-sud': 'Région Sud',
+  'provence-alpes-cote-d-azur': 'Provence-Alpes-Côte d\'Azur',
   'nouvelle-aquitaine': 'Nouvelle-Aquitaine',
   'auvergne-rhone-alpes': 'Auvergne-Rhône-Alpes',
   'ile-de-france': 'Île-de-France',

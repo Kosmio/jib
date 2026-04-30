@@ -678,14 +678,14 @@ const SEED_EDITIONS = [
     programme_key: 'normandie',
   },
   {
-    title: 'Région Sud',
+    title: 'Région Provence-Alpes-Côte-d\'Azur',
     year: 2026,
-    region: 'region-sud',
+    region: 'provence-alpes-cote-d-azur',
     date: '2026-06-15',
     city: 'À confirmer',
     edition_status: 'a-venir',
     image_file: 'editions/a-venir.png',
-    description: 'Deuxième étape de la tournée — Région Sud, juin 2026.',
+    description: 'Deuxième étape de la tournée — Provence-Alpes-Côte-d\'Azur, juin 2026.',
     lieux: [],
     programme_key: null,
   },
@@ -752,6 +752,13 @@ module.exports = {
 
     // Set French labels on content types
     await setFrenchLabels(strapi);
+
+    // Apply data migrations (must run before any content-type validation)
+    try {
+      await runDataMigrations(strapi);
+    } catch (err) {
+      strapi.log.error(`[migration] failed: ${err.message}`);
+    }
 
     // Seed demo data if no editions exist yet
     await seedData(strapi);
@@ -1082,6 +1089,23 @@ async function setFrenchLabels(strapi) {
       strapi.log.info(`Labels français appliqués pour ${uid}`);
     }
   }
+}
+
+// =============================================================================
+// DATA MIGRATIONS
+// =============================================================================
+
+/**
+ * Apply one-shot DB migrations needed when content-type schemas change in a
+ * way that requires updating existing rows (e.g. enum value renames).
+ * Each migration must be idempotent — safe to run on every boot.
+ */
+async function runDataMigrations(strapi) {
+  const knex = strapi.db.connection;
+
+  // 2026-04-30: rename region enum 'region-sud' → 'provence-alpes-cote-d-azur'
+  const r = await knex('editions').where({ region: 'region-sud' }).update({ region: 'provence-alpes-cote-d-azur' });
+  if (r > 0) strapi.log.info(`[migration] renamed region for ${r} edition(s) — region-sud → provence-alpes-cote-d-azur`);
 }
 
 // =============================================================================

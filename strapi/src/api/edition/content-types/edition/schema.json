@@ -27,7 +27,7 @@
       "type": "enumeration",
       "enum": [
         "normandie",
-        "region-sud",
+        "provence-alpes-cote-d-azur",
         "nouvelle-aquitaine",
         "auvergne-rhone-alpes",
         "ile-de-france",
@@ -43,8 +43,7 @@
       "required": true
     },
     "date": {
-      "type": "date",
-      "required": true
+      "type": "date"
     },
     "city": {
       "type": "string",
