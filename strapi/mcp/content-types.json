@@ -1,35 +1,314 @@
 {
-  "articles": {
-    "singularName": "article",
-    "displayName": "Article",
-    "description": "Blog articles published on the website",
+  "tags": {
+    "singularName": "tag",
+    "displayName": "Tag",
+    "description": "Étiquettes thématiques utilisées pour catégoriser organisations et intervenants (ex: 'innovation', 'bois-construction'). Pas de draft/publish — les tags sont immédiatement disponibles dès leur création.",
+    "draftAndPublish": false,
+    "fields": {
+      "name": {
+        "type": "string",
+        "required": true,
+        "unique": true,
+        "description": "Libellé visible du tag (ex: 'Innovation matériau')"
+      },
+      "slug": {
+        "type": "uid",
+        "description": "Identifiant URL-friendly généré à partir du name. Utilisez des minuscules et des tirets si vous le créez via API"
+      },
+      "color": {
+        "type": "string",
+        "description": "Couleur hexadécimale optionnelle pour l'affichage du badge (ex: '#00B194')"
+      },
+      "organisations": {
+        "type": "relation manyToMany",
+        "target": "organisations",
+        "description": "Organisations associées à ce tag"
+      },
+      "intervenants": {
+        "type": "relation manyToMany",
+        "target": "intervenants",
+        "description": "Intervenants associés à ce tag"
+      }
+    }
+  },
+  "organisations": {
+    "singularName": "organisation",
+    "displayName": "Organisation",
+    "description": "Entreprises, laboratoires, institutions et collectifs qui participent aux Journées de l'Innovation Filière Bois (co-organisateurs, soutiens, partenaires institutionnels, sponsors privés).",
+    "draftAndPublish": true,
+    "fields": {
+      "name": {
+        "type": "string",
+        "required": true,
+        "description": "Nom officiel de l'organisation (ex: 'Xylofutur', 'FCBA')"
+      },
+      "slug": {
+        "type": "uid",
+        "description": "Identifiant URL-friendly généré à partir du name"
+      },
+      "logo": {
+        "type": "media",
+        "description": "Logo de l'organisation (image unique). Utilisez upload_media pour obtenir l'ID du média, puis passez-le ici"
+      },
+      "description": {
+        "type": "text",
+        "description": "Description courte affichée dans les cartes (max ~200 caractères)"
+      },
+      "long_description": {
+        "type": "richtext",
+        "description": "Description détaillée en Markdown affichée sur la page de l'organisation"
+      },
+      "website": {
+        "type": "string",
+        "description": "URL du site web public (incluant https://)"
+      },
+      "linkedin_url": {
+        "type": "string",
+        "description": "URL de la page LinkedIn de l'organisation"
+      },
+      "tags": {
+        "type": "relation manyToMany",
+        "target": "tags",
+        "description": "Tags thématiques associés (passez un tableau d'IDs ou de documentIds)"
+      },
+      "intervenants": {
+        "type": "relation oneToMany",
+        "target": "intervenants",
+        "description": "Intervenants rattachés à cette organisation (relation inverse, gérée côté intervenant)"
+      },
+      "partenariats": {
+        "type": "relation oneToMany",
+        "target": "partenaires",
+        "description": "Partenariats liant cette organisation à des éditions (relation inverse)"
+      },
+      "programme_items": {
+        "type": "relation manyToMany",
+        "target": "programme-items",
+        "description": "Éléments de programme auxquels l'organisation participe"
+      }
+    }
+  },
+  "intervenants": {
+    "singularName": "intervenant",
+    "displayName": "Intervenant",
+    "description": "Personnes qui interviennent lors des journées (conférenciers, animateurs de tables rondes, témoins). Un intervenant est en général rattaché à une organisation.",
+    "draftAndPublish": true,
+    "fields": {
+      "name": {
+        "type": "string",
+        "required": true,
+        "description": "Prénom et nom de l'intervenant (ex: 'Arnaud Groff')"
+      },
+      "slug": {
+        "type": "uid",
+        "description": "Identifiant URL-friendly généré à partir du name"
+      },
+      "title": {
+        "type": "string",
+        "description": "Fonction / titre court (ex: 'Directeur R&D', 'Chercheur INRAE')"
+      },
+      "bio": {
+        "type": "richtext",
+        "description": "Biographie courte en Markdown affichée sur la fiche intervenant"
+      },
+      "long_description": {
+        "type": "richtext",
+        "description": "Bio détaillée pour la page intervenant"
+      },
+      "photo": {
+        "type": "media",
+        "description": "Portrait. Utilisez upload_media pour obtenir l'ID puis passez-le ici"
+      },
+      "topic": {
+        "type": "string",
+        "description": "Sujet principal de l'intervention (titre court)"
+      },
+      "linkedin_url": {
+        "type": "string",
+        "description": "URL LinkedIn personnelle"
+      },
+      "video_url": {
+        "type": "string",
+        "description": "URL d'une vidéo associée (interview, replay)"
+      },
+      "organisation": {
+        "type": "relation manyToOne",
+        "target": "organisations",
+        "description": "Organisation à laquelle l'intervenant est rattaché"
+      },
+      "tags": {
+        "type": "relation manyToMany",
+        "target": "tags",
+        "description": "Tags thématiques de l'intervenant"
+      },
+      "programme_items": {
+        "type": "relation manyToMany",
+        "target": "programme-items",
+        "description": "Éléments de programme dans lesquels l'intervenant prend la parole"
+      }
+    }
+  },
+  "partenaires": {
+    "singularName": "partenaire",
+    "displayName": "Partenariat",
+    "description": "Lien de partenariat entre une Organisation et une ou plusieurs Éditions, avec un rôle (soutien, co-organisateur, institutionnel, privé). Permet de gérer la liste des partenaires affichés par édition.",
+    "draftAndPublish": true,
+    "fields": {
+      "display_name": {
+        "type": "string",
+        "description": "Libellé d'affichage du partenariat (ex: 'Xylofutur — Co-organisateur'). Si vide, le nom de l'organisation est utilisé"
+      },
+      "role": {
+        "type": "enumeration",
+        "enum": ["soutien", "co-organisateur", "institutionnel", "prive"],
+        "required": true,
+        "description": "Type de partenariat. 'co-organisateur' = pôle/Fibois ; 'soutien' = financeur ; 'institutionnel' = acteur public ; 'prive' = entreprise"
+      },
+      "organisation": {
+        "type": "relation manyToOne",
+        "target": "organisations",
+        "description": "Organisation partenaire (obligatoire)"
+      },
+      "editions": {
+        "type": "relation manyToMany",
+        "target": "editions",
+        "description": "Éditions auxquelles ce partenariat s'applique"
+      }
+    }
+  },
+  "editions": {
+    "singularName": "edition",
+    "displayName": "Édition",
+    "description": "Une édition régionale des Journées de l'Innovation Filière Bois (ex: 'Paris 2025', 'Normandie 2024'). Chaque édition a un programme, des partenaires, et des lieux.",
     "draftAndPublish": true,
     "fields": {
       "title": {
         "type": "string",
         "required": true,
-        "description": "Article title, displayed as the page heading and in article list cards"
+        "description": "Titre complet de l'édition (ex: 'Journées de l'Innovation Filière Bois — Paris 2025')"
       },
       "slug": {
         "type": "uid",
+        "description": "Identifiant URL-friendly généré à partir du title"
+      },
+      "year": {
+        "type": "integer",
         "required": true,
-        "description": "URL-friendly identifier used in the article URL (e.g. 'my-article'). Must be set manually when creating via API — use lowercase, hyphens instead of spaces, no special characters"
+        "description": "Année de l'édition (ex: 2025)"
       },
-      "content": {
+      "region": {
+        "type": "enumeration",
+        "enum": ["normandie", "region-sud", "nouvelle-aquitaine", "auvergne-rhone-alpes", "ile-de-france", "bretagne", "occitanie", "grand-est", "hauts-de-france", "pays-de-la-loire", "bourgogne-franche-comte", "centre-val-de-loire", "corse"],
+        "required": true,
+        "description": "Région française d'accueil"
+      },
+      "date": {
+        "type": "date",
+        "required": true,
+        "description": "Date de l'édition au format YYYY-MM-DD"
+      },
+      "city": {
+        "type": "string",
+        "required": true,
+        "description": "Ville hôte (ex: 'Paris', 'Rouen')"
+      },
+      "edition_status": {
+        "type": "enumeration",
+        "enum": ["a-venir", "inscriptions-ouvertes", "complet", "passee"],
+        "required": true,
+        "description": "État de l'édition. Pilote l'affichage du CTA d'inscription"
+      },
+      "description": {
         "type": "richtext",
-        "description": "Article body in Markdown, rendered on the article detail page via react-markdown"
+        "description": "Pitch de l'édition affiché en haut de la page"
       },
-      "excerpt": {
-        "type": "text",
-        "description": "Short plain-text summary shown in article list cards and used for meta description, keep under 200 chars"
+      "inscription_url": {
+        "type": "string",
+        "description": "URL externe d'inscription (Eventbrite, Weezevent, etc.). Affichée si edition_status = 'inscriptions-ouvertes'"
       },
       "image": {
         "type": "media",
-        "description": "Cover image displayed at the top of the article and as thumbnail in lists. Use upload_media first to get a media ID, then pass it here"
+        "description": "Image principale de l'édition (bannière). Utilisez upload_media pour obtenir l'ID"
       },
-      "published_date": {
-        "type": "date",
-        "description": "Publication date in YYYY-MM-DD format, displayed on the article page"
+      "gallery": {
+        "type": "media multiple",
+        "description": "Galerie photo (post-édition)"
+      },
+      "video_urls": {
+        "type": "text",
+        "description": "Liste d'URLs de vidéos (une par ligne)"
+      },
+      "summary": {
+        "type": "richtext",
+        "description": "Bilan post-édition (chiffres clés, retours)"
+      },
+      "testimonials": {
+        "type": "richtext",
+        "description": "Témoignages de participants (Markdown)"
+      },
+      "lieux": {
+        "type": "component repeatable (edition.lieu)",
+        "description": "Lieux de l'édition. Composant à champs: name (req), address (req), description, map_url, time_slot. Passez un tableau d'objets"
+      },
+      "programme_items": {
+        "type": "relation oneToMany",
+        "target": "programme-items",
+        "description": "Éléments du programme de cette édition (relation inverse)"
+      },
+      "partenaires": {
+        "type": "relation manyToMany",
+        "target": "partenaires",
+        "description": "Partenariats associés à cette édition"
+      }
+    }
+  },
+  "programme-items": {
+    "singularName": "programme-item",
+    "displayName": "Élément de programme",
+    "description": "Une intervention ou un moment du programme d'une édition (conférence, table ronde, pause, accueil). Liée à une seule édition, peut impliquer plusieurs intervenants et organisations.",
+    "draftAndPublish": true,
+    "fields": {
+      "title": {
+        "type": "string",
+        "required": true,
+        "description": "Titre de l'intervention (ex: 'Table ronde : Innovation matériau bois')"
+      },
+      "start_time": {
+        "type": "string",
+        "required": true,
+        "description": "Heure de début au format 'HH:MM' (ex: '09:30')"
+      },
+      "end_time": {
+        "type": "string",
+        "description": "Heure de fin au format 'HH:MM'. Optionnel"
+      },
+      "description": {
+        "type": "richtext",
+        "description": "Description détaillée en Markdown"
+      },
+      "order": {
+        "type": "integer",
+        "description": "Ordre d'affichage dans le programme (les items sont triés par order croissant)"
+      },
+      "edition": {
+        "type": "relation manyToOne",
+        "target": "editions",
+        "description": "Édition à laquelle cet élément appartient (obligatoire)"
+      },
+      "intervenants": {
+        "type": "relation manyToMany",
+        "target": "intervenants",
+        "description": "Intervenants prenant la parole sur cet élément"
+      },
+      "organisations": {
+        "type": "relation manyToMany",
+        "target": "organisations",
+        "description": "Organisations impliquées dans cet élément (au-delà des intervenants)"
+      },
+      "tags": {
+        "type": "relation manyToMany",
+        "target": "tags",
+        "description": "Tags thématiques de l'élément"
       }
     }
   }

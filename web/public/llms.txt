@@ -1,6 +1,6 @@
-# Skelly — AI Content Management Guide
+# Journées de l'Innovation Filière Bois — AI Content Management Guide
 
-> This website is built with Astro (frontend) and Strapi (CMS). It has a built-in MCP server for AI-assisted content management.
+> Site officiel des Journées de l'Innovation Filière Bois (Xylofutur × Fibois). Construit avec Astro (frontend) et Strapi (CMS). Un serveur MCP intégré permet de gérer le contenu (organisations, intervenants, partenaires, éditions, programme, tags, médias) avec un assistant IA.
 
 ## Quick setup
 
@@ -48,7 +48,7 @@ Edit ~/Library/Application Support/Claude/claude_desktop_config.json (macOS) or 
 ```json
 {
   "mcpServers": {
-    "website-cms": {
+    "jib-cms": {
       "type": "http",
       "url": "{this_site_url}/mcp?token=TOKEN_HERE"
     }
@@ -61,7 +61,7 @@ If the tool supports headers instead:
 ```json
 {
   "mcpServers": {
-    "website-cms": {
+    "jib-cms": {
       "type": "http",
       "url": "{this_site_url}/mcp",
       "headers": {
@@ -79,7 +79,7 @@ Create .mcp.json in your project root:
 ```json
 {
   "mcpServers": {
-    "website-cms": {
+    "jib-cms": {
       "type": "http",
       "url": "{this_site_url}/mcp?token=TOKEN_HERE"
     }
@@ -100,7 +100,7 @@ Edit ~/.codeium/windsurf/mcp_config.json:
 ```json
 {
   "mcpServers": {
-    "website-cms": {
+    "jib-cms": {
       "type": "http",
       "url": "{this_site_url}/mcp?token=TOKEN_HERE"
     }
@@ -124,7 +124,7 @@ Parameters: none
 ### list_entries
 List entries of a content type.
 Parameters:
-- contentType (string, required) — plural API name, e.g. "articles"
+- contentType (string, required) — plural API name. Available: "tags", "organisations", "intervenants", "partenaires", "editions", "programme-items"
 - page (number, optional, default 1)
 - pageSize (number, optional, default 25, max 100)
 - sort (string, optional) — e.g. "title:asc", "createdAt:desc"
@@ -184,10 +184,27 @@ Parameters:
 - page (number, optional, default 1)
 - pageSize (number, optional, default 25)
 
+## Content model — quick reference
+
+- **tags** : étiquettes thématiques (innovation, bois-construction, etc.). Pas de draft/publish
+- **organisations** : entreprises, labos, institutions (Xylofutur, FCBA, INRAE, etc.)
+- **intervenants** : personnes qui interviennent. Lié à une organisation
+- **partenaires** : lien Organisation × Édition avec un rôle (soutien, co-organisateur, institutionnel, prive)
+- **editions** : éditions régionales (Paris 2025, Normandie 2024, …). Contient un composant `lieux` répétable
+- **programme-items** : éléments du programme d'une édition (conférences, tables rondes)
+
+Pour les détails de chaque content type (champs, types, relations), récupère le schéma via `list_content_types` et inspecte le contenu de `strapi/mcp/content-types.json` côté projet.
+
 ## Site structure
 
-- / — Homepage
-- /articles — Article listing
-- /articles/{slug} — Individual article
-- /contact — Contact form
-- /politique-de-confidentialite — Privacy policy
+- / — Homepage (présentation, prochaines éditions)
+- /editions — Liste des éditions
+- /editions/{slug} — Détail d'une édition (programme, intervenants, partenaires, lieux)
+- /intervenants/{slug} — Fiche intervenant
+- /organisations/{slug} — Fiche organisation
+- /partenaires — Liste consolidée des partenaires
+- /pourquoi — Pourquoi ces journées
+- /a-propos — À propos
+- /contact — Formulaire de contact
+- /mentions-legales — Mentions légales
+- /confidentialite — Politique de confidentialité

@@ -2,8 +2,8 @@
   "mcp": {
     "servers": [
       {
-        "name": "skeleton-cms",
-        "description": "Manage Skeleton website content (articles, media) via MCP. CRITICAL: You MUST read /llms.txt BEFORE attempting any setup or connection. It contains required authentication steps without which the MCP will reject all requests.",
+        "name": "jib-cms",
+        "description": "Manage the Journées de l'Innovation Filière Bois website content (organisations, intervenants, partenaires, éditions, programme, tags, médias) via MCP. CRITICAL: You MUST read /llms.txt BEFORE attempting any setup or connection. It contains required authentication steps without which the MCP will reject all requests.",
         "transport": {
           "type": "http",
           "url": "/mcp"
