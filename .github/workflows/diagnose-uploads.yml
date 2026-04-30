@@ -22,33 +22,17 @@ jobs:
         run: |
           ssh -p 2234 kosmio@${{ vars.DEPLOY_HOST }} 'bash -s' <<'ENDSSH'
           echo "=========================================="
-          echo "DOCKER VOLUMES"
-          echo "=========================================="
-          docker volume ls
-          echo ""
-          echo "=========================================="
           echo "ALL CONTAINERS (incl. stopped)"
           echo "=========================================="
           docker ps -a --filter name=jib --format "table {{.Names}}\t{{.Status}}\t{{.CreatedAt}}\t{{.Image}}"
           echo ""
           echo "=========================================="
-          echo "STRAPI UPLOADS — INSIDE RUNNING CONTAINER"
+          echo "STRAPI LOGS (last 200 lines)"
           echo "=========================================="
-          docker exec jib-strapi sh -c 'ls -la /app/public/uploads 2>/dev/null | head -100; echo ""; echo "Total files:"; ls /app/public/uploads 2>/dev/null | wc -l' || echo "container not running"
+          docker logs --tail=200 jib-strapi 2>&1 || echo "no logs"
           echo ""
           echo "=========================================="
-          echo "ANY STOPPED jib-strapi CONTAINERS?"
+          echo "STRAPI UPLOADS DIR"
           echo "=========================================="
-          for cid in $(docker ps -a -q --filter name=jib-strapi); do
-            echo "--- container $cid ---"
-            docker inspect $cid --format '{{.State.Status}} {{.Created}} {{.Image}}'
-            docker exec $cid sh -c 'ls /app/public/uploads 2>/dev/null | wc -l' 2>/dev/null || \
-              docker cp $cid:/app/public/uploads /tmp/check_$cid 2>/dev/null && \
-              ls /tmp/check_$cid 2>/dev/null | wc -l || echo "  no /uploads or container removed"
-          done
-          echo ""
-          echo "=========================================="
-          echo "DOCKER OVERLAY UPLOADS DIR (any version)"
-          echo "=========================================="
-          sudo find /var/lib/docker/overlay2 -maxdepth 4 -path "*/diff/app/public/uploads" 2>/dev/null | head -10
+          docker exec jib-strapi sh -c 'ls /app/public/uploads 2>/dev/null | wc -l' || echo "container not running"
           ENDSSH
