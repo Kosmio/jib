@@ -1126,7 +1126,15 @@ async function restoreMissingMedia(strapi) {
       }
     }
     try {
-      await uploadAndAttach(strapi, relPath, { refId: entity.id, ref: uid, field: mediaField });
+      const uploaded = await uploadAndAttach(strapi, relPath, { refId: entity.id, ref: uid, field: mediaField });
+      // Strapi v5 documents API: explicitly link the new file to the entity
+      const fileId = Array.isArray(uploaded) ? uploaded[0]?.id : uploaded?.id;
+      if (fileId && entity.documentId) {
+        await strapi.documents(uid).update({
+          documentId: entity.documentId,
+          data: { [mediaField]: fileId },
+        });
+      }
       restored++;
     } catch (e) {
       strapi.log.warn(`[restore] upload failed for "${lookupValue}": ${e.message}`);
