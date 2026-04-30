@@ -1,0 +1,35 @@
+{
+  "kind": "collectionType",
+  "collectionName": "static_pages",
+  "info": {
+    "singularName": "static-page",
+    "pluralName": "static-pages",
+    "displayName": "Page statique",
+    "description": "Pages textuelles éditables : Pourquoi, À propos, Mentions légales, Politique de confidentialité"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "attributes": {
+    "slug": {
+      "type": "uid",
+      "required": true,
+      "description": "Identifiant URL — ex: 'pourquoi', 'a-propos', 'mentions-legales', 'confidentialite'"
+    },
+    "title": {
+      "type": "string",
+      "required": true
+    },
+    "hero_subtitle": {
+      "type": "string"
+    },
+    "body": {
+      "type": "richtext",
+      "required": true
+    },
+    "meta_description": {
+      "type": "text",
+      "maxLength": 200
+    }
+  }
+}

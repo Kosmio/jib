@@ -91,3 +91,22 @@ export const getProgrammeItems = (
   strapiFetch(
     `/programme-items?filters[edition][documentId][$eq]=${editionDocumentId}&populate[0]=intervenants.photo&populate[1]=organisations.logo&populate[2]=tags&sort=order:asc`
   );
+
+// --- Static Pages ---
+
+export type StaticPage = {
+  slug: string;
+  title: string;
+  hero_subtitle?: string;
+  body: string;
+  meta_description?: string;
+};
+
+export const getStaticPageBySlug = async (slug: string): Promise<StaticPage | null> => {
+  try {
+    const res = await strapiFetch(`/static-pages?filters[slug][$eq]=${slug}`);
+    return res?.data?.[0] ?? null;
+  } catch {
+    return null;
+  }
+};

@@ -261,6 +261,37 @@
       }
     }
   },
+  "static-pages": {
+    "singularName": "static-page",
+    "displayName": "Page statique",
+    "description": "Pages textuelles éditables du site (mentions légales, politique de confidentialité, etc.). Le contenu est en Markdown et est rendu directement dans la page.",
+    "draftAndPublish": true,
+    "fields": {
+      "slug": {
+        "type": "uid",
+        "required": true,
+        "description": "Identifiant URL — slugs utilisés par le site : 'mentions-legales', 'confidentialite'. Pour ajouter une nouvelle page, créez aussi le fichier .astro correspondant côté front"
+      },
+      "title": {
+        "type": "string",
+        "required": true,
+        "description": "Titre affiché dans le hero de la page"
+      },
+      "hero_subtitle": {
+        "type": "string",
+        "description": "Sous-titre optionnel affiché sous le titre dans le hero"
+      },
+      "body": {
+        "type": "richtext",
+        "required": true,
+        "description": "Contenu principal de la page en Markdown — liens, listes, gras/italique, headings (## et ###) supportés"
+      },
+      "meta_description": {
+        "type": "text",
+        "description": "Meta description SEO (max 200 caractères)"
+      }
+    }
+  },
   "programme-items": {
     "singularName": "programme-item",
     "displayName": "Élément de programme",

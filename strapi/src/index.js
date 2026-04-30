@@ -715,6 +715,119 @@ const SEED_EDITIONS = [
   },
 ];
 
+const DEFAULT_STATIC_PAGES = [
+  {
+    slug: 'mentions-legales',
+    title: 'Mentions légales',
+    hero_subtitle: '',
+    meta_description: 'Mentions légales du site des Journées de l\'Innovation de la Filière Bois.',
+    body: `## Éditeur du site
+
+**Xylofutur — Pôle de Compétitivité Produits et Matériaux des Forêts Cultivées**
+Siège social : Xylofutur, Site de Pierroton, 69 route d'Arcachon, 33612 Cestas Cedex
+Téléphone : 05 56 81 52 90
+Email : [contact@xylofutur.fr](mailto:contact@xylofutur.fr)
+Site web : [https://xylofutur.fr](https://xylofutur.fr)
+
+Directrice de la publication : Charlotte Perrier, Directrice du Pôle Xylofutur.
+
+## Hébergement
+
+Le site est hébergé par :
+*[À compléter — nom, adresse et coordonnées de l'hébergeur]*
+
+## Propriété intellectuelle
+
+L'ensemble des contenus (textes, images, logos, vidéos, graphismes) présents sur ce site est protégé par le droit d'auteur et le droit de la propriété intellectuelle. Toute reproduction, représentation ou exploitation, totale ou partielle, est interdite sans l'autorisation préalable et écrite de Xylofutur.
+
+Les marques et logos des partenaires sont la propriété de leurs détenteurs respectifs.
+
+## Responsabilité
+
+Xylofutur s'efforce d'assurer l'exactitude et la mise à jour des informations diffusées sur ce site. Toutefois, Xylofutur ne peut garantir l'exactitude, la précision ou l'exhaustivité des informations mises à disposition. Les informations présentes sur ce site sont données à titre indicatif et sont susceptibles d'être modifiées à tout moment.
+
+## Liens hypertextes
+
+Ce site peut contenir des liens vers des sites tiers. Xylofutur n'exerce aucun contrôle sur le contenu de ces sites et décline toute responsabilité quant à leur contenu ou aux dommages pouvant résulter de leur utilisation.
+
+## Crédits
+
+Conception et développement : [Kosmio](https://kosmio.fr)
+Photographies : *[À compléter]*`,
+  },
+  {
+    slug: 'confidentialite',
+    title: 'Politique de confidentialité',
+    hero_subtitle: '',
+    meta_description: 'Politique de confidentialité et protection des données personnelles.',
+    body: `## Responsable du traitement
+
+Le responsable du traitement des données personnelles est :
+**Xylofutur — Pôle de Compétitivité Produits et Matériaux des Forêts Cultivées**
+Site de Pierroton, 69 route d'Arcachon, 33612 Cestas Cedex
+Email : [contact@xylofutur.fr](mailto:contact@xylofutur.fr)
+
+## Données collectées
+
+Dans le cadre de l'utilisation de ce site, les données suivantes peuvent être collectées :
+
+- **Formulaire de contact** : nom, adresse email, objet et contenu du message.
+- **Newsletter** : adresse email.
+- **Inscription aux événements** : les inscriptions sont gérées par la plateforme HelloAsso. Nous vous invitons à consulter leur [politique de confidentialité](https://www.helloasso.com/confidentialite).
+- **Cookies de mesure d'audience** : données de navigation anonymisées (via Matomo, sans cookies par défaut).
+
+## Finalités du traitement
+
+Les données collectées sont utilisées aux fins suivantes :
+
+- Répondre aux demandes de contact.
+- Envoyer des informations sur les prochaines éditions des Journées de l'Innovation (newsletter).
+- Analyser la fréquentation du site de manière anonyme pour en améliorer le contenu.
+
+## Base juridique
+
+Le traitement des données repose sur le consentement de l'utilisateur (article 6.1.a du RGPD) lors de l'inscription à la newsletter ou de l'envoi d'un formulaire de contact, et sur l'intérêt légitime (article 6.1.f) pour l'analyse d'audience anonymisée.
+
+## Durée de conservation
+
+- **Données de contact** : conservées pendant 3 ans à compter du dernier échange.
+- **Newsletter** : conservées jusqu'au désabonnement.
+- **Données de navigation** : 13 mois maximum.
+
+## Sous-traitants
+
+Les données peuvent être transmises aux prestataires suivants, dans le cadre de leurs services :
+
+- **Brevo (ex-Sendinblue)** — envoi des newsletters. Données hébergées en UE.
+- **HelloAsso** — gestion des inscriptions événementielles. Données hébergées en France.
+
+## Vos droits
+
+Conformément au Règlement Général sur la Protection des Données (RGPD), vous disposez des droits suivants sur vos données personnelles :
+
+- Droit d'accès
+- Droit de rectification
+- Droit à l'effacement
+- Droit à la limitation du traitement
+- Droit à la portabilité
+- Droit d'opposition
+
+Pour exercer ces droits, contactez-nous à : [contact@xylofutur.fr](mailto:contact@xylofutur.fr)
+
+Vous pouvez également déposer une réclamation auprès de la [CNIL](https://www.cnil.fr) (Commission Nationale de l'Informatique et des Libertés).
+
+## Cookies
+
+Ce site utilise Matomo pour l'analyse d'audience, configuré en mode **sans cookies** par défaut (conformément aux recommandations de la CNIL). Aucun cookie de tracking n'est déposé sans votre consentement.
+
+Si le bandeau de consentement est activé, vous pouvez à tout moment modifier vos préférences en cliquant sur "Gestion des cookies" en bas de page.
+
+## Mise à jour
+
+Cette politique de confidentialité peut être mise à jour à tout moment. Date de dernière modification : avril 2026.`,
+  },
+];
+
 // =============================================================================
 // BOOTSTRAP
 // =============================================================================
@@ -748,6 +861,7 @@ module.exports = {
       { api: 'programme-item', actions: ['find', 'findOne'] },
       { api: 'intervenant', actions: ['find', 'findOne'] },
       { api: 'partenaire', actions: ['find', 'findOne'] },
+      { api: 'static-page', actions: ['find', 'findOne'] },
     ]);
 
     // Set French labels on content types
@@ -1106,6 +1220,24 @@ async function runDataMigrations(strapi) {
   // 2026-04-30: rename region enum 'region-sud' → 'provence-alpes-cote-d-azur'
   const r = await knex('editions').where({ region: 'region-sud' }).update({ region: 'provence-alpes-cote-d-azur' });
   if (r > 0) strapi.log.info(`[migration] renamed region for ${r} edition(s) — region-sud → provence-alpes-cote-d-azur`);
+
+  // 2026-04-30: ensure static-page entries exist with default content
+  await ensureStaticPages(strapi);
+}
+
+async function ensureStaticPages(strapi) {
+  for (const page of DEFAULT_STATIC_PAGES) {
+    const existing = await strapi.documents('api::static-page.static-page').findMany({
+      filters: { slug: { $eq: page.slug } },
+      limit: 1,
+    });
+    if (existing && existing.length > 0) continue;
+    await strapi.documents('api::static-page.static-page').create({
+      data: page,
+      status: 'published',
+    });
+    strapi.log.info(`[migration] created static-page "${page.slug}"`);
+  }
 }
 
 // =============================================================================
