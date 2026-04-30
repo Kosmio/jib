@@ -27,17 +27,45 @@ You are a security auditor for an Astro 6 + Strapi v5 web project. Your job is t
 
 ## PROCESS
 
-### Step 1: Pre-flight
+### Step 1: Choose audit target
+
+If invoked via `/quality`, the target URL (`$TARGET_URL`) is already set -- skip to pre-flight.
+
+If invoked standalone, ask the user what to test against:
+
+> Where should I run the runtime checks?
+> 1. **Local dev server** (`http://localhost:4321`) -- tests your current code in development
+> 2. **Deployed environment** -- tests a live deployment (dev or prod)
+> 3. **Code-only** -- skip runtime checks, only analyze source code
+
+If the user picks **option 2**, ask which environment:
+> Which environment?
+> 1. **dev**
+> 2. **prod**
+
+Then resolve the target URL from the infra overlay:
+1. Read the env file at `infra/deploy/overlays/<env>/.env.<env>` (e.g., `.env.dev` or `.env.prod`)
+2. Extract `HOST_NAME` from that file
+3. The target URL is `https://<HOST_NAME>`
+4. If `HOST_NAME` is still a placeholder (contains `your-domain`), warn the user and ask for the actual URL
+
+If the user picks **option 1** (local), set `$TARGET_URL` to `http://localhost:4321`.
+
+If the user picks **option 3** (code-only), skip all runtime checks (equivalent to `--quick`).
+
+**When `--quick` is passed as argument, skip this step entirely.**
+
+### Step 2: Pre-flight
 
 1. **Read project structure** -- Scan the codebase to understand what exists: API endpoints, forms, external integrations, auth mechanisms.
-2. **Check dev server** -- Run `curl -s -o /dev/null -w "%{http_code}" http://localhost:4321`. If running, use for header analysis and rendered page checks. If not, code-level only (warn the user).
+2. **Check target is reachable** (if `$TARGET_URL` is set) -- Run `curl -s -o /dev/null -w "%{http_code}" $TARGET_URL`. If reachable, use for header analysis and rendered page checks. If not and target is local, warn the user. If not and target is remote, offer to fall back to code-only mode.
 3. **Check previous audit** -- Look for `.claude/skills/security/last-audit.json`. If found, use for delta comparison.
 
-### Step 2: Dynamic discovery
+### Step 3: Dynamic discovery
 
 Before checking known patterns, scan the project for security-relevant additions beyond the skeleton.
 
-#### 2a. API endpoint inventory
+#### 3a. API endpoint inventory
 
 Find all API endpoints:
 - Strapi custom controllers: `strapi/src/api/*/controllers/*.js`
@@ -51,7 +79,7 @@ For each endpoint:
 - What input does it accept?
 - What does it do with the input (DB write, external API call, email, file)?
 
-#### 2b. Authentication & authorization scan
+#### 3b. Authentication & authorization scan
 
 Check if the project has added:
 - User authentication (Strapi users-permissions plugin, custom auth)
@@ -61,7 +89,7 @@ Check if the project has added:
 - Admin panel customizations
 - Role-based access control beyond Strapi defaults
 
-#### 2c. External service scan
+#### 3c. External service scan
 
 Scan `web/src/` and `strapi/src/` for external service integrations:
 - `fetch()` calls to external URLs
@@ -71,9 +99,9 @@ Scan `web/src/` and `strapi/src/` for external service integrations:
 - File storage services
 - Email services beyond Brevo
 
-### Step 3: Input validation & injection (Category 1)
+### Step 4: Input validation & injection (Category 1)
 
-#### 3a. Form input validation
+#### 4a. Form input validation
 
 Read each form handler (contact, newsletter, and any additions):
 
@@ -89,7 +117,7 @@ Read each form handler (contact, newsletter, and any additions):
 - Check: email domain validation (MX record check not required, but format check is)
 - Severity: MEDIUM
 
-#### 3b. XSS vectors
+#### 4b. XSS vectors
 
 Search for unsafe HTML rendering:
 - In `.astro` files: `set:html` directive (Astro's equivalent of dangerouslySetInnerHTML)
@@ -108,22 +136,22 @@ For each found:
 - Is sanitization applied (DOMPurify or equivalent)?
 - Severity: HIGH if user-controlled, MEDIUM if admin-only CMS content (lower risk, but defense-in-depth)
 
-#### 3c. Query injection
+#### 4c. Query injection
 
 Check Strapi query parameters:
 - Custom queries in controllers using `strapi.documents()` or `strapi.db.query()`
 - Are query parameters taken from user input without validation?
 - Is `populate` taken from user input (could expose unexpected relations)?
 
-#### 3d. Pagination limits
+#### 4d. Pagination limits
 
 Verify Strapi API limits:
 - Read `strapi/config/api.js` -- confirm `maxLimit` is set
 - Check if any custom endpoint bypasses the default limit
 
-### Step 4: Secret & configuration exposure (Category 2)
+### Step 5: Secret & configuration exposure (Category 2)
 
-#### 4a. Environment variable exposure
+#### 5a. Environment variable exposure
 
 Check for secrets leaked to the client:
 - Grep `web/src/` for `PUBLIC_` env vars -- verify none contain actual secrets
@@ -138,13 +166,13 @@ Search patterns:
   STRAPI_KEY (should never appear in client code)
 ```
 
-#### 4b. .env file security
+#### 5b. .env file security
 
 - Check `.gitignore` includes all `.env*` files (except `.env.example`)
 - Check `.env.example` doesn't contain actual secret values
 - Check no `.env` file is committed to git: `git log --all --diff-filter=A -- '*.env' ':!*.env.example'`
 
-#### 4c. Error information leakage
+#### 5c. Error information leakage
 
 If dev server is running:
 - Send a request to a non-existent Strapi endpoint, check if the error response leaks stack traces or DB details
@@ -155,20 +183,20 @@ In code:
 - Search for `console.log`, `console.error` in production paths that might log sensitive data
 - Check Strapi controllers for error responses that include `error.message` or `error.stack`
 
-#### 4d. Strapi API token scope
+#### 5d. Strapi API token scope
 
 - Read Strapi admin config and document that API tokens should be scoped to read-only for the web frontend
 - Flag if any documentation suggests creating full-access tokens
 - Check `STRAPI_KEY` usage -- is it a read-only token or full-access?
 
-### Step 5: Security headers & CORS (Category 3)
+### Step 6: Security headers & CORS (Category 3)
 
-#### 5a. HTTP security headers
+#### 6a. HTTP security headers
 
-If dev server is running, check response headers from both Astro and Strapi:
+If `$TARGET_URL` is reachable, check response headers from both Astro and Strapi:
 
 ```bash
-curl -sI http://localhost:4321 | grep -iE 'x-content-type|x-frame|strict-transport|referrer-policy|permissions-policy|content-security-policy|x-powered-by'
+curl -sI $TARGET_URL | grep -iE 'x-content-type|x-frame|strict-transport|referrer-policy|permissions-policy|content-security-policy|x-powered-by'
 ```
 
 Check for each header:
@@ -185,7 +213,7 @@ Check for each header:
 
 Note: HSTS and some headers are typically set by Traefik in production. Check Traefik config in `infra/deploy/overlays/*/docker-compose.override.yml` for production header configuration.
 
-#### 5b. Content Security Policy
+#### 6b. Content Security Policy
 
 If CSP is missing, recommend a starter policy appropriate for the stack:
 - `default-src 'self'`
@@ -196,7 +224,7 @@ If CSP is missing, recommend a starter policy appropriate for the stack:
 - `connect-src 'self'` (Strapi API, Matomo)
 - `frame-ancestors 'none'`
 
-#### 5c. CORS configuration
+#### 6c. CORS configuration
 
 Read `strapi/config/middlewares.js` -- check the `strapi::cors` middleware config:
 - Is `origin` set to specific domains or wildcard `*`?
@@ -204,13 +232,13 @@ Read `strapi/config/middlewares.js` -- check the `strapi::cors` middleware confi
 - Is `Access-Control-Allow-Methods` restricted to needed methods?
 - Check Astro Node adapter CORS behavior
 
-#### 5d. Technology stack disclosure
+#### 6d. Technology stack disclosure
 
 Check if `X-Powered-By` or similar headers reveal the stack (Strapi, Astro, Express, Node.js version).
 - Strapi: `strapi::poweredBy` middleware -- check if it's configured to suppress or customize
 - Astro: check if Node adapter sets `X-Powered-By`
 
-### Step 6: Dependency vulnerabilities (Category 4)
+### Step 7: Dependency vulnerabilities (Category 4)
 
 Run dependency audits for both packages:
 
@@ -239,16 +267,16 @@ Check lock file integrity:
 - Verify `pnpm-lock.yaml` exists and is committed
 - Flag if any scripts use `--no-frozen-lockfile` in CI
 
-### Step 7: Authentication & access control (Category 5)
+### Step 8: Authentication & access control (Category 5)
 
-#### 7a. Strapi admin panel
+#### 8a. Strapi admin panel
 
 - Check admin URL configuration (`ADMIN_URL` env var)
 - Verify admin panel is not accessible from the public web without Traefik path routing
 - Check if admin panel has strong password requirements
 - Check for default/weak admin credentials in seed data (`strapi/src/index.js`)
 
-#### 7b. API permissions
+#### 8b. API permissions
 
 Check Strapi content-type permissions:
 - Article: should be read-only public (find, findOne)
@@ -256,13 +284,13 @@ Check Strapi content-type permissions:
 - Newsletter: should only expose the custom `subscribe` endpoint
 - Verify no content types are accidentally set to public write access
 
-#### 7c. API token management
+#### 8c. API token management
 
 - Document that `STRAPI_KEY` should be a read-only API token
 - Check if the project documents token creation with minimum required permissions
 - Verify tokens are not logged or exposed in error responses
 
-### Step 8: Rate limiting (Category 6)
+### Step 9: Rate limiting (Category 6)
 
 Check each public endpoint for rate limiting:
 
@@ -281,7 +309,7 @@ Check if Strapi has rate limiting configured:
 
 Captcha (Altcha) provides some protection but is not a substitute for rate limiting -- captcha can be solved programmatically.
 
-### Step 9: File upload security (Category 7)
+### Step 10: File upload security (Category 7)
 
 Check Strapi's upload plugin configuration:
 - What file types are allowed?
@@ -292,9 +320,9 @@ Check Strapi's upload plugin configuration:
 
 If the project has no custom upload handling (skeleton default), note this and check if Strapi's default upload config is secure.
 
-### Step 10: Logging & error handling (Category 8)
+### Step 11: Logging & error handling (Category 8)
 
-#### 10a. Debug logging
+#### 11a. Debug logging
 
 Search for `console.log`, `console.debug` in production code paths:
 ```
@@ -308,16 +336,16 @@ Check if any log statements include:
 - Request bodies containing sensitive data
 - Passwords or authentication credentials
 
-#### 10b. Error responses
+#### 11b. Error responses
 
 Check each API endpoint's error handling:
 - Do catch blocks return generic errors or internal details?
 - Does Strapi's default error handler leak stack traces in production mode?
 - Check `NODE_ENV` handling in Strapi config
 
-### Step 11: Cryptography & secrets (Category 9)
+### Step 12: Cryptography & secrets (Category 9)
 
-#### 11a. Random number generation
+#### 12a. Random number generation
 
 Search for `Math.random()` in security-sensitive contexts:
 ```
@@ -325,7 +353,7 @@ Search patterns: Math.random
 Check context: is it used for tokens, IDs, or session values?
 ```
 
-#### 11b. Hardcoded secrets
+#### 12b. Hardcoded secrets
 
 Search for potential hardcoded secrets:
 ```
@@ -334,7 +362,7 @@ Search patterns:
   Exclude: .env.example, node_modules, test files
 ```
 
-#### 11c. HTTPS enforcement
+#### 12c. HTTPS enforcement
 
 Check for `http://` URLs in production code (excluding localhost):
 ```
@@ -342,16 +370,16 @@ Search: http:// in fetch calls, API URLs, redirect URIs
 Exclude: localhost, 127.0.0.1, comments
 ```
 
-#### 11d. Altcha secret management
+#### 12d. Altcha secret management
 
 Check how Altcha captcha secret is managed:
 - Is it in an environment variable?
 - Is it hardcoded?
 - Is it strong enough (entropy)?
 
-### Step 12: Infrastructure (Category 10)
+### Step 13: Infrastructure (Category 10)
 
-#### 12a. Docker security
+#### 13a. Docker security
 
 Check Dockerfiles for:
 - Running as root (should use non-root user)
@@ -360,13 +388,13 @@ Check Dockerfiles for:
 - Build cache/source code in runtime stage
 - Base image currency (outdated base images with known CVEs)
 
-#### 12b. Source maps
+#### 13b. Source maps
 
 Check if production builds include source maps:
 - Astro: check if source maps are generated in production build
 - Source maps reveal original source code to anyone who finds them
 
-#### 12c. Traefik security
+#### 13c. Traefik security
 
 Check Traefik configuration in deploy overlays:
 - TLS configuration (min version, cipher suites)
@@ -374,7 +402,7 @@ Check Traefik configuration in deploy overlays:
 - Rate limiting middleware
 - Admin dashboard exposure
 
-### Step 13: Present the report
+### Step 14: Present the report
 
 ```
 ## Security Audit Report
@@ -421,7 +449,7 @@ Check Traefik configuration in deploy overlays:
 - This is an automated audit -- it does not replace professional penetration testing
 ```
 
-### Step 14: Offer to fix
+### Step 15: Offer to fix
 
 After presenting the report, ask:
 
@@ -433,6 +461,30 @@ After presenting the report, ask:
 > 5. Add rate limiting guidance
 > 6. No fixes -- I'll keep the report for reference"
 
+**Fix risk assessment -- apply to every finding:**
+
+| Fix type | Risk | Why |
+|----------|------|-----|
+| Remove `X-Powered-By` header | ✅ Safe | No functionality depends on this header |
+| Add `.env` patterns to `.gitignore` | ✅ Safe | Prevents future accidents, no behavior change |
+| Add `X-Content-Type-Options: nosniff` | ✅ Safe | Only prevents MIME sniffing attacks, no legitimate use case affected |
+| Add `X-Frame-Options: DENY` | ⚠️ Caution | Breaks legitimate iframe embeds. If the site is meant to be embedded (widgets, previews), this will break it |
+| Add `Referrer-Policy` header | ⚠️ Caution | Stricter policies can break OAuth flows, analytics, or affiliate tracking that relies on referrer information |
+| Add `Permissions-Policy` header | ⚠️ Caution | Restricting browser APIs (camera, mic, geolocation) is safe unless the site actually uses them |
+| Add input validation to form controllers | ⚠️ Caution | Overly strict validation can reject legitimate input (long names, special characters, international emails) |
+| Replace verbose error responses with generic messages | ⚠️ Caution | Can make debugging harder if too aggressive; ensure logs still capture the details |
+| Run `pnpm audit fix` | ⚠️ Caution | Dependency updates can introduce breaking changes, especially major version bumps |
+| Add `Content-Security-Policy` header | 🚫 Risky | **This is the #1 "fix everything" footgun.** CSP blocks any script, style, font, image, or connection not explicitly whitelisted. If the site loads Matomo, Google Fonts, Strapi images, cookie consent JS, or any third-party resource, they will silently stop loading. The site will look broken with no obvious error. Must inventory every external resource before writing the policy |
+| Tighten CORS origins (replace `*` with specific domains) | 🚫 Risky | Wrong origins will block the frontend from calling the Strapi API. Site will show empty content with failed fetch errors in console |
+| Add rate limiting | 🚫 Risky | Too aggressive limits will block legitimate users, especially behind shared IPs (offices, mobile carriers). Must tune thresholds to actual traffic |
+| Add `Strict-Transport-Security` (HSTS) | 🚫 Risky | Once sent, browsers will refuse HTTP for the domain for the specified max-age (often 1 year). If HTTPS is later misconfigured, the site becomes completely inaccessible. Do not add with long max-age until HTTPS is verified stable |
+| Modify Docker USER directives | 🚫 Risky | Non-root user may lack permissions for volume mounts, port binding, or file writes that the app needs. Must test the full container lifecycle |
+
+**Fix risk gating (same rules as /quality):**
+- ✅ Safe: apply directly
+- ⚠️ Caution: apply, then summarize what changed
+- 🚫 Risky: **STOP after Safe/Caution fixes.** Ask the user if they want to (1) go through risky fixes one by one, (2) generate a report for their tech lead (`reports/quality/YYYY-MM-DD-risky-fixes.md`), or (3) skip entirely. See /quality SKILL.md Step 10 for the full flow. For CSP specifically, always inventory all external resources loaded by the site before proposing a policy.
+
 **When fixing:**
 
 - **Security headers**: Add headers via Astro middleware (`web/src/middleware.ts`) or recommend Traefik labels for production. Provide a starter CSP tailored to the project's external resources.
@@ -441,7 +493,10 @@ After presenting the report, ask:
 - **Dependency fixes**: Run `pnpm audit fix` where possible. For unfixable transitive deps, document the risk.
 - **Error handling**: Replace verbose error responses with generic messages in Strapi controllers.
 - **Docker**: Add non-root USER directives, remove unnecessary COPY statements.
-- After fixing, **automatically re-run the audit** (not ask -- just do it). Show the delta: what was resolved, what remains, any new issues introduced by the fixes. This gives the user immediate feedback on the impact of the changes.
+**Fix flow (same as /quality Step 10):**
+1. Apply all ✅ Safe and ⚠️ Caution fixes. Update practice docs (`ai/ASTRO_PRACTICES.md`, `ai/STRAPI_PRACTICES.md`, `ai/INFRA_PRACTICES.md`) for the patterns just introduced (e.g., input validation conventions, security header config, CSP update process, rate limiting config, error handling patterns, Docker security).
+2. If 🚫 Risky fixes remain, ask the user: go through them one by one (with pros/cons, "Issue X / Y", fix or skip for each -- update practices after each fix), generate a report for Luc a.k.a. the professional fixer, or skip entirely.
+3. **Automatically re-run the audit.** Show the delta.
 
 ## ARGUMENTS
 

@@ -40,21 +40,54 @@ French government eco-design reference with 115 criteria. When reporting finding
 
 ## PROCESS
 
-### Step 1: Pre-flight checks
+### Step 1: Choose audit target
 
-1. **Check dev server is running.** Run `curl -s -o /dev/null -w "%{http_code}" http://localhost:4321`. If not 200, tell the user to start it with `cd web && pnpm dev` and wait.
+If invoked via `/quality`, the target URL (`$TARGET_URL`) is already set -- skip to pre-flight checks.
+
+If invoked standalone, ask the user what to test against:
+
+> Where should I run the runtime checks?
+> 1. **Local dev server** (`http://localhost:4321`) -- tests your current code in development
+> 2. **Deployed environment** -- tests a live deployment (dev or prod)
+> 3. **Code-only** -- skip EcoIndex measurement, only analyze source code
+
+If the user picks **option 2**, ask which environment:
+> Which environment?
+> 1. **dev**
+> 2. **prod**
+
+Then resolve the target URL from the infra overlay:
+1. Read the env file at `infra/deploy/overlays/<env>/.env.<env>` (e.g., `.env.dev` or `.env.prod`)
+2. Extract `HOST_NAME` from that file
+3. The target URL is `https://<HOST_NAME>`
+4. If `HOST_NAME` is still a placeholder (contains `your-domain`), warn the user and ask for the actual URL
+
+If the user picks **option 1** (local), set `$TARGET_URL` to `http://localhost:4321`.
+
+If the user picks **option 3** (code-only), skip all runtime checks (equivalent to `--quick`).
+
+**When `--quick` is passed as argument, skip this step entirely.**
+
+### Step 2: Pre-flight checks
+
+1. **Check target is reachable.** Run `curl -s -o /dev/null -w "%{http_code}" $TARGET_URL`.
+   - If 200: good, proceed.
+   - If not and target is local (`http://localhost:4321`): tell the user to start it with `cd web && pnpm dev` and wait.
+   - If not and target is remote: warn the user the server is unreachable. Offer to fall back to code-only mode.
 2. **Check Node.js is available.** Run `node --version`. Must be 18+.
 3. **Check previous audit exists.** Look for `.claude/skills/ecoconception/last-audit.json`. If found, use for delta comparison.
 
-### Step 2: EcoIndex measurement (lighthouse-plugin-ecoindex)
+### Step 3: EcoIndex measurement (lighthouse-plugin-ecoindex)
+
+**IMPORTANT:** lighthouse-plugin-ecoindex is available via npx and MUST be run. Do NOT skip this step or fall back to code-only analysis without first attempting to run the command. Verify with `npx lighthouse-plugin-ecoindex --help` if unsure.
 
 Run the lighthouse-plugin-ecoindex against key pages:
 
 ```bash
 npx lighthouse-plugin-ecoindex collect \
-  --url http://localhost:4321 \
-  --url http://localhost:4321/articles \
-  --url http://localhost:4321/contact \
+  --url $TARGET_URL \
+  --url $TARGET_URL/articles \
+  --url $TARGET_URL/contact \
   --extra-header '{"Cookie":""}' \
   --output json \
   --output html
@@ -64,18 +97,18 @@ If the plugin doesn't support multiple URLs in one command, run it per page:
 
 ```bash
 # Home
-npx lighthouse-plugin-ecoindex collect --url http://localhost:4321 --output json --output-path .claude/skills/ecoconception/ecoindex-home.json
+npx lighthouse-plugin-ecoindex collect --url $TARGET_URL --output json --output-path .claude/skills/ecoconception/ecoindex-home.json
 
 # Articles list
-npx lighthouse-plugin-ecoindex collect --url http://localhost:4321/articles --output json --output-path .claude/skills/ecoconception/ecoindex-articles.json
+npx lighthouse-plugin-ecoindex collect --url $TARGET_URL/articles --output json --output-path .claude/skills/ecoconception/ecoindex-articles.json
 
 # Contact
-npx lighthouse-plugin-ecoindex collect --url http://localhost:4321/contact --output json --output-path .claude/skills/ecoconception/ecoindex-contact.json
+npx lighthouse-plugin-ecoindex collect --url $TARGET_URL/contact --output json --output-path .claude/skills/ecoconception/ecoindex-contact.json
 ```
 
 Also get an article detail page (find a slug from the sitemap or by fetching the articles list first):
 ```bash
-npx lighthouse-plugin-ecoindex collect --url http://localhost:4321/articles/<first-slug> --output json --output-path .claude/skills/ecoconception/ecoindex-article-detail.json
+npx lighthouse-plugin-ecoindex collect --url $TARGET_URL/articles/<first-slug> --output json --output-path .claude/skills/ecoconception/ecoindex-article-detail.json
 ```
 
 **Note:** If `lighthouse-plugin-ecoindex` CLI interface differs from above, adapt the commands. Check `npx lighthouse-plugin-ecoindex --help` first. The key output needed: EcoIndex score, grade, DOM nodes, HTTP requests, page weight, water consumption, CO2 emissions, GreenIT best practices results, plus standard Lighthouse performance metrics.
@@ -91,7 +124,7 @@ Extract from each report:
 - Lighthouse Performance score
 - LCP, CLS, TBT, FCP, Speed Index
 
-### Step 3: Astro-specific static analysis
+### Step 4: Astro-specific static analysis
 
 These checks analyze source code directly -- no browser needed.
 
@@ -167,7 +200,7 @@ grep -rn 'transition\|animation\|@keyframes\|transform' web/src/ --include='*.as
 Check if `@media (prefers-reduced-motion: reduce)` is used anywhere in CSS to disable or reduce animations for users who prefer it. If not: **warning**.
 - **RGESN mapping**: RGESN 4.2 (respect user preferences)
 
-### Step 4: Strapi-specific checks
+### Step 5: Strapi-specific checks
 
 #### 4a. API over-fetching
 
@@ -184,7 +217,7 @@ Check if Strapi provides responsive image formats:
 - Check if the frontend uses appropriate sizes for different contexts (thumbnail for cards, full for hero)
 - **RGESN mapping**: RGESN 4.5 (serve appropriately sized images)
 
-### Step 5: Infrastructure checks
+### Step 6: Infrastructure checks
 
 #### 5a. Docker image analysis
 
@@ -201,7 +234,7 @@ If images aren't built locally, analyze the Dockerfiles:
 #### 5b. Compression
 
 Check if HTTP compression is configured:
-- If dev server is running: `curl -sI -H 'Accept-Encoding: gzip, br' http://localhost:4321 | grep -i content-encoding`
+- If target is reachable: `curl -sI -H 'Accept-Encoding: gzip, br' $TARGET_URL | grep -i content-encoding`
 - Check Astro config (`web/astro.config.mjs`) for compression settings
 - Check Traefik config (overlay docker-compose files) for compression middleware
 - Note: Astro's Node adapter does NOT compress by default -- this must be handled by Traefik or a middleware
@@ -209,10 +242,10 @@ Check if HTTP compression is configured:
 
 #### 5c. Caching headers
 
-If dev server is running:
+If target is reachable:
 ```bash
-curl -sI http://localhost:4321/assets/cookieconsent.js | grep -i cache-control
-curl -sI http://localhost:4321/assets/skelly.png | grep -i cache-control
+curl -sI $TARGET_URL/assets/cookieconsent.js | grep -i cache-control
+curl -sI $TARGET_URL/assets/skelly.png | grep -i cache-control
 ```
 
 - Check if static assets have appropriate Cache-Control headers
@@ -220,7 +253,7 @@ curl -sI http://localhost:4321/assets/skelly.png | grep -i cache-control
 - Public assets (in `web/public/`) may not have cache headers set
 - **RGESN mapping**: RGESN 5.4 (implement caching strategy)
 
-### Step 6: Present the report
+### Step 7: Present the report
 
 ```
 ## Ecoconception Audit Report
@@ -295,7 +328,7 @@ curl -sI http://localhost:4321/assets/skelly.png | grep -i cache-control
 - This audit focuses on what can be measured and improved in code. Broader eco-design decisions (feature necessity, content strategy, hosting choice) are out of scope but equally important.
 ```
 
-### Step 7: Offer to fix
+### Step 8: Offer to fix
 
 After presenting the report, ask:
 
@@ -307,6 +340,26 @@ After presenting the report, ask:
 > 5. Optimize Strapi API calls (replace populate=* with specific fields)
 > 6. No fixes -- I'll keep the report for reference"
 
+**Fix risk assessment -- apply to every finding:**
+
+| Fix type | Risk | Why |
+|----------|------|-----|
+| Add `loading="lazy"` to below-the-fold images | ✅ Safe | Standard browser behavior, no visual change |
+| Add image `width`/`height` attributes | ✅ Safe | Prevents CLS, no visual change |
+| Add `@media (prefers-reduced-motion)` | ✅ Safe | Only affects users who opted into reduced motion |
+| Extract duplicate SVGs to components | ✅ Safe | Refactor with identical output |
+| Add `loading="lazy"` to hero/above-the-fold images | ⚠️ Caution | Can delay LCP and hurt perceived performance -- only lazy-load below-the-fold |
+| Self-host fonts (replace Google Fonts CDN) | ⚠️ Caution | Font rendering may differ slightly between CDN and self-hosted versions; font-display strategy matters |
+| Change hydration directives (`client:load` → `client:visible`) | 🚫 Risky | Component won't be interactive until it scrolls into view. If the component is above the fold or needs immediate interactivity (e.g., a form), users will see a broken/unresponsive UI |
+| Replace `populate=*` with specific fields | 🚫 Risky | If you miss a field the page actually uses, that page will break silently (missing data, blank sections, or errors). Must verify every field usage before changing |
+| Replace `<img>` with Astro `<Image>` | 🚫 Risky | Changes rendering pipeline, can break dynamic Strapi image URLs, may require `inferSize` or explicit dimensions |
+| Add compression middleware | 🚫 Risky | Misconfigured compression can corrupt responses, break streaming, or conflict with existing proxy compression |
+
+**Fix risk gating (same rules as /quality):**
+- ✅ Safe: apply directly
+- ⚠️ Caution: apply, then summarize what changed
+- 🚫 Risky: **STOP after Safe/Caution fixes.** Ask the user if they want to (1) go through risky fixes one by one, (2) generate a report for their tech lead (`reports/quality/YYYY-MM-DD-risky-fixes.md`), or (3) skip entirely. See /quality SKILL.md Step 10 for the full flow.
+
 **When fixing:**
 
 - **Image optimization**: Replace `<img>` with Astro `<Image>` in .astro files. Add `width`, `height`, `loading="lazy"` attributes. For Strapi images (dynamic URLs), use `<Image>` with `inferSize` or pass dimensions from the API response. For React components (.tsx), add `loading="lazy"` and `width`/`height` to `<img>` tags (can't use Astro Image in React).
@@ -315,7 +368,10 @@ After presenting the report, ask:
 - **Strapi API optimization**: In `web/src/lib/strapi.ts`, replace `populate=*` with specific field selection for each endpoint.
 - **SVG extraction**: Extract repeated SVG icons into reusable Astro components in `web/src/components/icons/`.
 - **Compression**: If not configured, add compression middleware guidance (Traefik or Node.js level).
-- After fixing, **automatically re-run the audit** (not ask -- just do it). Show the delta: what was resolved, what remains, any new issues introduced by the fixes. This gives the user immediate feedback on the impact of the changes.
+**Fix flow (same as /quality Step 10):**
+1. Apply all ✅ Safe and ⚠️ Caution fixes. Update practice docs (`ai/ASTRO_PRACTICES.md`, `ai/STRAPI_PRACTICES.md`, `ai/INFRA_PRACTICES.md`) for the patterns just introduced (e.g., self-hosted font loading, image optimization conventions, hydration directive rules, API field selection patterns, compression config).
+2. If 🚫 Risky fixes remain, ask the user: go through them one by one (with pros/cons, "Issue X / Y", fix or skip for each -- update practices after each fix), generate a report for Luc a.k.a. the professional fixer, or skip entirely.
+3. **Automatically re-run the audit.** Show the delta.
 
 ## ARGUMENTS
 

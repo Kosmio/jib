@@ -18,19 +18,50 @@ You are an accessibility auditor for an Astro 6 + Strapi v5 project. Your job is
 
 ## PROCESS
 
-### Step 1: Pre-flight checks
+### Step 1: Choose audit target
 
-1. **Check dev server is running.** Run `curl -s -o /dev/null -w "%{http_code}" http://localhost:4321`. If not 200, tell the user to start it with `cd web && pnpm dev` and wait.
+If invoked via `/quality`, the target URL (`$TARGET_URL`) is already set -- skip to pre-flight checks.
+
+If invoked standalone, ask the user what to test against:
+
+> Where should I run the runtime checks?
+> 1. **Local dev server** (`http://localhost:4321`) -- tests your current code in development
+> 2. **Deployed environment** -- tests a live deployment (dev or prod)
+> 3. **Code-only** -- skip runtime checks, only run jsx-a11y static analysis
+
+If the user picks **option 2**, ask which environment:
+> Which environment?
+> 1. **dev**
+> 2. **prod**
+
+Then resolve the target URL from the infra overlay:
+1. Read the env file at `infra/deploy/overlays/<env>/.env.<env>` (e.g., `.env.dev` or `.env.prod`)
+2. Extract `HOST_NAME` from that file
+3. The target URL is `https://<HOST_NAME>`
+4. If `HOST_NAME` is still a placeholder (contains `your-domain`), warn the user and ask for the actual URL
+
+If the user picks **option 1** (local), set `$TARGET_URL` to `http://localhost:4321`.
+
+If the user picks **option 3** (code-only), skip all runtime checks (equivalent to `--static-only`).
+
+**When `--static-only` is passed as argument, skip this step entirely.**
+
+### Step 2: Pre-flight checks
+
+1. **Check target is reachable.** Run `curl -s -o /dev/null -w "%{http_code}" $TARGET_URL`.
+   - If 200: good, proceed.
+   - If not and target is local (`http://localhost:4321`): tell the user to start it with `cd web && pnpm dev` and wait.
+   - If not and target is remote: warn the user the server is unreachable. Offer to fall back to static-only mode.
 2. **Check Node.js is available.** Run `node --version`. Must be 18+.
 3. **Check previous audit exists.** Look for `.claude/skills/accessibility/a11y-audit/last-audit.json`. If found, it will be used for delta comparison.
 
-### Step 2: Runtime audit (axe-core + Puppeteer)
+### Step 3: Runtime audit (axe-core + Puppeteer)
 
 This is the primary audit. It scans live rendered pages in a headless browser.
 
 1. **Read the bundled skill instructions** at `.claude/skills/accessibility/a11y-audit/SKILL.md` -- follow its process for discovery, scanning, and reporting.
-2. **Target URL:** `http://localhost:4321`
-3. **Discovery source:** The project has @astrojs/sitemap configured. The sitemap is at `http://localhost:4321/sitemap-index.xml`. Use it for page discovery.
+2. **Target URL:** `$TARGET_URL`
+3. **Discovery source:** The project has @astrojs/sitemap configured. The sitemap is at `$TARGET_URL/sitemap-index.xml`. Use it for page discovery.
 4. **Output mode:** `markdown+json` -- generate both human-readable report and structured JSON.
 5. **Save the JSON output** to `.claude/skills/accessibility/a11y-audit/last-audit.json` for future delta comparisons.
 6. If a previous `last-audit.json` exists, pass it to the report step for delta analysis.
@@ -42,7 +73,7 @@ When interpreting results, keep in mind:
 - **Layout.astro** is the shared template for all pages. Any violation found in the header, footer, or `<head>` section affects every page. The snapsynapse template detection should catch this automatically.
 - **Strapi content:** Image alt texts come from Strapi's media library (`image.alternativeText`). Missing alt text on article images is a CMS content issue, not a code issue -- note this distinction in the report.
 
-### Step 3: Static analysis (jsx-a11y)
+### Step 4: Static analysis (jsx-a11y)
 
 This catches a11y anti-patterns in React source code that might not manifest in runtime scanning.
 
@@ -82,7 +113,7 @@ This catches a11y anti-patterns in React source code that might not manifest in 
 
 3. **Collect results** and merge into the overall report.
 
-### Step 4: Present the report
+### Step 5: Present the report
 
 Combine both runtime and static findings into a single unified report. Structure it as:
 
@@ -121,7 +152,7 @@ Combine both runtime and static findings into a single unified report. Structure
 - Strapi content issues (missing alt text in CMS) flagged separately from code issues
 ```
 
-### Step 5: Offer to fix
+### Step 6: Offer to fix
 
 After presenting the report, ask:
 
@@ -130,12 +161,34 @@ After presenting the report, ask:
 > 2. Fix specific issues (tell me which)
 > 3. No fixes -- I'll keep the report for reference"
 
+**Fix risk assessment -- apply to every finding:**
+
+| Fix type | Risk | Why |
+|----------|------|-----|
+| Add missing `alt` text to `<img>` | ✅ Safe | Purely additive, no side effects |
+| Add missing `lang` attribute | ✅ Safe | Purely additive |
+| Add ARIA labels to buttons/links | ✅ Safe | Purely additive, no visual change |
+| Fix heading hierarchy (e.g., h1→h3 skip) | ⚠️ Caution | Changing heading levels may affect CSS styles that target `h2`, `h3`, etc. |
+| Add landmark roles (`<main>`, `<nav>`) | ⚠️ Caution | Restructuring HTML can affect CSS selectors and layout |
+| Change color contrast in `@theme` | ⚠️ Caution | Affects the visual design -- colors will look different |
+| Add `tabindex`, focus management | ⚠️ Caution | Can change keyboard navigation order |
+| Restructure Layout.astro landmarks | 🚫 Risky | Affects every page, can break layout/styling across the site |
+| Add/change ARIA roles on interactive components | 🚫 Risky | Incorrect ARIA is worse than no ARIA -- screen readers will misrepresent the element |
+
+**Fix risk gating (same rules as /quality):**
+- ✅ Safe: apply directly
+- ⚠️ Caution: apply, then summarize what changed
+- 🚫 Risky: **STOP after Safe/Caution fixes.** Ask the user if they want to (1) go through risky fixes one by one, (2) generate a report for their tech lead (`reports/quality/YYYY-MM-DD-risky-fixes.md`), or (3) skip entirely. See /quality SKILL.md Step 10 for the full flow.
+
 **When fixing:**
 - For code issues (missing ARIA, landmark structure, heading hierarchy): edit the Astro/React source files directly.
 - For Tailwind contrast issues: adjust colors in `web/src/styles/app.css` `@theme` block, noting it may affect the design.
 - For Strapi content issues (missing alt text): tell the user to fix it in the Strapi admin panel -- don't modify Strapi data.
 - For Layout.astro issues: warn that changes affect all pages, confirm before proceeding.
-- After fixing, **automatically re-run the audit** (not ask -- just do it). Show the delta: what was resolved, what remains, any new issues introduced by the fixes. This gives the user immediate feedback on the impact of the changes.
+**Fix flow (same as /quality Step 10):**
+1. Apply all ✅ Safe and ⚠️ Caution fixes. Update practice docs (`ai/ASTRO_PRACTICES.md`, `ai/STRAPI_PRACTICES.md`) for the patterns just introduced (e.g., ARIA conventions, heading hierarchy rules, contrast requirements).
+2. If 🚫 Risky fixes remain, ask the user: go through them one by one (with pros/cons, "Issue X / Y", fix or skip for each -- update practices after each fix), generate a report for Luc a.k.a. the professional fixer, or skip entirely.
+3. **Automatically re-run the audit.** Show the delta.
 
 ## ARGUMENTS
 

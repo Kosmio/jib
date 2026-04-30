@@ -5,6 +5,8 @@ description: Interactive quality audit that runs accessibility, SEO, ecoconcepti
 
 # Quality Audit
 
+> **Heads up:** This audit is thorough and will consume a significant chunk of the conversation's token budget (~20% of a session just for the analysis / report part). Mention it to the user.
+
 You are a quality auditor for a web project built with Astro and Strapi. Your job is to help the user understand and improve the quality of their website across five areas: accessibility, SEO, eco-design, GDPR compliance, and security.
 
 ## TONE & APPROACH
@@ -45,27 +47,63 @@ Start with a friendly introduction that explains what /quality does:
 
 Wait for the user's response before proceeding.
 
-### Step 2: Pre-flight checks
+### Step 2: Choose audit target
+
+Before running any audit, ask the user what to test against:
+
+> Where should I run the runtime checks?
+> 1. **Local dev server** (`http://localhost:4321`) -- tests your current code in development
+> 2. **Deployed environment** -- tests a live deployment (dev or prod)
+> 3. **Code-only** -- skip runtime checks, only analyze source code
+
+If the user picks **option 2**, ask which environment:
+> Which environment?
+> 1. **dev**
+> 2. **prod**
+
+Then resolve the target URL from the infra overlay:
+1. Read the env file at `infra/deploy/overlays/<env>/.env.<env>` (e.g., `.env.dev` or `.env.prod`)
+2. Extract `HOST_NAME` from that file
+3. The target URL is `https://<HOST_NAME>`
+4. If `HOST_NAME` is still a placeholder (contains `your-domain`), warn the user and ask for the actual URL
+
+If the user picks **option 1** (local), set the target URL to `http://localhost:4321`.
+
+If the user picks **option 3** (code-only), skip all runtime checks (equivalent to `--quick`).
+
+Store the resolved target URL as `$TARGET_URL` -- all sub-skills use this for runtime checks.
+
+**When `--quick` is passed as argument, skip this step entirely (no runtime checks).**
+
+### Step 3: Pre-flight checks
 
 Before running any audit:
 
-1. **Check dev server is running.** Run `curl -s -o /dev/null -w "%{http_code}" http://localhost:4321`.
+1. **Check target is reachable.** Run `curl -s -o /dev/null -w "%{http_code}" $TARGET_URL`.
    - If 200: good, proceed.
-   - If not: explain in plain language and offer to start it:
+   - If not and target is local (`http://localhost:4321`): explain and offer to start it:
      > Your development server doesn't seem to be running. I need it to analyze your pages.
      > Would you like me to start it for you, or do you prefer to start it yourself?
      > 1. **Start it for me** -- I'll run `cd web && pnpm dev` in the background
      > 2. **I'll start it myself** -- run `cd web && pnpm dev` in another terminal and let me know when it's ready
-   - If the user chooses option 1: run `cd /Users/luc/Bazar/skeleton-astro-strapi/web && pnpm dev` in the background using `run_in_background: true`. Then poll with `curl -s -o /dev/null -w "%{http_code}" http://localhost:4321` every 3 seconds (up to 30 seconds) until the server responds 200. If it doesn't come up in time, tell the user and ask them to check for errors.
-   - If the user chooses option 2: wait for the user to confirm.
-   - Exception: if the user only selected GDPR and/or security, some checks can run without the dev server (code analysis). Offer to proceed with code-only mode.
+     - If the user chooses option 1: run `cd /Users/luc/Bazar/skeleton-astro-strapi/web && pnpm dev` in the background using `run_in_background: true`. Then poll with `curl -s -o /dev/null -w "%{http_code}" http://localhost:4321` every 3 seconds (up to 30 seconds) until the server responds 200. If it doesn't come up in time, tell the user and ask them to check for errors.
+     - If the user chooses option 2: wait for the user to confirm.
+   - If not and target is remote: warn the user the server is unreachable. Offer to fall back to code-only mode or try a different URL.
+   - Exception: if the user only selected GDPR and/or security, some checks can run without a live server (code analysis). Offer to proceed with code-only mode.
 
 2. **Check for previous run.** Look for `reports/quality/.last-run.json`. If found, tell the user:
    > I found a previous quality report. I'll compare the results to show you what improved and what's new.
 
 3. **Create reports directory** if it doesn't exist: `mkdir -p reports/quality`
 
-### Step 3: Lighthouse coordination
+4. **Verify runtime audit tools are available.** Run these checks and confirm each tool works BEFORE starting any audit:
+   ```bash
+   npx lighthouse --version
+   npx lighthouse-plugin-ecoindex --help
+   ```
+   These tools are available via npx and MUST be used for runtime measurements. **Do NOT skip Lighthouse or EcoIndex.** Do NOT fall back to "code-only analysis" unless the tools genuinely fail after attempting to run them. "I assumed they weren't available" is not an acceptable reason to skip -- you must try first.
+
+### Step 4: Lighthouse coordination
 
 If both /seo AND /ecoconception are in the selected audits:
 
@@ -76,7 +114,7 @@ If both /seo AND /ecoconception are in the selected audits:
 
 If only one of them is selected, run normally as that sub-skill specifies.
 
-### Step 4: Run selected audits
+### Step 5: Run selected audits
 
 Run each selected audit sequentially. Before each one, briefly tell the user what's happening:
 
@@ -96,12 +134,13 @@ Run each selected audit sequentially. Before each one, briefly tell the user wha
 > Starting security audit -- checking your site for vulnerabilities that attackers could exploit...
 
 For each sub-skill:
-1. Run the sub-skill's full process as specified in its SKILL.md
-2. Capture the structured findings (each sub-skill saves JSON artifacts)
-3. Save the individual sub-report to `reports/quality/YYYY-MM-DD-<skill>.md`
-4. Continue to the next selected audit
+1. **Pass `$TARGET_URL` to the sub-skill.** The sub-skill uses this URL instead of its default `http://localhost:4321` for all runtime checks (curl, Lighthouse, axe-core, EcoIndex, etc.).
+2. Run the sub-skill's full process as specified in its SKILL.md
+3. Capture the structured findings (each sub-skill saves JSON artifacts)
+4. Save the individual sub-report to `reports/quality/YYYY-MM-DD-<skill>.md`
+5. Continue to the next selected audit
 
-### Step 5: Cross-cutting deduplication
+### Step 6: Cross-cutting deduplication
 
 After all selected audits complete, merge findings and deduplicate:
 
@@ -125,7 +164,7 @@ After all selected audits complete, merge findings and deduplicate:
 - Keep the most detailed description, add category tags from all matching findings
 - Preserve severity from the most critical category
 
-### Step 6: Generate unified report
+### Step 7: Generate unified report
 
 Write the unified report to `reports/quality/YYYY-MM-DD-quality-report.md`:
 
@@ -152,13 +191,14 @@ Generated on [date] by /quality
 
 Fixes sorted from most efficient (high impact, low effort) to least. This helps you decide where to spend time first.
 
-| Fix | Impact | Categories | Effort | Ratio |
-|-----|--------|------------|--------|-------|
-| [description] | [what improves] | a11y + SEO | low | high |
-| ... | ... | ... | ... | ... |
+| Fix | Impact | Categories | Effort | Fix risk | Ratio |
+|-----|--------|------------|--------|----------|-------|
+| [description] | [what improves] | a11y + SEO | low | ✅ Safe -- no side effects | high |
+| [description] | [what improves] | sec | high | 🚫 Risky -- blocks scripts not whitelisted | low |
 
 **Impact** = how many issues it resolves, how many categories it affects, severity of the issues.
 **Effort** = estimated work (low = a few lines, medium = a component, high = architecture change).
+**Fix risk** = could the fix break the site? MUST include the level AND a short reason (e.g., "⚠️ Caution -- may reject valid intl emails" or "🚫 Risky -- wrong CORS origins break API calls").
 **Ratio** = impact / effort -- higher is better. Fixes are sorted by this.
 
 ## Critical issues (must fix)
@@ -171,14 +211,27 @@ For each issue:
 - **Where** (file path and line number)
 - **How to fix** (specific guidance)
 - **Categories** (which audits flagged this)
+- **Fix risk** (see risk levels below) -- MUST include the risk level AND a one-line explanation of what could go wrong (or "no side effects" for Safe). Example: "⚠️ Caution -- lazy loading on above-the-fold images delays LCP" or "🚫 Risky -- CSP will block any script/font/image not explicitly whitelisted, breaking the site if resources are missed"
+
+### Fix risk levels
+
+Every fixable issue MUST include a fix risk assessment:
+
+| Risk | Icon | Meaning | Auto-fix behavior |
+|------|------|---------|-------------------|
+| **Safe** | ✅ | Fix cannot break anything. Adding an alt text, a meta tag, a privacy policy link. | Applied automatically when user says "fix all" |
+| **Caution** | ⚠️ | Fix is correct but could affect behavior if not tuned to the project. Changing heading hierarchy, adding lazy loading to above-the-fold images, tightening CORS origins, updating dependencies. | Applied automatically, but summarize what changed and why after applying |
+| **Risky** | 🚫 | Fix can break the site if applied blindly. Content-Security-Policy, rate limiting, replacing `populate=*` with specific fields, removing `client:load` directives, changing font loading strategy. | **NEVER auto-fix.** Explain the risk, show what the fix would look like, and ask the user to confirm before applying -- even if they said "fix everything". |
+
+**How to assess risk:** Ask yourself "if I apply this fix and walk away, could the site break for real users?" If yes → Risky. If it could subtly change behavior → Caution. If it's purely additive with no side effects → Safe.
 
 ## Warnings (should fix)
 
-[Same format]
+[Same format, including fix risk]
 
 ## Info & best practices (nice to have)
 
-[Same format]
+[Same format, including fix risk]
 
 ## Detailed scores
 
@@ -217,7 +270,7 @@ Full details for each category are in the individual report files:
 *This report was generated by /quality. It provides automated checks -- it does not replace professional audits for accessibility, SEO strategy, or legal compliance.*
 ```
 
-### Step 7: Save delta tracking data
+### Step 8: Save delta tracking data
 
 Save structured data to `reports/quality/.last-run.json`:
 ```json
@@ -248,7 +301,7 @@ Save structured data to `reports/quality/.last-run.json`:
 }
 ```
 
-### Step 8: Present summary in conversation
+### Step 9: Present summary in conversation
 
 After writing the reports, present a **concise summary** in the conversation (NOT the full report):
 
@@ -276,12 +329,100 @@ After writing the reports, present a **concise summary** in the conversation (NO
 > 3. Fix specific issues (tell me which)
 > 4. No fixes for now
 
-### Step 9: Fix mode
+### Step 10: Fix mode
 
-If the user chooses to fix:
-- For each fix, briefly explain what you're about to change and why
-- Make the change
-- **After all fixes are applied, automatically re-run the selected audits** (not ask -- just do it). Show the delta: what was resolved, what remains, any new issues introduced by the fixes. This gives the user immediate feedback on the impact of the changes. Present the updated summary the same way as Step 8.
+#### Phase 1: Safe & Caution fixes
+
+Apply all ✅ Safe and ⚠️ Caution fixes. For each fix, briefly explain what changed. For Caution fixes, also explain why it's flagged as caution so the user can verify.
+
+**After Phase 1, update the practice docs** (`ai/ASTRO_PRACTICES.md`, `ai/STRAPI_PRACTICES.md`, `ai/INFRA_PRACTICES.md`) to document the new patterns introduced by the fixes just applied. Examples:
+- Added input validation → add the pattern to STRAPI_PRACTICES
+- Added JSON-LD structured data → document the schema pattern in ASTRO_PRACTICES
+- Self-hosted fonts → document the font loading approach in ASTRO_PRACTICES
+- Created a privacy policy page → document it in ASTRO_PRACTICES
+
+Keep additions concise and consistent with the existing doc style. Don't rewrite sections -- append to or update the relevant section.
+
+Then tell the user what was fixed and move to Phase 2.
+
+#### Phase 2: Risky fixes
+
+If there are 🚫 Risky fixes remaining, ask the user:
+
+> Some fixes are flagged as **risky** -- they can improve security/performance/compliance, but if applied incorrectly they can break the site.
+>
+> Would you like to:
+> 1. **Go through them with me** -- I'll show each one with pros and cons, and you decide for each
+> 2. **Skip and generate a report** -- I'll write a detailed report so you can hand it to Luc a.k.a. the professional fixer to review and apply later. He can also decide if some fixes should be applied upstream to the skeleton that served as the base for this project.
+> 3. **Skip entirely** -- ignore risky fixes for now
+
+**This question is asked even if the user originally said "fix everything."** "Fix everything" means "fix everything safe, then ask me about the risky stuff."
+
+**If the user picks option 1 (go through them):**
+
+Go through each risky fix one by one. For each, present it as:
+
+> **Issue X / Y** -- [Fix title]
+>
+> **What it does:** [plain language]
+> **Where:** [file path and line number]
+>
+> **Pros:**
+> - [benefit 1]
+> - [benefit 2]
+>
+> **Cons / what could break:**
+> - [risk 1]
+> - [risk 2]
+>
+> **Proposed change:** [show the code diff or config]
+>
+> **Fix or skip?**
+
+Wait for the user's answer before proceeding.
+
+- If the user says **fix**: apply the fix, update the relevant practice docs for this fix, then present the next issue.
+- If the user says **skip**: move to the next issue without applying.
+
+Continue until all risky issues are addressed.
+
+**If the user picks option 2 (generate report):**
+
+Generate `reports/quality/YYYY-MM-DD-risky-fixes.md`:
+
+```markdown
+# Risky fixes -- requires manual review
+
+Generated on [date] by /quality
+These fixes were flagged during the quality audit but NOT applied because they carry a risk of breaking the site if misconfigured. They need a developer to review and apply them.
+
+## How to use this report
+Hand this file to Luc a.k.a. the professional fixer. He can arbitrate which fixes to apply to this project, and whether some should also go upstream to the skeleton that served as its base. For each fix below, he should:
+1. Read the "What could break" section
+2. Decide if the fix applies to this project
+3. Apply and test in a dev environment before deploying
+
+## Fixes
+
+### [Fix title]
+- **Category**: [security / SEO / eco / GDPR / a11y]
+- **Severity**: [critical / high / medium / low]
+- **What it does**: [plain language explanation]
+- **What could break**: [specific scenarios where this fix causes problems]
+- **Recommended change**: [code snippet or config change]
+- **Where**: [file path and line number]
+- **How to verify**: [how to test that the fix works without breaking anything]
+
+[Repeat for each risky fix]
+```
+
+Tell the user where the report is saved.
+
+**If the user picks option 3:** move on, no further action on risky fixes.
+
+#### Phase 3: Re-run
+
+After all fixes are done (both phases), **automatically re-run the selected audits** (not ask -- just do it). Show the delta: what was resolved, what remains, any new issues introduced by the fixes. Present the updated summary the same way as Step 9.
 
 ## ARGUMENTS
 

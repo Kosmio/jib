@@ -68,17 +68,48 @@ Other sub-skills (keyword-research, competitor-analysis, rank-tracker, etc.) are
 
 ## PROCESS
 
-### Step 1: Pre-flight checks
+### Step 1: Choose audit target
 
-1. **Check dev server is running.** Run `curl -s -o /dev/null -w "%{http_code}" http://localhost:4321`. If not 200, tell the user to start it with `cd web && pnpm dev` and wait.
+If invoked via `/quality`, the target URL (`$TARGET_URL`) is already set -- skip to pre-flight checks.
+
+If invoked standalone, ask the user what to test against:
+
+> Where should I run the runtime checks?
+> 1. **Local dev server** (`http://localhost:4321`) -- tests your current code in development
+> 2. **Deployed environment** -- tests a live deployment (dev or prod)
+> 3. **Code-only** -- skip Lighthouse and runtime checks, only analyze source code
+
+If the user picks **option 2**, ask which environment:
+> Which environment?
+> 1. **dev**
+> 2. **prod**
+
+Then resolve the target URL from the infra overlay:
+1. Read the env file at `infra/deploy/overlays/<env>/.env.<env>` (e.g., `.env.dev` or `.env.prod`)
+2. Extract `HOST_NAME` from that file
+3. The target URL is `https://<HOST_NAME>`
+4. If `HOST_NAME` is still a placeholder (contains `your-domain`), warn the user and ask for the actual URL
+
+If the user picks **option 1** (local), set `$TARGET_URL` to `http://localhost:4321`.
+
+If the user picks **option 3** (code-only), skip all runtime checks (equivalent to `--quick`).
+
+**When `--quick` is passed as argument, skip this step entirely.**
+
+### Step 2: Pre-flight checks
+
+1. **Check target is reachable.** Run `curl -s -o /dev/null -w "%{http_code}" $TARGET_URL`.
+   - If 200: good, proceed.
+   - If not and target is local (`http://localhost:4321`): tell the user to start it with `cd web && pnpm dev` and wait.
+   - If not and target is remote: warn the user the server is unreachable. Offer to fall back to code-only mode.
 2. **Check Node.js is available.** Run `node --version`. Must be 18+.
 3. **Check previous audit exists.** Look for `.claude/skills/seo/last-audit.json`. If found, it will be used for delta comparison.
 
-### Step 2: Sitemap & robots.txt analysis
+### Step 3: Sitemap & robots.txt analysis
 
 #### Sitemap
-1. Fetch `http://localhost:4321/sitemap-index.xml`
-2. If not found, check `http://localhost:4321/sitemap.xml` (Astro may generate either)
+1. Fetch `$TARGET_URL/sitemap-index.xml`
+2. If not found, check `$TARGET_URL/sitemap.xml` (Astro may generate either)
 3. Parse the XML and extract all listed URLs
 4. For each URL, verify it returns HTTP 200 (flag orphan URLs that 404)
 5. Crawl the site navigation (Header, Footer links) to find pages NOT in the sitemap
@@ -87,7 +118,7 @@ Other sub-skills (keyword-research, competitor-analysis, rank-tracker, etc.) are
 8. Check `site` value in `web/astro.config.mjs` -- if it's still `"https://your-domain.com"` (placeholder), flag it
 
 #### robots.txt
-1. Fetch `http://localhost:4321/robots.txt`
+1. Fetch `$TARGET_URL/robots.txt`
 2. If not found, flag as **critical** -- robots.txt is required for search engines
 3. If found, check:
    - Syntax is valid
@@ -96,7 +127,7 @@ Other sub-skills (keyword-research, competitor-analysis, rank-tracker, etc.) are
    - Strapi admin paths are blocked if exposed (`/strapi/admin`)
    - `User-agent: *` is present
 
-### Step 3: Page-by-page SEO audit
+### Step 4: Page-by-page SEO audit
 
 For each page discovered via sitemap, fetch the HTML and check:
 
@@ -145,19 +176,21 @@ Read the bundled `build/schema-markup-generator/` sub-skill for JSON-LD generati
 - Links have descriptive text (not "click here", "read more" without context)
 - External links have `rel="noopener"` (or `rel="noopener noreferrer"`)
 
-### Step 4: Core Web Vitals (Lighthouse)
+### Step 5: Core Web Vitals (Lighthouse)
 
-Run Lighthouse CLI against the dev server for key pages:
+**IMPORTANT:** Lighthouse is available via npx and MUST be run. Do NOT skip this step or fall back to code-only analysis without first attempting to run the command. Verify with `npx lighthouse --version` if unsure.
+
+Run Lighthouse CLI against `$TARGET_URL` for key pages:
 
 ```bash
-npx lighthouse http://localhost:4321 --output=json --output-path=.claude/skills/seo/lighthouse-home.json --chrome-flags="--headless --no-sandbox" --only-categories=performance,seo,best-practices
+npx lighthouse $TARGET_URL --output=json --output-path=.claude/skills/seo/lighthouse-home.json --chrome-flags="--headless --no-sandbox" --only-categories=performance,seo,best-practices
 ```
 
 Repeat for key page types:
-- Home: `http://localhost:4321/`
-- Article list: `http://localhost:4321/articles`
-- Article detail: `http://localhost:4321/articles/<first-slug>` (get slug from sitemap)
-- Contact: `http://localhost:4321/contact`
+- Home: `$TARGET_URL/`
+- Article list: `$TARGET_URL/articles`
+- Article detail: `$TARGET_URL/articles/<first-slug>` (get slug from sitemap)
+- Contact: `$TARGET_URL/contact`
 
 Extract from each Lighthouse report:
 - **Performance score** (0-100)
@@ -174,7 +207,7 @@ Extract from each Lighthouse report:
 
 **Note:** Lab data (Lighthouse) is not identical to field data (real users). Note this in the report. For field data, the user would need Google Search Console or CrUX integration (available via the bundled sub-skills).
 
-### Step 5: Astro-specific checks
+### Step 6: Astro-specific checks
 
 These checks analyze source code, not rendered output:
 
@@ -198,7 +231,7 @@ These checks analyze source code, not rendered output:
    - Verify `@astrojs/sitemap` is in the integrations array in `web/astro.config.mjs`
    - Verify `site` property is set to a real domain (not `"https://your-domain.com"`)
 
-### Step 6: Strapi-specific checks
+### Step 7: Strapi-specific checks
 
 1. **Content type SEO fields** -- Read `strapi/src/api/article/content-types/article/schema.json`
    - Check for: `title` (exists), `slug` (exists), `excerpt` (exists -- used as meta description)
@@ -213,7 +246,7 @@ These checks analyze source code, not rendered output:
    - Verify `populate=*` is used (or specific fields including `image` with `alternativeText`)
    - Flag if SEO-relevant fields could be missing from API responses
 
-### Step 7: Present the report
+### Step 8: Present the report
 
 Combine all findings into a unified report:
 
@@ -269,7 +302,7 @@ Combine all findings into a unified report:
 - Strapi content issues (missing alt text in CMS) are flagged but must be fixed in admin panel
 ```
 
-### Step 8: Offer to fix
+### Step 9: Offer to fix
 
 After presenting the report, ask:
 
@@ -278,6 +311,26 @@ After presenting the report, ask:
 > 2. Fix specific issues (tell me which)
 > 3. Generate missing components (robots.txt, JSON-LD templates, OG meta in Layout.astro)
 > 4. No fixes -- I'll keep the report for reference"
+
+**Fix risk assessment -- apply to every finding:**
+
+| Fix type | Risk | Why |
+|----------|------|-----|
+| Add missing meta description, OG tags, Twitter cards | ✅ Safe | Purely additive `<head>` tags, no visual impact |
+| Add missing `alt` text to images | ✅ Safe | Purely additive |
+| Add image `width`/`height` attributes | ✅ Safe | Prevents CLS, no visual change |
+| Add JSON-LD structured data blocks | ✅ Safe | Invisible to users, only affects search engines |
+| Create `robots.txt` | ⚠️ Caution | Incorrect rules can block search engine crawling |
+| Add `loading="lazy"` to images | ⚠️ Caution | If applied to above-the-fold hero images, can delay LCP and hurt perceived performance |
+| Change heading hierarchy | ⚠️ Caution | May affect CSS styles targeting heading levels |
+| Modify Layout.astro `<head>` | ⚠️ Caution | Affects every page -- one mistake propagates everywhere |
+| Change `site` in astro.config.mjs | 🚫 Risky | Affects canonical URLs, sitemap URLs, and OG URLs across the entire site. Wrong value = SEO damage |
+| Replace `<img>` with Astro `<Image>` | 🚫 Risky | Changes rendering pipeline, can break dynamic Strapi image URLs, may require `inferSize` or explicit dimensions |
+
+**Fix risk gating (same rules as /quality):**
+- ✅ Safe: apply directly
+- ⚠️ Caution: apply, then summarize what changed
+- 🚫 Risky: **STOP after Safe/Caution fixes.** Ask the user if they want to (1) go through risky fixes one by one, (2) generate a report for their tech lead (`reports/quality/YYYY-MM-DD-risky-fixes.md`), or (3) skip entirely. See /quality SKILL.md Step 10 for the full flow.
 
 **When fixing:**
 
@@ -288,9 +341,12 @@ After presenting the report, ask:
 - **Card.astro alt text**: Update to accept and use `alternativeText` prop from Strapi.
 - **astro.config.mjs site**: Warn user they need to set the real domain -- don't guess it.
 - **Strapi content issues**: Tell the user to fix missing alt text in the Strapi admin panel.
-- After fixing, **automatically re-run the audit** (not ask -- just do it). Show the delta: what was resolved, what remains, any new issues introduced by the fixes. This gives the user immediate feedback on the impact of the changes.
+**Fix flow (same as /quality Step 10):**
+1. Apply all ✅ Safe and ⚠️ Caution fixes. Update practice docs (`ai/ASTRO_PRACTICES.md`, `ai/STRAPI_PRACTICES.md`) for the patterns just introduced (e.g., meta tag conventions in Layout, JSON-LD schema patterns, robots.txt rules, image optimization approach).
+2. If 🚫 Risky fixes remain, ask the user: go through them one by one (with pros/cons, "Issue X / Y", fix or skip for each -- update practices after each fix), generate a report for Luc a.k.a. the professional fixer, or skip entirely.
+3. **Automatically re-run the audit.** Show the delta.
 
-### Step 9: Save audit state
+### Step 10: Save audit state
 
 1. Save structured audit results to `.claude/skills/seo/last-audit.json` for delta tracking
 2. Save Lighthouse JSON reports to `.claude/skills/seo/lighthouse-*.json`

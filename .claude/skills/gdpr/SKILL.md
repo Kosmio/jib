@@ -40,13 +40,41 @@ CNIL (French authority) specific:
 
 ## PROCESS
 
-### Step 1: Pre-flight
+### Step 1: Choose audit target
+
+If invoked via `/quality`, the target URL (`$TARGET_URL`) is already set -- skip to pre-flight.
+
+If invoked standalone, ask the user what to test against:
+
+> Where should I run the runtime checks?
+> 1. **Local dev server** (`http://localhost:4321`) -- tests your current code in development
+> 2. **Deployed environment** -- tests a live deployment (dev or prod)
+> 3. **Code-only** -- skip runtime checks, only analyze source code
+
+If the user picks **option 2**, ask which environment:
+> Which environment?
+> 1. **dev**
+> 2. **prod**
+
+Then resolve the target URL from the infra overlay:
+1. Read the env file at `infra/deploy/overlays/<env>/.env.<env>` (e.g., `.env.dev` or `.env.prod`)
+2. Extract `HOST_NAME` from that file
+3. The target URL is `https://<HOST_NAME>`
+4. If `HOST_NAME` is still a placeholder (contains `your-domain`), warn the user and ask for the actual URL
+
+If the user picks **option 1** (local), set `$TARGET_URL` to `http://localhost:4321`.
+
+If the user picks **option 3** (code-only), skip all runtime checks (equivalent to `--quick`).
+
+**When `--quick` is passed as argument, skip this step entirely.**
+
+### Step 2: Pre-flight
 
 1. **Read project structure** -- Scan `web/src/pages/`, `web/src/components/`, `web/src/react-components/`, `web/src/layouts/` to understand what exists.
-2. **Check dev server** -- Run `curl -s -o /dev/null -w "%{http_code}" http://localhost:4321`. If running, it will be used for rendered page analysis. If not, code-level analysis only (warn the user).
+2. **Check target is reachable** (if `$TARGET_URL` is set) -- Run `curl -s -o /dev/null -w "%{http_code}" $TARGET_URL`. If reachable, it will be used for rendered page analysis. If not and target is local, warn the user. If not and target is remote, offer to fall back to code-only mode.
 3. **Check previous audit** -- Look for `.claude/skills/gdpr/last-audit.json`. If found, will be used for delta comparison.
 
-### Step 2: Dynamic discovery
+### Step 3: Dynamic discovery
 
 Before checking known patterns, scan the entire project for GDPR-relevant additions. This catches anything added after the skeleton was initialized.
 
@@ -112,7 +140,7 @@ If dev server not running:
 2. Check Matomo configuration -- does it set cookies?
 3. Check cookieconsent configuration -- what categories are defined?
 
-### Step 3: Known pattern checks
+### Step 4: Known pattern checks
 
 These are specific to what the skeleton ships with. Run them regardless of dynamic discovery results.
 
@@ -203,8 +231,8 @@ These are specific to what the skeleton ships with. Run them regardless of dynam
 
 #### 3h. Security headers
 
-If the dev server is running:
-1. Fetch `http://localhost:4321` and check response headers
+If `$TARGET_URL` is reachable:
+1. Fetch `$TARGET_URL` and check response headers
 2. Check for:
    - `Strict-Transport-Security` (HSTS) -- may not be present on localhost, note this
    - `Content-Security-Policy` (CSP) -- helps prevent XSS
@@ -228,7 +256,7 @@ Also check the deployed Traefik configuration if overlay files are present:
 3. If personal data is stored indefinitely: **warning** -- Art. 5(1)(e) requires storage limitation
 4. Cite: Art. 5(1)(e) (storage limitation), Art. 17 (right to erasure)
 
-### Step 4: Present the report
+### Step 5: Present the report
 
 ```
 ## GDPR Compliance Audit Report
@@ -293,7 +321,7 @@ Also check the deployed Traefik configuration if overlay files are present:
 - This is an automated audit -- it does not replace legal counsel for full GDPR compliance
 ```
 
-### Step 5: Offer to fix
+### Step 6: Offer to fix
 
 After presenting the report, ask:
 
@@ -302,6 +330,23 @@ After presenting the report, ask:
 > 2. Fix specific issues (tell me which)
 > 3. Generate missing artifacts (privacy policy page, consent text for forms, self-hosted fonts)
 > 4. No fixes -- I'll keep the report for reference"
+
+**Fix risk assessment -- apply to every finding:**
+
+| Fix type | Risk | Why |
+|----------|------|-----|
+| Generate privacy policy page template | ✅ Safe | New page with `[TODO]` placeholders, doesn't affect existing pages |
+| Add privacy policy link in Footer | ✅ Safe | Adds a link, no existing functionality changed |
+| Add purpose statement text on contact form | ✅ Safe | Adds text below form, no behavior change |
+| Add consent text on newsletter form | ✅ Safe | Adds text below input, no behavior change |
+| Self-host fonts (replace Google Fonts CDN) | ⚠️ Caution | Font rendering may differ slightly; font-display strategy matters |
+| Modify cookieconsent.js configuration | 🚫 Risky | Wrong config can break analytics entirely, block legitimate scripts, or show consent banners that don't actually gate anything -- giving a false sense of compliance |
+| Add/modify cookie consent categories or script blocking | 🚫 Risky | Blocking scripts by category can break third-party integrations (analytics, chat, embeds) if the category mapping is wrong |
+
+**Fix risk gating (same rules as /quality):**
+- ✅ Safe: apply directly
+- ⚠️ Caution: apply, then summarize what changed
+- 🚫 Risky: **STOP after Safe/Caution fixes.** Ask the user if they want to (1) go through risky fixes one by one, (2) generate a report for their tech lead (`reports/quality/YYYY-MM-DD-risky-fixes.md`), or (3) skip entirely. See /quality SKILL.md Step 10 for the full flow.
 
 **When fixing:**
 
@@ -312,7 +357,10 @@ After presenting the report, ask:
 - **Google Fonts self-hosting**: Download Inter font files, save to `web/public/fonts/`, replace Google Fonts `<link>` tags in Layout.astro with local `@font-face` declarations in `web/src/styles/app.css`.
 - **Cookie consent configuration**: If `PUBLIC_COOKIE_CONSENT` is enabled, review and fix the cookieconsent.js configuration for CNIL compliance.
 - **Strapi content issues**: Tell the user to handle Brevo DPA externally -- this is a contractual matter, not a code fix.
-- After fixing, **automatically re-run the audit** (not ask -- just do it). Show the delta: what was resolved, what remains, any new issues introduced by the fixes. This gives the user immediate feedback on the impact of the changes.
+**Fix flow (same as /quality Step 10):**
+1. Apply all ✅ Safe and ⚠️ Caution fixes. Update practice docs (`ai/ASTRO_PRACTICES.md`, `ai/STRAPI_PRACTICES.md`) for the patterns just introduced (e.g., privacy policy page conventions, form consent text requirements, cookie consent configuration, font self-hosting).
+2. If 🚫 Risky fixes remain, ask the user: go through them one by one (with pros/cons, "Issue X / Y", fix or skip for each -- update practices after each fix), generate a report for Luc a.k.a. the professional fixer, or skip entirely.
+3. **Automatically re-run the audit.** Show the delta.
 
 ## ARGUMENTS
 
