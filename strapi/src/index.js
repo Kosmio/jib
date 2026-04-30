@@ -1133,6 +1133,7 @@ async function restoreMissingMedia(strapi) {
         await strapi.documents(uid).update({
           documentId: entity.documentId,
           data: { [mediaField]: fileId },
+          status: 'published',
         });
       }
       restored++;
