@@ -757,7 +757,11 @@ module.exports = {
     await seedData(strapi);
 
     // Re-upload missing media on existing entities (recovery from lost uploads volume)
-    await restoreMissingMedia(strapi);
+    try {
+      await restoreMissingMedia(strapi);
+    } catch (err) {
+      strapi.log.error(`[restore] failed: ${err.message}`);
+    }
   },
 };
 
@@ -1096,16 +1100,17 @@ async function restoreMissingMedia(strapi) {
   let kept = 0;
   let notFound = 0;
 
-  const restoreOne = async (uid, seedItem, mediaField, seedFileKey) => {
-    const relPath = seedItem[seedFileKey];
+  const restoreOne = async (uid, lookupField, lookupValue, mediaField, relPath) => {
     if (!relPath) return;
 
-    const found = await strapi.documents(uid).findMany({
-      filters: { name: seedItem.name },
-      populate: { [mediaField]: true },
-      limit: 1,
-    });
-    const entity = found[0];
+    let entity;
+    try {
+      const all = await strapi.documents(uid).findMany({ populate: [mediaField] });
+      entity = all.find((e) => e[lookupField] === lookupValue);
+    } catch (e) {
+      strapi.log.warn(`[restore] findMany ${uid} failed: ${e.message}`);
+      return;
+    }
     if (!entity) { notFound++; return; }
 
     const media = entity[mediaField];
@@ -1115,23 +1120,27 @@ async function restoreMissingMedia(strapi) {
       try {
         await strapi.plugins.upload.services.upload.remove(media);
       } catch (e) {
-        strapi.log.warn(`[restore] could not remove dangling media for "${seedItem.name}": ${e.message}`);
+        strapi.log.warn(`[restore] could not remove dangling media for "${lookupValue}": ${e.message}`);
       }
     }
-    await uploadAndAttach(strapi, relPath, { refId: entity.id, ref: uid, field: mediaField });
-    restored++;
+    try {
+      await uploadAndAttach(strapi, relPath, { refId: entity.id, ref: uid, field: mediaField });
+      restored++;
+    } catch (e) {
+      strapi.log.warn(`[restore] upload failed for "${lookupValue}": ${e.message}`);
+    }
   };
 
   strapi.log.info('[restore] scanning for missing media...');
 
   for (const o of SEED_ORGANISATIONS) {
-    await restoreOne('api::organisation.organisation', o, 'logo', 'logo_file');
+    await restoreOne('api::organisation.organisation', 'name', o.name, 'logo', o.logo_file);
   }
   for (const i of SEED_INTERVENANTS) {
-    await restoreOne('api::intervenant.intervenant', i, 'photo', 'photo_file');
+    await restoreOne('api::intervenant.intervenant', 'name', i.name, 'photo', i.photo_file);
   }
   for (const e of SEED_EDITIONS) {
-    await restoreOne('api::edition.edition', { name: e.title, ...e }, 'image', 'image_file');
+    await restoreOne('api::edition.edition', 'title', e.title, 'image', e.image_file);
   }
 
   strapi.log.info(`[restore] done — restored=${restored} kept=${kept} entities-not-found=${notFound}`);
