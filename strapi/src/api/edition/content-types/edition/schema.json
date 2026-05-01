@@ -75,12 +75,6 @@
       "component": "edition.lieu",
       "repeatable": true
     },
-    "programme_items": {
-      "type": "relation",
-      "relation": "oneToMany",
-      "target": "api::programme-item.programme-item",
-      "mappedBy": "edition"
-    },
     "sequences": {
       "type": "relation",
       "relation": "oneToMany",

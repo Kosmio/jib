@@ -53,12 +53,6 @@
       "target": "api::tag.tag",
       "inversedBy": "intervenants"
     },
-    "programme_items": {
-      "type": "relation",
-      "relation": "manyToMany",
-      "target": "api::programme-item.programme-item",
-      "mappedBy": "intervenants"
-    },
     "interventions": {
       "type": "relation",
       "relation": "oneToMany",

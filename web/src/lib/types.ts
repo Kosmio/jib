@@ -59,7 +59,6 @@ export interface Organisation extends Entity {
   tags?: Tag[];
   intervenants?: Intervenant[];
   partenariats?: Partenaire[];
-  programme_items?: ProgrammeItem[];
 }
 
 export interface Intervenant extends Entity {
@@ -74,7 +73,6 @@ export interface Intervenant extends Entity {
   video_url: string | null;
   tags?: Tag[];
   organisation?: Organisation | null;
-  programme_items?: ProgrammeItem[];
   interventions?: Intervention[];
 }
 
@@ -82,18 +80,6 @@ export interface Partenaire extends Entity {
   role: 'soutien' | 'co-organisateur' | 'institutionnel' | 'prive';
   organisation?: Organisation | null;
   editions?: Edition[];
-}
-
-export interface ProgrammeItem extends Entity {
-  title: string;
-  start_time: string;
-  end_time: string;
-  description: string | null;
-  tags?: Tag[];
-  order: number | null;
-  edition?: Edition;
-  intervenants?: Intervenant[];
-  organisations?: Organisation[];
 }
 
 export interface FileMedia {
@@ -160,7 +146,6 @@ export interface Edition extends Entity {
   inscription_url: string | null;
   image: Image | null;
   lieux: Lieu[];
-  programme_items?: ProgrammeItem[];
   sequences?: Sequence[];
   partenaires?: Partenaire[];
   gallery: Image[];

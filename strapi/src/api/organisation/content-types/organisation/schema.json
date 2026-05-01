@@ -53,12 +53,6 @@
       "relation": "oneToMany",
       "target": "api::partenaire.partenaire",
       "mappedBy": "organisation"
-    },
-    "programme_items": {
-      "type": "relation",
-      "relation": "manyToMany",
-      "target": "api::programme-item.programme-item",
-      "mappedBy": "organisations"
     }
   }
 }

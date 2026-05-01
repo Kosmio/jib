@@ -474,10 +474,6 @@ export interface ApiEditionEdition extends Struct.CollectionTypeSchema {
         },
         number
       >;
-    programme_items: Schema.Attribute.Relation<
-      'oneToMany',
-      'api::programme-item.programme-item'
-    >;
     publishedAt: Schema.Attribute.DateTime;
     region: Schema.Attribute.Enumeration<
       [
@@ -543,10 +539,6 @@ export interface ApiIntervenantIntervenant extends Struct.CollectionTypeSchema {
       'api::organisation.organisation'
     >;
     photo: Schema.Attribute.Media<'images'>;
-    programme_items: Schema.Attribute.Relation<
-      'manyToMany',
-      'api::programme-item.programme-item'
-    >;
     publishedAt: Schema.Attribute.DateTime;
     slug: Schema.Attribute.UID<'name'>;
     tags: Schema.Attribute.Relation<'manyToMany', 'api::tag.tag'>;
@@ -631,10 +623,6 @@ export interface ApiOrganisationOrganisation
       'oneToMany',
       'api::partenaire.partenaire'
     >;
-    programme_items: Schema.Attribute.Relation<
-      'manyToMany',
-      'api::programme-item.programme-item'
-    >;
     publishedAt: Schema.Attribute.DateTime;
     slug: Schema.Attribute.UID<'name'>;
     tags: Schema.Attribute.Relation<'manyToMany', 'api::tag.tag'>;
@@ -677,50 +665,6 @@ export interface ApiPartenairePartenaire extends Struct.CollectionTypeSchema {
       ['soutien', 'co-organisateur', 'institutionnel', 'prive']
     > &
       Schema.Attribute.Required;
-    updatedAt: Schema.Attribute.DateTime;
-    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
-      Schema.Attribute.Private;
-  };
-}
-
-export interface ApiProgrammeItemProgrammeItem
-  extends Struct.CollectionTypeSchema {
-  collectionName: 'programme_items';
-  info: {
-    description: "Les interventions et moments du programme d'une \u00E9dition";
-    displayName: '\u00C9l\u00E9ment de programme';
-    pluralName: 'programme-items';
-    singularName: 'programme-item';
-  };
-  options: {
-    draftAndPublish: true;
-  };
-  attributes: {
-    createdAt: Schema.Attribute.DateTime;
-    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
-      Schema.Attribute.Private;
-    description: Schema.Attribute.RichText;
-    edition: Schema.Attribute.Relation<'manyToOne', 'api::edition.edition'>;
-    end_time: Schema.Attribute.String;
-    intervenants: Schema.Attribute.Relation<
-      'manyToMany',
-      'api::intervenant.intervenant'
-    >;
-    locale: Schema.Attribute.String & Schema.Attribute.Private;
-    localizations: Schema.Attribute.Relation<
-      'oneToMany',
-      'api::programme-item.programme-item'
-    > &
-      Schema.Attribute.Private;
-    order: Schema.Attribute.Integer;
-    organisations: Schema.Attribute.Relation<
-      'manyToMany',
-      'api::organisation.organisation'
-    >;
-    publishedAt: Schema.Attribute.DateTime;
-    start_time: Schema.Attribute.String & Schema.Attribute.Required;
-    tags: Schema.Attribute.Relation<'manyToMany', 'api::tag.tag'>;
-    title: Schema.Attribute.String & Schema.Attribute.Required;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -1360,7 +1304,6 @@ declare module '@strapi/strapi' {
       'api::intervention.intervention': ApiInterventionIntervention;
       'api::organisation.organisation': ApiOrganisationOrganisation;
       'api::partenaire.partenaire': ApiPartenairePartenaire;
-      'api::programme-item.programme-item': ApiProgrammeItemProgrammeItem;
       'api::sequence.sequence': ApiSequenceSequence;
       'api::static-page.static-page': ApiStaticPageStaticPage;
       'api::tag.tag': ApiTagTag;

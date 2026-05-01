@@ -858,7 +858,6 @@ module.exports = {
       { api: 'tag', actions: ['find', 'findOne'] },
       { api: 'organisation', actions: ['find', 'findOne'] },
       { api: 'edition', actions: ['find', 'findOne'] },
-      { api: 'programme-item', actions: ['find', 'findOne'] },
       { api: 'sequence', actions: ['find', 'findOne'] },
       { api: 'intervention', actions: ['find', 'findOne'] },
       { api: 'intervenant', actions: ['find', 'findOne'] },
@@ -1044,17 +1043,17 @@ async function seedData(strapi) {
     }
 
     // -----------------------------------------------------------------------
-    // 6. Create Programme Items for editions that have one
+    // 6. Create Sequences (+ Interventions) for editions that have a programme
     // -----------------------------------------------------------------------
     const editionProgramme = programme_key ? programmeByKey[programme_key] : null;
     if (editionProgramme) {
+      let totalInterventions = 0;
       for (const prog of editionProgramme) {
         const { intervenant_names, org_names, tag_slugs, ...progFields } = prog;
 
         const linkedIntervenants = (intervenant_names || [])
           .map((name) => intMap[name])
-          .filter(Boolean)
-          .map((i) => ({ documentId: i.documentId }));
+          .filter(Boolean);
 
         const linkedOrgs = (org_names || [])
           .map((name) => orgMap[name])
@@ -1066,18 +1065,30 @@ async function seedData(strapi) {
           .filter(Boolean)
           .map((t) => ({ documentId: t.documentId }));
 
-        await strapi.documents('api::programme-item.programme-item').create({
+        const sequence = await strapi.documents('api::sequence.sequence').create({
           data: {
             ...progFields,
             edition: { documentId: edition.documentId },
-            intervenants: linkedIntervenants,
             organisations: linkedOrgs,
             tags: linkedTags,
           },
           status: 'published',
         });
+
+        let order = 0;
+        for (const intervenant of linkedIntervenants) {
+          await strapi.documents('api::intervention.intervention').create({
+            data: {
+              sequence: { documentId: sequence.documentId },
+              intervenant: { documentId: intervenant.documentId },
+              order: order++,
+            },
+            status: 'published',
+          });
+          totalInterventions++;
+        }
       }
-      strapi.log.info(`Seeded ${editionProgramme.length} programme items for ${edData.title}.`);
+      strapi.log.info(`Seeded ${editionProgramme.length} sequences (${totalInterventions} interventions) for ${edData.title}.`);
     }
 
     strapi.log.info(`Seeded edition: ${edData.title}`);
@@ -1109,7 +1120,6 @@ const FRENCH_LABELS = {
     tags: 'Tags',
     intervenants: 'Intervenants',
     partenariats: 'Partenariats',
-    programme_items: 'Interventions au programme',
   },
   'api::intervenant.intervenant': {
     name: 'Nom',
@@ -1123,7 +1133,6 @@ const FRENCH_LABELS = {
     video_url: 'URL de la vidéo',
     long_description: 'Description complète',
     tags: 'Tags',
-    programme_items: 'Interventions au programme (legacy)',
     interventions: 'Interventions',
   },
   'api::partenaire.partenaire': {
@@ -1131,17 +1140,6 @@ const FRENCH_LABELS = {
     role: 'Rôle',
     organisation: 'Organisation',
     editions: 'Éditions associées',
-  },
-  'api::programme-item.programme-item': {
-    title: 'Titre',
-    start_time: 'Heure de début',
-    end_time: 'Heure de fin',
-    description: 'Description',
-    tags: 'Tags',
-    order: 'Ordre d\'affichage',
-    edition: 'Édition',
-    intervenants: 'Intervenants',
-    organisations: 'Organisations',
   },
   'api::sequence.sequence': {
     title: 'Titre',
@@ -1173,7 +1171,6 @@ const FRENCH_LABELS = {
     inscription_url: 'Lien d\'inscription',
     image: 'Image de couverture',
     lieux: 'Lieux',
-    programme_items: 'Éléments du programme (legacy)',
     sequences: 'Séquences du programme',
     partenaires: 'Partenariats',
     gallery: 'Galerie photos',
@@ -1246,82 +1243,38 @@ async function runDataMigrations(strapi) {
   // 2026-04-30: ensure static-page entries exist with default content
   await ensureStaticPages(strapi);
 
-  // 2026-05-01: migrate programme_items → sequences + interventions
-  await migrateProgrammeItemsToSequences(strapi);
+  // 2026-05-01: drop legacy programme-item table and join tables (content type removed)
+  await dropLegacyProgrammeItems(strapi);
 }
 
 /**
- * Migration one-shot programme-item → sequence + intervention.
+ * Cleanup one-shot après suppression de la content type programme-item.
+ * Supprime la table principale et ses join tables qui restent orphelines après
+ * que Strapi a unloaded la content type.
  *
- * Pour chaque programme_item :
- *   - une `sequence` est créée avec mêmes title/start_time/end_time/description/order/edition/tags/organisations
- *   - pour chaque intervenant rattaché, une `intervention` est créée (description vide, sans présentation)
- *
- * Idempotent : le pivot est l'existence d'au moins une sequence en base.
- * Les programme_items existants ne sont PAS supprimés (cohabitation des 2 modèles le temps
- * de la validation en prod). Suppression manuelle ultérieure.
+ * Idempotente : si la table n'existe plus, la fonction sort silencieusement.
  */
-async function migrateProgrammeItemsToSequences(strapi) {
-  const existingSeq = await strapi.documents('api::sequence.sequence').findMany({ limit: 1, status: 'published' });
-  if (existingSeq.length > 0) {
-    strapi.log.info('[migration] sequences already exist, skipping programme-item → sequence migration');
-    return;
-  }
-
-  const items = await strapi.documents('api::programme-item.programme-item').findMany({
-    populate: { edition: true, intervenants: true, organisations: true, tags: true },
-    status: 'published',
-  });
-
-  if (items.length === 0) {
-    strapi.log.info('[migration] no programme_items found, skipping');
-    return;
-  }
-
-  strapi.log.info(`[migration] migrating ${items.length} programme_items → sequences + interventions`);
-
-  let createdSequences = 0;
-  let createdInterventions = 0;
-
-  for (const item of items) {
-    const tags = (item.tags || []).map((t) => ({ documentId: t.documentId }));
-    const organisations = (item.organisations || []).map((o) => ({ documentId: o.documentId }));
-
-    const seqData = {
-      title: item.title,
-      start_time: item.start_time,
-      end_time: item.end_time || null,
-      description: item.description || null,
-      order: item.order ?? null,
-      tags,
-      organisations,
-    };
-    if (item.edition?.documentId) {
-      seqData.edition = { documentId: item.edition.documentId };
-    }
-
-    const seq = await strapi.documents('api::sequence.sequence').create({
-      data: seqData,
-      status: 'published',
-    });
-    createdSequences++;
-
-    let order = 0;
-    for (const intervenant of (item.intervenants || [])) {
-      if (!intervenant?.documentId) continue;
-      await strapi.documents('api::intervention.intervention').create({
-        data: {
-          intervenant: { documentId: intervenant.documentId },
-          sequence: { documentId: seq.documentId },
-          order: order++,
-        },
-        status: 'published',
-      });
-      createdInterventions++;
+async function dropLegacyProgrammeItems(strapi) {
+  const knex = strapi.db.connection;
+  const tables = [
+    // join tables (à dropper avant la table principale)
+    'programme_items_intervenants_lnk',
+    'programme_items_organisations_lnk',
+    'programme_items_tags_lnk',
+    'programme_items_edition_lnk',
+    // table principale
+    'programme_items',
+  ];
+  for (const t of tables) {
+    try {
+      const exists = await knex.schema.hasTable(t);
+      if (!exists) continue;
+      await knex.schema.dropTable(t);
+      strapi.log.info(`[cleanup] dropped legacy table ${t}`);
+    } catch (err) {
+      strapi.log.warn(`[cleanup] could not drop ${t}: ${err.message}`);
     }
   }
-
-  strapi.log.info(`[migration] done — ${createdSequences} sequences and ${createdInterventions} interventions created`);
 }
 
 async function ensureStaticPages(strapi) {

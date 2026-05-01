@@ -80,11 +80,6 @@
         "type": "relation oneToMany",
         "target": "partenaires",
         "description": "Partenariats liant cette organisation à des éditions (relation inverse)"
-      },
-      "programme_items": {
-        "type": "relation manyToMany",
-        "target": "programme-items",
-        "description": "Éléments de programme auxquels l'organisation participe"
       }
     }
   },
@@ -140,11 +135,6 @@
         "type": "relation manyToMany",
         "target": "tags",
         "description": "Tags thématiques de l'intervenant"
-      },
-      "programme_items": {
-        "type": "relation manyToMany",
-        "target": "programme-items",
-        "description": "[LEGACY] Éléments de programme dans lesquels l'intervenant prend la parole. Conservé pour compatibilité — utilisez 'interventions' pour les nouvelles données"
       },
       "interventions": {
         "type": "relation oneToMany",
@@ -254,11 +244,6 @@
         "type": "component repeatable (edition.lieu)",
         "description": "Lieux de l'édition. Composant à champs: name (req), address (req), description, map_url, time_slot. Passez un tableau d'objets"
       },
-      "programme_items": {
-        "type": "relation oneToMany",
-        "target": "programme-items",
-        "description": "[LEGACY] Éléments du programme de cette édition (relation inverse). Conservé pour compatibilité — utilisez 'sequences' pour les nouvelles données"
-      },
       "sequences": {
         "type": "relation oneToMany",
         "target": "sequences",
@@ -299,56 +284,6 @@
       "meta_description": {
         "type": "text",
         "description": "Meta description SEO (max 200 caractères)"
-      }
-    }
-  },
-  "programme-items": {
-    "singularName": "programme-item",
-    "displayName": "Élément de programme (LEGACY)",
-    "description": "[LEGACY — ne plus créer ici] Ancien modèle de programme. Conservé en lecture seule pour compatibilité. Pour toute création, utiliser 'sequences' (créneaux) + 'interventions' (prises de parole).",
-    "draftAndPublish": true,
-    "fields": {
-      "title": {
-        "type": "string",
-        "required": true,
-        "description": "Titre de l'intervention (ex: 'Table ronde : Innovation matériau bois')"
-      },
-      "start_time": {
-        "type": "string",
-        "required": true,
-        "description": "Heure de début au format 'HH:MM' (ex: '09:30')"
-      },
-      "end_time": {
-        "type": "string",
-        "description": "Heure de fin au format 'HH:MM'. Optionnel"
-      },
-      "description": {
-        "type": "richtext",
-        "description": "Description détaillée en Markdown"
-      },
-      "order": {
-        "type": "integer",
-        "description": "Ordre d'affichage dans le programme (les items sont triés par order croissant)"
-      },
-      "edition": {
-        "type": "relation manyToOne",
-        "target": "editions",
-        "description": "Édition à laquelle cet élément appartient (obligatoire)"
-      },
-      "intervenants": {
-        "type": "relation manyToMany",
-        "target": "intervenants",
-        "description": "Intervenants prenant la parole sur cet élément"
-      },
-      "organisations": {
-        "type": "relation manyToMany",
-        "target": "organisations",
-        "description": "Organisations impliquées dans cet élément (au-delà des intervenants)"
-      },
-      "tags": {
-        "type": "relation manyToMany",
-        "target": "tags",
-        "description": "Tags thématiques de l'élément"
       }
     }
   },

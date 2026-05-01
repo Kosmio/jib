@@ -1,4 +1,4 @@
-import type { Edition, Intervenant, Organisation, Partenaire, ProgrammeItem, Responses, Sequence, Tag } from "./types";
+import type { Edition, Intervenant, Organisation, Partenaire, Responses, Sequence, Tag } from "./types";
 
 const strapiUrl = import.meta.env.STRAPI_URL || process.env.STRAPI_URL;
 const reactStrapiUrl = import.meta.env.REACT_STRAPI_URL || process.env.REACT_STRAPI_URL;
@@ -95,15 +95,6 @@ export const getOrganisationBySlug = (
 
 export const getTags = (): Promise<Responses<Tag>> =>
   strapiFetch("/tags?sort=name:asc");
-
-// --- Programme Items (legacy, kept for compat) ---
-
-export const getProgrammeItems = (
-  editionDocumentId: string
-): Promise<Responses<ProgrammeItem>> =>
-  strapiFetch(
-    `/programme-items?filters[edition][documentId][$eq]=${editionDocumentId}&populate[0]=intervenants.photo&populate[1]=organisations.logo&populate[2]=tags&sort=order:asc`
-  );
 
 // --- Sequences ---
 
