@@ -1,0 +1,59 @@
+{
+  "kind": "singleType",
+  "collectionName": "home_pages",
+  "info": {
+    "singularName": "home-page",
+    "pluralName": "home-pages",
+    "displayName": "Page d'accueil",
+    "description": "Textes éditables de la page d'accueil. Une seule fiche, structurée par sections."
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "attributes": {
+    "hero_subtitle": {
+      "type": "text"
+    },
+    "pourquoi_title": {
+      "type": "string"
+    },
+    "pourquoi_intro": {
+      "type": "text"
+    },
+    "pourquoi_cards": {
+      "type": "component",
+      "component": "home.feature-card",
+      "repeatable": true
+    },
+    "pourquoi_link_label": {
+      "type": "string"
+    },
+    "editions_title": {
+      "type": "string"
+    },
+    "editions_intro": {
+      "type": "text"
+    },
+    "dynamique_title": {
+      "type": "string"
+    },
+    "dynamique_body": {
+      "type": "richtext"
+    },
+    "partenaires_label": {
+      "type": "string"
+    },
+    "suite_title": {
+      "type": "string"
+    },
+    "suite_body": {
+      "type": "text"
+    },
+    "suite_cta_label": {
+      "type": "string"
+    },
+    "suite_cta_url": {
+      "type": "string"
+    }
+  }
+}

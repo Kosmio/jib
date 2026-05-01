@@ -132,3 +132,37 @@ export const getStaticPageBySlug = async (slug: string): Promise<StaticPage | nu
     return null;
   }
 };
+
+// --- Home page (singleType) ---
+
+export type HomeFeatureCard = {
+  icon: 'ia' | 'circular' | 'finance' | 'research' | 'networking' | 'wood';
+  title: string;
+  description: string;
+};
+
+export type HomePage = {
+  hero_subtitle?: string;
+  pourquoi_title?: string;
+  pourquoi_intro?: string;
+  pourquoi_cards?: HomeFeatureCard[];
+  pourquoi_link_label?: string;
+  editions_title?: string;
+  editions_intro?: string;
+  dynamique_title?: string;
+  dynamique_body?: string;
+  partenaires_label?: string;
+  suite_title?: string;
+  suite_body?: string;
+  suite_cta_label?: string;
+  suite_cta_url?: string;
+};
+
+export const getHomePage = async (): Promise<HomePage | null> => {
+  try {
+    const res = await strapiFetch('/home-page?populate=pourquoi_cards');
+    return res?.data ?? null;
+  } catch {
+    return null;
+  }
+};

@@ -863,6 +863,7 @@ module.exports = {
       { api: 'intervenant', actions: ['find', 'findOne'] },
       { api: 'partenaire', actions: ['find', 'findOne'] },
       { api: 'static-page', actions: ['find', 'findOne'] },
+      { api: 'home-page', actions: ['find', 'findOne'] },
     ]);
 
     // Set French labels on content types
@@ -1159,6 +1160,22 @@ const FRENCH_LABELS = {
     presentation: 'Présentation (PDF, partagée après l\'événement)',
     order: 'Ordre dans la séquence',
   },
+  'api::home-page.home-page': {
+    hero_subtitle: 'Sous-titre du hero',
+    pourquoi_title: 'Section "Pourquoi ?" — Titre',
+    pourquoi_intro: 'Section "Pourquoi ?" — Intro',
+    pourquoi_cards: 'Section "Pourquoi ?" — 3 cartes thématiques',
+    pourquoi_link_label: 'Section "Pourquoi ?" — Libellé du lien (vers /pourquoi)',
+    editions_title: 'Section "Éditions" — Titre',
+    editions_intro: 'Section "Éditions" — Intro',
+    dynamique_title: 'Section "Dynamique collective" — Titre',
+    dynamique_body: 'Section "Dynamique collective" — Texte (Markdown)',
+    partenaires_label: 'Bandeau partenaires — Libellé (ex: "Avec le soutien de")',
+    suite_title: 'Section "Et pour la suite ?" — Titre',
+    suite_body: 'Section "Et pour la suite ?" — Texte',
+    suite_cta_label: 'Section "Et pour la suite ?" — Libellé du bouton',
+    suite_cta_url: 'Section "Et pour la suite ?" — URL du bouton',
+  },
   'api::edition.edition': {
     title: 'Titre',
     slug: 'Identifiant URL',
@@ -1245,6 +1262,9 @@ async function runDataMigrations(strapi) {
 
   // 2026-05-01: drop legacy programme-item table and join tables (content type removed)
   await dropLegacyProgrammeItems(strapi);
+
+  // 2026-05-01: ensure home-page single type has a published entry seeded with defaults
+  await ensureHomePage(strapi);
 }
 
 /**
@@ -1275,6 +1295,57 @@ async function dropLegacyProgrammeItems(strapi) {
       strapi.log.warn(`[cleanup] could not drop ${t}: ${err.message}`);
     }
   }
+}
+
+/**
+ * Idempotent : si la page d'accueil n'a pas encore d'entrée publiée, la crée
+ * avec les valeurs par défaut (qui correspondent aux textes actuels du site).
+ * N'écrase JAMAIS une entrée existante (ne touche pas si l'admin a saisi son contenu).
+ */
+async function ensureHomePage(strapi) {
+  const existing = await strapi.documents('api::home-page.home-page').findFirst({
+    status: 'published',
+  });
+  if (existing) return;
+
+  const defaults = {
+    hero_subtitle: "Une dynamique collective pour connecter les acteurs, structurer des projets et accélérer les innovations de la filière bois.",
+    pourquoi_title: "Pourquoi ces journées ?",
+    pourquoi_intro: "La filière forêt-bois fait face à des transformations majeures. Ces journées réunissent TPE, PME, startups, chercheurs et financeurs pour accélérer l'innovation.",
+    pourquoi_cards: [
+      {
+        icon: "ia",
+        title: "IA & Digitalisation",
+        description: "Comment l'intelligence artificielle et les outils numériques transforment les process de la filière bois.",
+      },
+      {
+        icon: "circular",
+        title: "Économie circulaire",
+        description: "Réemploi, recyclage, biosourcé — les modèles circulaires au service de la construction et de l'industrie bois.",
+      },
+      {
+        icon: "finance",
+        title: "Financement de l'innovation",
+        description: "BpiFrance, business angels, aides régionales — les dispositifs pour financer vos projets innovants.",
+      },
+    ],
+    pourquoi_link_label: "En savoir plus",
+    editions_title: "Les éditions",
+    editions_intro: "Retrouvez les Journées de l'Innovation, région par région.",
+    dynamique_title: "Une dynamique collective",
+    dynamique_body: "Ensemble, nous portons une ambition commune : **connecter** les écosystèmes, **structurer** les projets d'innovation et **valoriser** les solutions qui créent de la valeur pour notre filière et nos territoires.",
+    partenaires_label: "Avec le soutien de",
+    suite_title: "Et pour la suite ?",
+    suite_body: "La tournée continue ! Provence-Alpes-Côte d'Azur, Nouvelle-Aquitaine, Auvergne-Rhône-Alpes... Inscrivez-vous à la newsletter pour être informé des prochaines éditions.",
+    suite_cta_label: "Prendre RDV avec l'équipe",
+    suite_cta_url: "https://outlook.office.com/book/RDVXylofutur@xylofutur.fr/",
+  };
+
+  await strapi.documents('api::home-page.home-page').create({
+    data: defaults,
+    status: 'published',
+  });
+  strapi.log.info('[seed] created home-page single type with defaults');
 }
 
 async function ensureStaticPages(strapi) {

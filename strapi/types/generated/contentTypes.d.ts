@@ -506,6 +506,48 @@ export interface ApiEditionEdition extends Struct.CollectionTypeSchema {
   };
 }
 
+export interface ApiHomePageHomePage extends Struct.SingleTypeSchema {
+  collectionName: 'home_pages';
+  info: {
+    description: "Textes \u00E9ditables de la page d'accueil. Une seule fiche, structur\u00E9e par sections.";
+    displayName: "Page d'accueil";
+    pluralName: 'home-pages';
+    singularName: 'home-page';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    dynamique_body: Schema.Attribute.RichText;
+    dynamique_title: Schema.Attribute.String;
+    editions_intro: Schema.Attribute.Text;
+    editions_title: Schema.Attribute.String;
+    hero_subtitle: Schema.Attribute.Text;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::home-page.home-page'
+    > &
+      Schema.Attribute.Private;
+    partenaires_label: Schema.Attribute.String;
+    pourquoi_cards: Schema.Attribute.Component<'home.feature-card', true>;
+    pourquoi_intro: Schema.Attribute.Text;
+    pourquoi_link_label: Schema.Attribute.String;
+    pourquoi_title: Schema.Attribute.String;
+    publishedAt: Schema.Attribute.DateTime;
+    suite_body: Schema.Attribute.Text;
+    suite_cta_label: Schema.Attribute.String;
+    suite_cta_url: Schema.Attribute.String;
+    suite_title: Schema.Attribute.String;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
 export interface ApiIntervenantIntervenant extends Struct.CollectionTypeSchema {
   collectionName: 'intervenants';
   info: {
@@ -1300,6 +1342,7 @@ declare module '@strapi/strapi' {
       'admin::transfer-token-permission': AdminTransferTokenPermission;
       'admin::user': AdminUser;
       'api::edition.edition': ApiEditionEdition;
+      'api::home-page.home-page': ApiHomePageHomePage;
       'api::intervenant.intervenant': ApiIntervenantIntervenant;
       'api::intervention.intervention': ApiInterventionIntervention;
       'api::organisation.organisation': ApiOrganisationOrganisation;

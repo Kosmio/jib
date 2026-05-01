@@ -337,6 +337,71 @@
       }
     }
   },
+  "home-page": {
+    "singularName": "home-page",
+    "displayName": "Page d'accueil",
+    "description": "Single type — une seule entrée. Textes éditables de la page d'accueil, structurés par sections (hero, pourquoi, éditions, dynamique, partenaires, suite). Le frontend retombe sur des valeurs par défaut si la fiche est vide.",
+    "kind": "singleType",
+    "draftAndPublish": true,
+    "fields": {
+      "hero_subtitle": {
+        "type": "text",
+        "description": "Sous-titre du hero (sous le logo JIB)"
+      },
+      "pourquoi_title": {
+        "type": "string",
+        "description": "Section 'Pourquoi ?' — titre"
+      },
+      "pourquoi_intro": {
+        "type": "text",
+        "description": "Section 'Pourquoi ?' — paragraphe d'introduction"
+      },
+      "pourquoi_cards": {
+        "type": "component repeatable (home.feature-card)",
+        "description": "3 cartes thématiques. Composant à champs : icon (enum: ia|circular|finance|research|networking|wood), title, description. L'icône est rendue côté frontend en SVG"
+      },
+      "pourquoi_link_label": {
+        "type": "string",
+        "description": "Libellé du lien vers /pourquoi (ex: 'En savoir plus')"
+      },
+      "editions_title": {
+        "type": "string",
+        "description": "Section 'Éditions' — titre"
+      },
+      "editions_intro": {
+        "type": "text",
+        "description": "Section 'Éditions' — paragraphe d'introduction"
+      },
+      "dynamique_title": {
+        "type": "string",
+        "description": "Section 'Dynamique collective' — titre"
+      },
+      "dynamique_body": {
+        "type": "richtext",
+        "description": "Section 'Dynamique collective' — texte. Markdown gras (**...**) supporté"
+      },
+      "partenaires_label": {
+        "type": "string",
+        "description": "Bandeau partenaires — petite étiquette au-dessus des logos (ex: 'Avec le soutien de')"
+      },
+      "suite_title": {
+        "type": "string",
+        "description": "Section 'Et pour la suite ?' — titre"
+      },
+      "suite_body": {
+        "type": "text",
+        "description": "Section 'Et pour la suite ?' — paragraphe"
+      },
+      "suite_cta_label": {
+        "type": "string",
+        "description": "Section 'Et pour la suite ?' — libellé du bouton CTA"
+      },
+      "suite_cta_url": {
+        "type": "string",
+        "description": "Section 'Et pour la suite ?' — URL du bouton (ex: page Outlook de prise de RDV)"
+      }
+    }
+  },
   "interventions": {
     "singularName": "intervention",
     "displayName": "Intervention",

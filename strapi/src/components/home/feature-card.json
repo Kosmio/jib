@@ -1,0 +1,23 @@
+{
+  "collectionName": "components_home_feature_cards",
+  "info": {
+    "displayName": "Carte thématique (home)",
+    "icon": "grid"
+  },
+  "attributes": {
+    "icon": {
+      "type": "enumeration",
+      "enum": ["ia", "circular", "finance", "research", "networking", "wood"],
+      "required": true,
+      "default": "ia"
+    },
+    "title": {
+      "type": "string",
+      "required": true
+    },
+    "description": {
+      "type": "text",
+      "required": true
+    }
+  }
+}

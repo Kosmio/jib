@@ -1,6 +1,6 @@
 ---
 import Layout from "../layouts/Layout.astro";
-import { getEditions, getIntervenants, buildImageUrl } from "../lib/strapi";
+import { getEditions, getIntervenants, getHomePage, buildImageUrl } from "../lib/strapi";
 import { regionLabels } from "../lib/types";
 
 let editions = { data: [] } as Awaited<ReturnType<typeof getEditions>>;
@@ -13,6 +13,8 @@ try {
   intervenants = await getIntervenants();
 } catch {}
 
+const home = (await getHomePage()) ?? null;
+
 const nextEdition = editions?.data?.find((e) => e.edition_status === "inscriptions-ouvertes" || e.edition_status === "a-venir");
 
 const editionsCount = editions?.data?.length ?? 0;
@@ -20,6 +22,52 @@ const intervenantsCount = intervenants?.data?.length ?? 0;
 const participantsCount = (editions?.data ?? [])
   .filter((e) => e.edition_status === "passee")
   .reduce((sum, e) => sum + (e.participants_count ?? 0), 0);
+
+// --- Textes éditables avec fallback en dur (résilience si home-page indisponible) ---
+const txt = {
+  hero_subtitle: home?.hero_subtitle || "Une dynamique collective pour connecter les acteurs, structurer des projets et accélérer les innovations de la filière bois.",
+  pourquoi_title: home?.pourquoi_title || "Pourquoi ces journées ?",
+  pourquoi_intro: home?.pourquoi_intro || "La filière forêt-bois fait face à des transformations majeures. Ces journées réunissent TPE, PME, startups, chercheurs et financeurs pour accélérer l'innovation.",
+  pourquoi_link_label: home?.pourquoi_link_label || "En savoir plus",
+  editions_title: home?.editions_title || "Les éditions",
+  editions_intro: home?.editions_intro || "Retrouvez les Journées de l'Innovation, région par région.",
+  dynamique_title: home?.dynamique_title || "Une dynamique collective",
+  dynamique_body: home?.dynamique_body || "Ensemble, nous portons une ambition commune : **connecter** les écosystèmes, **structurer** les projets d'innovation et **valoriser** les solutions qui créent de la valeur pour notre filière et nos territoires.",
+  partenaires_label: home?.partenaires_label || "Avec le soutien de",
+  suite_title: home?.suite_title || "Et pour la suite ?",
+  suite_body: home?.suite_body || "La tournée continue ! Provence-Alpes-Côte d'Azur, Nouvelle-Aquitaine, Auvergne-Rhône-Alpes... Inscrivez-vous à la newsletter pour être informé des prochaines éditions.",
+  suite_cta_label: home?.suite_cta_label || "Prendre RDV avec l'équipe",
+  suite_cta_url: home?.suite_cta_url || "https://outlook.office.com/book/RDVXylofutur@xylofutur.fr/",
+};
+
+// Conversion gras Markdown (**...**) → <strong>...</strong> pour le bloc dynamique
+const renderBoldMd = (s: string) => s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+// Cartes avec fallback identique à l'existant si Strapi vide
+const fallbackCards = [
+  { icon: "ia" as const, title: "IA & Digitalisation", description: "Comment l'intelligence artificielle et les outils numériques transforment les process de la filière bois." },
+  { icon: "circular" as const, title: "Économie circulaire", description: "Réemploi, recyclage, biosourcé — les modèles circulaires au service de la construction et de l'industrie bois." },
+  { icon: "finance" as const, title: "Financement de l'innovation", description: "BpiFrance, business angels, aides régionales — les dispositifs pour financer vos projets innovants." },
+];
+const cards = (home?.pourquoi_cards && home.pourquoi_cards.length > 0) ? home.pourquoi_cards : fallbackCards;
+
+// Mapping icône → SVG path (lucide-style 24x24, stroke="currentColor")
+const ICON_PATHS: Record<string, string> = {
+  ia: "M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z",
+  circular: "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15",
+  finance: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
+  research: "M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z",
+  networking: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z",
+  wood: "M5 8h14M5 16h14M9 4l-2 16M17 4l-2 16",
+};
+const ICON_BG: Record<string, string> = {
+  ia: "bg-blue-100 text-blue-700",
+  circular: "bg-emerald-100 text-primary",
+  finance: "bg-amber-100 text-amber-700",
+  research: "bg-purple-100 text-purple-700",
+  networking: "bg-pink-100 text-pink-700",
+  wood: "bg-wood/10 text-wood-dark",
+};
 
 // Mapping régions → coordonnées SVG sur la carte de France (viewBox 0 0 1280 720, offset +300px)
 const regionCoords: Record<string, { x: number; y: number }> = {
@@ -202,7 +250,7 @@ const statusColors: Record<string, string> = {
 
           <!-- Subtitle -->
           <p class="mt-6 text-lg md:text-xl text-white/80 max-w-[520px] mx-auto lg:mx-0 leading-relaxed">
-            Une dynamique collective pour connecter les acteurs, structurer des projets et accélérer les innovations de la filière bois.
+            {txt.hero_subtitle}
           </p>
 
           <!-- Date/Lieu card -->
@@ -317,48 +365,30 @@ const statusColors: Record<string, string> = {
     <div class="max-w-6xl mx-auto px-6">
       <div class="text-center mb-16">
         <h2 class="text-3xl md:text-4xl font-bold">
-          Pourquoi ces journées ?
+          {txt.pourquoi_title}
         </h2>
         <p class="mt-4 text-muted text-lg max-w-2xl mx-auto">
-          La filière forêt-bois fait face à des transformations majeures. Ces journées réunissent TPE, PME, startups, chercheurs et financeurs pour accélérer l'innovation.
+          {txt.pourquoi_intro}
         </p>
       </div>
 
       <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
-        <div class="p-6 rounded-xl bg-surface border border-gray-100">
-          <div class="w-10 h-10 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center mb-4">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-            </svg>
+        {cards.map((card) => (
+          <div class="p-6 rounded-xl bg-surface border border-gray-100">
+            <div class:list={["w-10 h-10 rounded-lg flex items-center justify-center mb-4", ICON_BG[card.icon] || ICON_BG.ia]}>
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={ICON_PATHS[card.icon] || ICON_PATHS.ia}/>
+              </svg>
+            </div>
+            <h3 class="font-semibold mb-2">{card.title}</h3>
+            <p class="text-sm text-muted leading-relaxed">{card.description}</p>
           </div>
-          <h3 class="font-semibold mb-2">IA & Digitalisation</h3>
-          <p class="text-sm text-muted leading-relaxed">Comment l'intelligence artificielle et les outils numériques transforment les process de la filière bois.</p>
-        </div>
-
-        <div class="p-6 rounded-xl bg-surface border border-gray-100">
-          <div class="w-10 h-10 rounded-lg bg-emerald-100 text-primary flex items-center justify-center mb-4">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-            </svg>
-          </div>
-          <h3 class="font-semibold mb-2">Economie circulaire</h3>
-          <p class="text-sm text-muted leading-relaxed">Réemploi, recyclage, biosourcé — les modèles circulaires au service de la construction et de l'industrie bois.</p>
-        </div>
-
-        <div class="p-6 rounded-xl bg-surface border border-gray-100">
-          <div class="w-10 h-10 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center mb-4">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
-          </div>
-          <h3 class="font-semibold mb-2">Financement de l'innovation</h3>
-          <p class="text-sm text-muted leading-relaxed">BpiFrance, business angels, aides régionales — les dispositifs pour financer vos projets innovants.</p>
-        </div>
+        ))}
       </div>
 
       <div class="mt-10 text-center">
         <a href="/pourquoi" class="text-sm font-medium text-primary hover:text-primary-dark transition-colors">
-          En savoir plus &rarr;
+          {txt.pourquoi_link_label} &rarr;
         </a>
       </div>
     </div>
@@ -370,8 +400,8 @@ const statusColors: Record<string, string> = {
       <div class="max-w-6xl mx-auto px-6">
         <div class="flex items-end justify-between mb-12">
           <div>
-            <h2 class="text-3xl md:text-4xl font-bold">Les éditions</h2>
-            <p class="mt-3 text-muted">Retrouvez les Journées de l'Innovation, région par région.</p>
+            <h2 class="text-3xl md:text-4xl font-bold">{txt.editions_title}</h2>
+            <p class="mt-3 text-muted">{txt.editions_intro}</p>
           </div>
           <a href="/editions" class="hidden sm:inline-flex items-center gap-1 text-sm font-medium text-primary hover:text-primary-dark transition-colors">
             Tout voir
@@ -419,10 +449,8 @@ const statusColors: Record<string, string> = {
   <!-- Dynamique collective -->
   <section class="py-20 md:py-28 bg-white">
     <div class="max-w-4xl mx-auto px-6 text-center">
-      <h2 class="text-3xl md:text-4xl font-bold">Une dynamique collective</h2>
-      <p class="mt-4 text-muted text-lg max-w-2xl mx-auto">
-        Ensemble, nous portons une ambition commune : <strong class="text-gray-900">connecter</strong> les écosystèmes, <strong class="text-gray-900">structurer</strong> les projets d'innovation et <strong class="text-gray-900">valoriser</strong> les solutions qui créent de la valeur pour notre filière et nos territoires.
-      </p>
+      <h2 class="text-3xl md:text-4xl font-bold">{txt.dynamique_title}</h2>
+      <p class="mt-4 text-muted text-lg max-w-2xl mx-auto" set:html={renderBoldMd(txt.dynamique_body)} />
       <div class="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
         <a href="/a-propos" class="inline-flex items-center justify-center px-7 py-3 bg-primary hover:bg-primary-dark text-white font-semibold text-sm rounded-lg transition-colors shadow-sm">
           Qui sommes-nous ?
@@ -437,7 +465,7 @@ const statusColors: Record<string, string> = {
   <!-- Partenaires — bandeau défilant -->
   <section class="py-12 bg-white border-t border-gray-100">
     <div class="max-w-6xl mx-auto px-6">
-      <p class="text-center text-sm font-medium text-muted mb-8 uppercase tracking-wider">Avec le soutien de</p>
+      <p class="text-center text-sm font-medium text-muted mb-8 uppercase tracking-wider">{txt.partenaires_label}</p>
       <div class="flex flex-wrap items-center justify-center gap-10 md:gap-14">
         <a href="https://www.codifab.fr" target="_blank" rel="noopener" class="h-12 hover:opacity-80 transition-opacity" title="Codifab">
           <img src="/assets/logo-codifab.svg" alt="Codifab" class="h-full w-auto object-contain" loading="lazy" />
@@ -449,13 +477,11 @@ const statusColors: Record<string, string> = {
   <!-- Et pour la suite ? -->
   <section class="py-20 md:py-28 bg-surface">
     <div class="max-w-3xl mx-auto px-6 text-center">
-      <h2 class="text-3xl md:text-4xl font-bold">Et pour la suite ?</h2>
-      <p class="mt-4 text-muted text-lg">
-        La tournée continue ! Provence-Alpes-Côte d'Azur, Nouvelle-Aquitaine, Auvergne-Rhône-Alpes... Inscrivez-vous à la newsletter pour être informé des prochaines éditions.
-      </p>
+      <h2 class="text-3xl md:text-4xl font-bold">{txt.suite_title}</h2>
+      <p class="mt-4 text-muted text-lg">{txt.suite_body}</p>
       <div class="mt-6">
-        <a href="https://outlook.office.com/book/RDVXylofutur@xylofutur.fr/" target="_blank" rel="noopener" class="inline-flex items-center gap-2 px-7 py-3 bg-accent hover:bg-accent-dark text-white font-semibold text-sm rounded-lg transition-colors">
-          Prendre RDV avec l'équipe
+        <a href={txt.suite_cta_url} target="_blank" rel="noopener" class="inline-flex items-center gap-2 px-7 py-3 bg-accent hover:bg-accent-dark text-white font-semibold text-sm rounded-lg transition-colors">
+          {txt.suite_cta_label}
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
           </svg>
