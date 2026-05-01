@@ -44,7 +44,7 @@ export const getEditionBySlug = (
 // --- Intervenants ---
 
 export const getIntervenants = (): Promise<Responses<Intervenant>> =>
-  strapiFetch("/intervenants?populate[0]=photo&populate[1]=organisation.logo&populate[2]=tags&sort=name:asc");
+  strapiFetch("/intervenants?populate[0]=photo&populate[1]=organisation.logo&populate[2]=tags&populate[3]=programme_items.edition&sort=name:asc");
 
 export const getIntervenantBySlug = (
   slug: string

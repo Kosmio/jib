@@ -8,13 +8,28 @@
   font-display: swap;
 }
 
-a, button, [type="submit"], [role="button"] {
-  cursor: pointer;
-}
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
 
-h1, h2 {
-  font-family: var(--font-display);
-  text-transform: uppercase;
+  a, button, [type="submit"], [role="button"] {
+    cursor: pointer;
+  }
+
+  h1, h2 {
+    font-family: var(--font-display);
+    text-transform: uppercase;
+    color: var(--color-title);
+  }
+
+  h3, h4, h5, h6 {
+    color: var(--color-title);
+  }
+
+  [id] {
+    scroll-margin-top: 5rem;
+  }
 }
 
 @theme {
@@ -28,6 +43,7 @@ h1, h2 {
   --color-surface-alt: #E8DFD4;
   --color-muted: #54585A;         /* PANTONE 432 C — charcoal */
   --color-text: #2E3133;
+  --color-title: #325062;         /* bleu acier — titres (h1–h6) */
 
   --color-wood: #8B5A2B;
   --color-wood-dark: #6B4423;

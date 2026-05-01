@@ -274,7 +274,7 @@ const eventJsonLd: Record<string, unknown> = {
   {programmeItems.length > 0 && (
     <section id="programme" class="py-16 md:py-24 bg-white scroll-mt-20">
       <div class="max-w-4xl mx-auto px-6">
-        <h2 class="text-2xl md:text-3xl font-bold text-gray-900 mb-10">Programme</h2>
+        <h2 class="text-2xl md:text-3xl font-bold mb-10">Programme</h2>
         <div class="space-y-1">
           {programmeItems.map((item) => (
             <div class="flex gap-4 py-4 border-b border-gray-100 last:border-0">
@@ -283,7 +283,7 @@ const eventJsonLd: Record<string, unknown> = {
               </div>
               <div class="flex-1">
                 <div class="flex items-start gap-2 flex-wrap">
-                  <h3 class="font-semibold text-gray-900">{item.title}</h3>
+                  <h3 class="font-semibold">{item.title}</h3>
                   {item.tags && item.tags.map((tag) => (
                     <span class={`text-xs font-medium px-2 py-0.5 rounded-full ${getTagColor(tag.slug)}`}>
                       {getTagLabel(tag.slug)}
@@ -325,14 +325,14 @@ const eventJsonLd: Record<string, unknown> = {
   {edition.lieux?.length > 0 && (
     <section class="py-16 md:py-24 bg-surface">
       <div class="max-w-4xl mx-auto px-6">
-        <h2 class="text-2xl md:text-3xl font-bold text-gray-900 mb-10">Infos pratiques</h2>
+        <h2 class="text-2xl md:text-3xl font-bold mb-10">Infos pratiques</h2>
         <div class="grid md:grid-cols-2 gap-8">
           {edition.lieux.map((lieu) => (
             <div class="bg-white rounded-xl p-6 border border-gray-100">
               {lieu.time_slot && (
                 <span class="text-xs font-medium text-accent-dark bg-accent/10 px-2.5 py-1 rounded-full">{lieu.time_slot}</span>
               )}
-              <h3 class="font-semibold text-gray-900 mt-3 text-lg">{lieu.name}</h3>
+              <h3 class="font-semibold mt-3 text-lg">{lieu.name}</h3>
               <p class="mt-2 text-sm text-muted whitespace-pre-line">{lieu.address}</p>
               {lieu.description && (
                 <p class="mt-3 text-sm text-muted">{lieu.description}</p>
@@ -357,7 +357,7 @@ const eventJsonLd: Record<string, unknown> = {
     <section id="intervenants" class="py-16 md:py-24 bg-white scroll-mt-20">
       <div class="max-w-6xl mx-auto px-6">
         <div class="text-center mb-12">
-          <h2 class="text-2xl md:text-3xl font-bold text-gray-900">Intervenants</h2>
+          <h2 class="text-2xl md:text-3xl font-bold">Intervenants</h2>
           <p class="mt-3 text-muted">Entrepreneurs, chercheurs, financeurs — les acteurs de l'innovation filière bois.</p>
         </div>
         {programmeItems.some((p) => p.intervenants && p.intervenants.length > 0) && (
@@ -382,7 +382,7 @@ const eventJsonLd: Record<string, unknown> = {
                     </div>
                   )}
                   <div class="min-w-0">
-                    <h3 class="font-semibold text-gray-900 group-hover:text-primary transition-colors">{intervenant.name}</h3>
+                    <h3 class="font-semibold group-hover:text-primary transition-colors">{intervenant.name}</h3>
                     {intervenant.title && (
                       <p class="text-sm text-muted">{intervenant.title}</p>
                     )}
@@ -422,7 +422,7 @@ const eventJsonLd: Record<string, unknown> = {
         )}
         {programmeItems.some((p) => p.organisations && p.organisations.length > 0) && (
           <div class="mt-12">
-            <h3 class="text-xl font-bold text-gray-900 mb-6">Organisations</h3>
+            <h3 class="text-xl font-bold mb-6">Organisations</h3>
             <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {[...new Map(
                 programmeItems
@@ -444,7 +444,7 @@ const eventJsonLd: Record<string, unknown> = {
                     </div>
                   )}
                   <div class="min-w-0">
-                    <h3 class="font-semibold text-gray-900 group-hover:text-primary transition-colors truncate">{org.name}</h3>
+                    <h3 class="font-semibold group-hover:text-primary transition-colors truncate">{org.name}</h3>
                     {org.description && (
                       <p class="text-sm text-muted line-clamp-2">{org.description}</p>
                     )}
@@ -462,7 +462,7 @@ const eventJsonLd: Record<string, unknown> = {
   {edition.partenaires && edition.partenaires.length > 0 && (
     <section class="py-16 md:py-24 bg-surface">
       <div class="max-w-6xl mx-auto px-6">
-        <h2 class="text-2xl md:text-3xl font-bold text-gray-900 mb-10">Partenaires</h2>
+        <h2 class="text-2xl md:text-3xl font-bold mb-10">Partenaires</h2>
         <div class="flex flex-wrap items-center justify-center gap-8 md:gap-12">
           {edition.partenaires.map((partenaire) => {
             const org = partenaire.organisation;
@@ -493,13 +493,13 @@ const eventJsonLd: Record<string, unknown> = {
   {edition.edition_status === "passee" && (edition.summary || edition.gallery?.length > 0 || edition.video_urls || edition.testimonials) && (
     <section class="py-16 md:py-24 bg-white">
       <div class="max-w-4xl mx-auto px-6">
-        <h2 class="text-2xl md:text-3xl font-bold text-gray-900 mb-10">Retour sur l'événement</h2>
+        <h2 class="text-2xl md:text-3xl font-bold mb-10">Retour sur l'événement</h2>
         {edition.summary && (
           <div class="prose prose-lg max-w-none mb-12" set:html={edition.summary} />
         )}
         {edition.testimonials && (
           <div class="mb-12">
-            <h3 class="font-semibold text-gray-900 mb-6">Témoignages</h3>
+            <h3 class="font-semibold mb-6">Témoignages</h3>
             <div class="relative bg-gradient-to-br from-wood/5 to-gold/5 rounded-2xl p-8 md:p-10 border border-wood/10">
               <!-- Quote icon -->
               <svg class="absolute top-6 left-6 w-10 h-10 text-gold/30" fill="currentColor" viewBox="0 0 24 24">
@@ -511,7 +511,7 @@ const eventJsonLd: Record<string, unknown> = {
         )}
         {edition.video_urls && (
           <div class="mb-12">
-            <h3 class="font-semibold text-gray-900 mb-4">Vidéos</h3>
+            <h3 class="font-semibold mb-4">Vidéos</h3>
             <div class="grid md:grid-cols-2 gap-6">
               {edition.video_urls.split('\n').filter((url: string) => url.trim()).map((url: string) => {
                 const trimmed = url.trim();
@@ -548,7 +548,7 @@ const eventJsonLd: Record<string, unknown> = {
         )}
         {edition.gallery?.length > 0 && (
           <div>
-            <h3 class="font-semibold text-gray-900 mb-4">Galerie photos</h3>
+            <h3 class="font-semibold mb-4">Galerie photos</h3>
             <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
               {edition.gallery.map((img) => (
                 <img

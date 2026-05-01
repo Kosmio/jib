@@ -1,0 +1,44 @@
+---
+import { regionLabels, type Edition } from "../lib/types";
+
+export interface Props {
+  editions: Edition[];
+}
+
+const { editions } = Astro.props;
+
+type BadgeData = { key: string; label: string; upcoming: boolean };
+
+const seen = new Map<string, BadgeData>();
+const upcomingStatuses = new Set(["a-venir", "inscriptions-ouvertes", "complet"]);
+
+for (const ed of editions) {
+  if (!ed?.region || !ed?.year) continue;
+  const key = `${ed.region}-${ed.year}`;
+  if (seen.has(key)) continue;
+  seen.set(key, {
+    key,
+    label: `${regionLabels[ed.region] || ed.region} ${ed.year}`,
+    upcoming: upcomingStatuses.has(ed.edition_status),
+  });
+}
+
+const badges = Array.from(seen.values());
+---
+
+{badges.length > 0 && (
+  <div class="flex flex-wrap gap-1.5 justify-center">
+    {badges.map((b) => (
+      <span
+        class:list={[
+          "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border",
+          b.upcoming
+            ? "bg-primary/5 text-primary border-primary/30"
+            : "bg-gray-50 text-gray-600 border-gray-200",
+        ]}
+      >
+        {b.label}
+      </span>
+    ))}
+  </div>
+)}

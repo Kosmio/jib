@@ -1,14 +1,71 @@
 ---
+import { getEditions } from "../lib/strapi";
+import { regionLabels, type Edition } from "../lib/types";
+
 const currentPath = Astro.url.pathname;
 
-const links = [
-  { href: "/", label: "Accueil" },
-  { href: "/editions", label: "Les éditions" },
+let editions = { data: [] } as Awaited<ReturnType<typeof getEditions>>;
+try {
+  editions = await getEditions();
+} catch {}
+
+const upcomingStatuses = new Set(["a-venir", "inscriptions-ouvertes", "complet"]);
+const now = new Date();
+
+const isUpcoming = (e: Edition) =>
+  upcomingStatuses.has(e.edition_status) || (e.date && new Date(e.date) >= now);
+
+const editionsByRegion = new Map<string, Edition>();
+for (const edition of editions.data ?? []) {
+  const current = editionsByRegion.get(edition.region);
+  if (!current) {
+    editionsByRegion.set(edition.region, edition);
+    continue;
+  }
+  const eUp = isUpcoming(edition);
+  const cUp = isUpcoming(current);
+  if (eUp && !cUp) {
+    editionsByRegion.set(edition.region, edition);
+  } else if (eUp && cUp) {
+    if (new Date(edition.date) < new Date(current.date)) editionsByRegion.set(edition.region, edition);
+  } else if (!eUp && !cUp) {
+    if (new Date(edition.date) > new Date(current.date)) editionsByRegion.set(edition.region, edition);
+  }
+}
+
+const regionEditions = Array.from(editionsByRegion.values()).sort((a, b) => {
+  const aUp = isUpcoming(a);
+  const bUp = isUpcoming(b);
+  if (aUp && !bUp) return -1;
+  if (!aUp && bUp) return 1;
+  if (aUp && bUp) return new Date(a.date).getTime() - new Date(b.date).getTime();
+  return new Date(b.date).getTime() - new Date(a.date).getTime();
+});
+
+const fmtDate = (d: string) =>
+  new Date(d).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" });
+
+type NavChild = { href: string; label: string; sub?: string };
+type NavItem = { href: string; label: string; children?: NavChild[]; matchPaths?: string[] };
+
+const aboutChildren: NavChild[] = [
   { href: "/pourquoi", label: "Pourquoi ?" },
-  { href: "/partenaires", label: "Partenaires" },
   { href: "/a-propos", label: "Qui sommes-nous ?" },
   { href: "/contact", label: "Contact" },
 ];
+
+const nav: NavItem[] = [
+  { href: "/", label: "Accueil" },
+  { href: "/editions", label: "Éditions", matchPaths: ["/editions"] },
+  { href: "/partenaires#partenaires", label: "Partenaires", matchPaths: ["/partenaires"] },
+  { href: "/partenaires#intervenants", label: "Intervenants", matchPaths: ["/partenaires", "/intervenants"] },
+  { href: "#", label: "À propos", children: aboutChildren, matchPaths: ["/pourquoi", "/a-propos", "/contact"] },
+];
+
+const isActive = (item: NavItem) => {
+  if (item.matchPaths?.some((p) => currentPath === p || currentPath.startsWith(p + "/"))) return true;
+  return currentPath === item.href;
+};
 ---
 
 <header class="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100">
@@ -20,21 +77,95 @@ const links = [
     </a>
 
     <ul class="hidden md:flex items-center gap-8 text-sm font-medium">
-      {links.map(({ href, label }) => (
-        <li>
-          <a
-            href={href}
-            class:list={[
-              "transition-colors",
-              currentPath === href || (href !== "/" && currentPath.startsWith(href))
-                ? "text-primary"
-                : "text-gray-600 hover:text-primary",
-            ]}
-          >
-            {label}
-          </a>
-        </li>
-      ))}
+      {nav.map((item) => {
+        const active = isActive(item);
+        const baseLinkClass = active ? "text-primary" : "text-gray-600 hover:text-primary";
+
+        if (item.label === "Éditions" && regionEditions.length > 0) {
+          return (
+            <li class="group relative">
+              <a href={item.href} class={`flex items-center gap-1 transition-colors ${baseLinkClass}`}>
+                {item.label}
+                <svg class="w-3.5 h-3.5 transition-transform group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </a>
+              <div class="invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-opacity absolute left-1/2 -translate-x-1/2 top-full pt-3 w-72 z-50">
+                <div class="bg-white border border-gray-100 rounded-xl shadow-xl py-2">
+                  <p class="px-4 py-2 text-[11px] uppercase tracking-wider text-muted font-semibold">Une édition par région</p>
+                  <ul class="max-h-[420px] overflow-y-auto">
+                    {regionEditions.map((edition) => {
+                      const upcoming = isUpcoming(edition);
+                      return (
+                        <li>
+                          <a
+                            href={`/editions/${edition.slug}`}
+                            class="flex items-start justify-between gap-3 px-4 py-2.5 hover:bg-surface transition-colors"
+                          >
+                            <div class="min-w-0">
+                              <p class={`text-sm font-medium truncate ${upcoming ? "text-primary" : "text-gray-700"}`}>
+                                {regionLabels[edition.region] || edition.region}
+                              </p>
+                              <p class="text-xs text-muted truncate">{edition.city} — {fmtDate(edition.date)}</p>
+                            </div>
+                            {upcoming && (
+                              <span class="shrink-0 mt-0.5 inline-flex items-center px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-semibold uppercase tracking-wide">
+                                À venir
+                              </span>
+                            )}
+                          </a>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  <div class="border-t border-gray-100 mt-1">
+                    <a href="/editions" class="block px-4 py-2.5 text-xs font-semibold text-primary hover:bg-surface">
+                      Voir toutes les éditions →
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </li>
+          );
+        }
+
+        if (item.children) {
+          return (
+            <li class="group relative">
+              <a href={item.href} class={`flex items-center gap-1 transition-colors ${baseLinkClass}`}>
+                {item.label}
+                <svg class="w-3.5 h-3.5 transition-transform group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </a>
+              <div class="invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-opacity absolute left-1/2 -translate-x-1/2 top-full pt-3 w-56 z-50">
+                <div class="bg-white border border-gray-100 rounded-xl shadow-xl py-2">
+                  <ul>
+                    {item.children.map((child) => (
+                      <li>
+                        <a
+                          href={child.href}
+                          class={`block px-4 py-2 text-sm hover:bg-surface transition-colors ${currentPath === child.href ? "text-primary font-semibold" : "text-gray-700 hover:text-primary"}`}
+                        >
+                          {child.label}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </li>
+          );
+        }
+
+        return (
+          <li>
+            <a href={item.href} class={`transition-colors ${baseLinkClass}`}>
+              {item.label}
+            </a>
+          </li>
+        );
+      })}
     </ul>
 
     <button id="mobile-menu-btn" class="md:hidden p-2 text-gray-600" aria-label="Menu">
@@ -45,22 +176,71 @@ const links = [
   </nav>
 
   <div id="mobile-menu" class="hidden md:hidden border-t border-gray-100 bg-white px-6 pb-4">
-    <ul class="flex flex-col gap-3 pt-3 text-sm font-medium">
-      {links.map(({ href, label }) => (
-        <li>
-          <a
-            href={href}
-            class:list={[
-              "block py-1 transition-colors",
-              currentPath === href || (href !== "/" && currentPath.startsWith(href))
-                ? "text-primary"
-                : "text-gray-600 hover:text-primary",
-            ]}
-          >
-            {label}
-          </a>
-        </li>
-      ))}
+    <ul class="flex flex-col gap-1 pt-3 text-sm font-medium">
+      {nav.map((item) => {
+        const active = isActive(item);
+        const baseLinkClass = active ? "text-primary" : "text-gray-700 hover:text-primary";
+
+        if (item.label === "Éditions" && regionEditions.length > 0) {
+          return (
+            <li>
+              <details class="group">
+                <summary class={`flex items-center justify-between py-2 cursor-pointer list-none ${baseLinkClass}`}>
+                  <a href={item.href}>{item.label}</a>
+                  <svg class="w-4 h-4 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                  </svg>
+                </summary>
+                <ul class="pl-3 border-l border-gray-100 mt-1 mb-2 space-y-1">
+                  {regionEditions.map((edition) => (
+                    <li>
+                      <a href={`/editions/${edition.slug}`} class="block py-1.5 text-sm text-gray-600 hover:text-primary">
+                        {regionLabels[edition.region] || edition.region}
+                        <span class="text-xs text-muted ml-1">— {fmtDate(edition.date)}</span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            </li>
+          );
+        }
+
+        if (item.children) {
+          return (
+            <li>
+              <details class="group">
+                <summary class={`flex items-center justify-between py-2 cursor-pointer list-none ${baseLinkClass}`}>
+                  {item.label}
+                  <svg class="w-4 h-4 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                  </svg>
+                </summary>
+                <ul class="pl-3 border-l border-gray-100 mt-1 mb-2 space-y-1">
+                  {item.children.map((child) => (
+                    <li>
+                      <a
+                        href={child.href}
+                        class={`block py-1.5 text-sm ${currentPath === child.href ? "text-primary font-semibold" : "text-gray-600 hover:text-primary"}`}
+                      >
+                        {child.label}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            </li>
+          );
+        }
+
+        return (
+          <li>
+            <a href={item.href} class={`block py-2 transition-colors ${baseLinkClass}`}>
+              {item.label}
+            </a>
+          </li>
+        );
+      })}
     </ul>
   </div>
 </header>

@@ -55,6 +55,10 @@
       "default": "a-venir",
       "required": true
     },
+    "participants_count": {
+      "type": "integer",
+      "min": 0
+    },
     "description": {
       "type": "richtext"
     },

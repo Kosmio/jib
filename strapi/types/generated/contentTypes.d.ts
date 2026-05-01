@@ -446,7 +446,7 @@ export interface ApiEditionEdition extends Struct.CollectionTypeSchema {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
-    date: Schema.Attribute.Date & Schema.Attribute.Required;
+    date: Schema.Attribute.Date;
     description: Schema.Attribute.RichText;
     edition_status: Schema.Attribute.Enumeration<
       ['a-venir', 'inscriptions-ouvertes', 'complet', 'passee']
@@ -467,6 +467,13 @@ export interface ApiEditionEdition extends Struct.CollectionTypeSchema {
       'manyToMany',
       'api::partenaire.partenaire'
     >;
+    participants_count: Schema.Attribute.Integer &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      >;
     programme_items: Schema.Attribute.Relation<
       'oneToMany',
       'api::programme-item.programme-item'
@@ -475,7 +482,7 @@ export interface ApiEditionEdition extends Struct.CollectionTypeSchema {
     region: Schema.Attribute.Enumeration<
       [
         'normandie',
-        'region-sud',
+        'provence-alpes-cote-d-azur',
         'nouvelle-aquitaine',
         'auvergne-rhone-alpes',
         'ile-de-france',
@@ -671,6 +678,42 @@ export interface ApiProgrammeItemProgrammeItem
     publishedAt: Schema.Attribute.DateTime;
     start_time: Schema.Attribute.String & Schema.Attribute.Required;
     tags: Schema.Attribute.Relation<'manyToMany', 'api::tag.tag'>;
+    title: Schema.Attribute.String & Schema.Attribute.Required;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiStaticPageStaticPage extends Struct.CollectionTypeSchema {
+  collectionName: 'static_pages';
+  info: {
+    description: 'Pages textuelles \u00E9ditables : Pourquoi, \u00C0 propos, Mentions l\u00E9gales, Politique de confidentialit\u00E9';
+    displayName: 'Page statique';
+    pluralName: 'static-pages';
+    singularName: 'static-page';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  attributes: {
+    body: Schema.Attribute.RichText & Schema.Attribute.Required;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    hero_subtitle: Schema.Attribute.String;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::static-page.static-page'
+    > &
+      Schema.Attribute.Private;
+    meta_description: Schema.Attribute.Text &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 200;
+      }>;
+    publishedAt: Schema.Attribute.DateTime;
+    slug: Schema.Attribute.UID & Schema.Attribute.Required;
     title: Schema.Attribute.String & Schema.Attribute.Required;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -1232,6 +1275,7 @@ declare module '@strapi/strapi' {
       'api::organisation.organisation': ApiOrganisationOrganisation;
       'api::partenaire.partenaire': ApiPartenairePartenaire;
       'api::programme-item.programme-item': ApiProgrammeItemProgrammeItem;
+      'api::static-page.static-page': ApiStaticPageStaticPage;
       'api::tag.tag': ApiTagTag;
       'plugin::content-releases.release': PluginContentReleasesRelease;
       'plugin::content-releases.release-action': PluginContentReleasesReleaseAction;

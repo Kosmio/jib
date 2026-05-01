@@ -53,7 +53,7 @@ const allEditions = [...editionsFromPartenariats, ...editionsFromProgramme]
         )}
 
         <div>
-          <h1 class="text-3xl md:text-4xl font-bold text-gray-900">{organisation.name}</h1>
+          <h1 class="text-3xl md:text-4xl font-bold">{organisation.name}</h1>
 
           {organisation.tags && organisation.tags.length > 0 && (
             <div class="mt-3 flex flex-wrap gap-2">
@@ -111,7 +111,7 @@ const allEditions = [...editionsFromPartenariats, ...editionsFromProgramme]
       <!-- Intervenants -->
       {organisation.intervenants && organisation.intervenants.length > 0 && (
         <div class="mb-10">
-          <h2 class="text-xl font-bold text-gray-900 mb-6">Intervenants</h2>
+          <h2 class="text-xl font-bold mb-6">Intervenants</h2>
           <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {organisation.intervenants.map((intervenant) => (
               <a
@@ -144,7 +144,7 @@ const allEditions = [...editionsFromPartenariats, ...editionsFromProgramme]
       <!-- Editions -->
       {allEditions.length > 0 && (
         <div>
-          <h2 class="text-xl font-bold text-gray-900 mb-4">Éditions</h2>
+          <h2 class="text-xl font-bold mb-4">Éditions</h2>
           <div class="flex flex-wrap gap-3">
             {allEditions.map((ed) => (
               <a

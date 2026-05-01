@@ -125,6 +125,7 @@ export interface Edition extends Entity {
   date: string;
   city: string;
   edition_status: 'a-venir' | 'inscriptions-ouvertes' | 'complet' | 'passee';
+  participants_count: number | null;
   description: string | null;
   inscription_url: string | null;
   image: Image | null;

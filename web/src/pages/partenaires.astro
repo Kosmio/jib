@@ -1,18 +1,25 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import Hero from "../components/Hero.astro";
-import { getPartenaires, buildImageUrl } from "../lib/strapi";
+import EditionBadges from "../components/EditionBadges.astro";
+import { getPartenaires, getIntervenants, buildImageUrl } from "../lib/strapi";
+import type { Edition, Intervenant } from "../lib/types";
 
 let partenaires = { data: [] } as Awaited<ReturnType<typeof getPartenaires>>;
 try {
   partenaires = await getPartenaires();
 } catch {}
 
+let intervenants = { data: [] } as Awaited<ReturnType<typeof getIntervenants>>;
+try {
+  intervenants = await getIntervenants();
+} catch {}
+
 const roleLabels: Record<string, string> = {
   "soutien": "Soutien national",
   "co-organisateur": "Co-organisateurs",
   "institutionnel": "Partenaires institutionnels",
-  "prive": "Les entreprises qui innovent",
+  "prive": "Entreprises partenaires",
 };
 
 const roleOrder = ["soutien", "co-organisateur", "institutionnel", "prive"];
@@ -22,25 +29,66 @@ const grouped = roleOrder.reduce((acc, role) => {
   if (items.length > 0) acc.push({ role, label: roleLabels[role] || role, items });
   return acc;
 }, [] as { role: string; label: string; items: typeof partenaires.data }[]);
+
+// --- Intervenants : déduire les éditions et trier par édition (à venir d'abord, puis passées récentes) ---
+const upcomingStatuses = new Set(["a-venir", "inscriptions-ouvertes", "complet"]);
+
+const editionsForIntervenant = (intervenant: Intervenant): Edition[] => {
+  const items = intervenant.programme_items ?? [];
+  const map = new Map<string, Edition>();
+  for (const it of items) {
+    if (it?.edition?.documentId) map.set(it.edition.documentId, it.edition);
+  }
+  return Array.from(map.values());
+};
+
+const intervenantSortKey = (intervenant: Intervenant): number => {
+  const eds = editionsForIntervenant(intervenant);
+  if (eds.length === 0) return Number.POSITIVE_INFINITY;
+  const upcoming = eds
+    .filter((e) => upcomingStatuses.has(e.edition_status))
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  if (upcoming.length > 0) return new Date(upcoming[0].date).getTime();
+  const passees = eds
+    .filter((e) => e.edition_status === "passee")
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  if (passees.length > 0) return -new Date(passees[0].date).getTime();
+  return Number.POSITIVE_INFINITY;
+};
+
+const intervenantsList = (intervenants?.data ?? [])
+  .slice()
+  .sort((a, b) => intervenantSortKey(a) - intervenantSortKey(b));
 ---
 
-<Layout title="Nos partenaires — Journées de l'Innovation Filière Bois" description="Découvrez les partenaires des Journées de l'Innovation de la Filière Bois : soutiens nationaux, co-organisateurs et partenaires institutionnels.">
+<Layout title="Nos partenaires & intervenants — Journées de l'Innovation Filière Bois" description="Découvrez les partenaires et intervenants des Journées de l'Innovation de la Filière Bois : soutiens nationaux, co-organisateurs, institutionnels et entreprises qui prennent la parole.">
   <Hero
     title="Nos partenaires"
     subtitle="Une dynamique collective pour accompagner l'innovation dans la filière bois."
     compact
   />
 
-  <section class="py-16 md:py-24 bg-white">
+  <!-- ============================ -->
+  <!-- Section Partenaires           -->
+  <!-- ============================ -->
+  <section id="partenaires" class="py-16 md:py-24 bg-white">
     <div class="max-w-6xl mx-auto px-6">
+      <div class="text-center mb-12">
+        <h2 class="text-3xl md:text-4xl font-bold">Nos partenaires</h2>
+        <p class="mt-3 text-muted max-w-2xl mx-auto">
+          Les organisations qui soutiennent et co-construisent les Journées de l'Innovation Filière Bois.
+        </p>
+      </div>
+
       {grouped.length > 0 ? (
         <div class="space-y-16">
           {grouped.map(({ label, items }) => (
             <div>
-              <h2 class="text-xl font-bold text-gray-900 mb-8">{label}</h2>
+              <h3 class="text-xl font-bold mb-8">{label}</h3>
               <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {items.map((partenaire) => {
                   const org = partenaire.organisation;
+                  const eds = (partenaire.editions ?? []) as Edition[];
                   return (
                     <a
                       href={org ? `/organisations/${org.slug}` : "#"}
@@ -57,9 +105,14 @@ const grouped = roleOrder.reduce((acc, role) => {
                           <span class="text-lg font-bold text-primary/30">{org?.name || ''}</span>
                         </div>
                       )}
-                      <h3 class="font-semibold text-gray-900 text-sm">{org?.name || ''}</h3>
+                      <h4 class="font-semibold text-sm">{org?.name || ''}</h4>
                       {org?.description && (
                         <p class="mt-2 text-xs text-muted leading-relaxed">{org.description}</p>
+                      )}
+                      {eds.length > 0 && (
+                        <div class="mt-3 w-full">
+                          <EditionBadges editions={eds} />
+                        </div>
                       )}
                       {org?.website && (
                         <span
@@ -93,6 +146,67 @@ const grouped = roleOrder.reduce((acc, role) => {
       ) : (
         <div class="text-center py-12">
           <p class="text-muted text-lg">Les partenaires seront bientôt présentés.</p>
+        </div>
+      )}
+    </div>
+  </section>
+
+  <!-- ============================ -->
+  <!-- Section Intervenants          -->
+  <!-- ============================ -->
+  <section id="intervenants" class="py-16 md:py-24 bg-surface">
+    <div class="max-w-6xl mx-auto px-6">
+      <div class="text-center mb-12">
+        <h2 class="text-3xl md:text-4xl font-bold">Les intervenants</h2>
+        <p class="mt-3 text-muted max-w-2xl mx-auto">
+          Les organisations et expert·e·s qui prennent la parole lors des Journées de l'Innovation.
+        </p>
+      </div>
+
+      {intervenantsList.length > 0 ? (
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {intervenantsList.map((intervenant) => {
+            const eds = editionsForIntervenant(intervenant);
+            const org = intervenant.organisation;
+            return (
+              <a
+                href={`/intervenants/${intervenant.slug}`}
+                class="flex flex-col items-center text-center p-6 rounded-xl bg-white border border-gray-100 hover:shadow-md transition-shadow group"
+              >
+                {intervenant.photo ? (
+                  <img
+                    src={buildImageUrl(intervenant.photo.url)}
+                    alt={intervenant.name}
+                    class="w-20 h-20 rounded-full object-cover mb-4"
+                  />
+                ) : (
+                  <div class="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                    <span class="text-xl font-bold text-primary/40">
+                      {intervenant.name?.split(" ").map((p) => p[0]).join("").slice(0, 2)}
+                    </span>
+                  </div>
+                )}
+                <h3 class="font-semibold text-sm group-hover:text-primary transition-colors">
+                  {intervenant.name}
+                </h3>
+                {intervenant.title && (
+                  <p class="mt-1 text-xs text-muted leading-snug">{intervenant.title}</p>
+                )}
+                {org?.name && (
+                  <p class="mt-1 text-xs font-medium text-gray-500">{org.name}</p>
+                )}
+                {eds.length > 0 && (
+                  <div class="mt-3 w-full">
+                    <EditionBadges editions={eds} />
+                  </div>
+                )}
+              </a>
+            );
+          })}
+        </div>
+      ) : (
+        <div class="text-center py-12">
+          <p class="text-muted text-lg">Les intervenants seront bientôt présentés.</p>
         </div>
       )}
     </div>
