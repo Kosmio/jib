@@ -859,6 +859,8 @@ module.exports = {
       { api: 'organisation', actions: ['find', 'findOne'] },
       { api: 'edition', actions: ['find', 'findOne'] },
       { api: 'programme-item', actions: ['find', 'findOne'] },
+      { api: 'sequence', actions: ['find', 'findOne'] },
+      { api: 'intervention', actions: ['find', 'findOne'] },
       { api: 'intervenant', actions: ['find', 'findOne'] },
       { api: 'partenaire', actions: ['find', 'findOne'] },
       { api: 'static-page', actions: ['find', 'findOne'] },
@@ -1121,7 +1123,8 @@ const FRENCH_LABELS = {
     video_url: 'URL de la vidéo',
     long_description: 'Description complète',
     tags: 'Tags',
-    programme_items: 'Interventions au programme',
+    programme_items: 'Interventions au programme (legacy)',
+    interventions: 'Interventions',
   },
   'api::partenaire.partenaire': {
     display_name: 'Nom affiché',
@@ -1140,6 +1143,24 @@ const FRENCH_LABELS = {
     intervenants: 'Intervenants',
     organisations: 'Organisations',
   },
+  'api::sequence.sequence': {
+    title: 'Titre',
+    start_time: 'Heure de début',
+    end_time: 'Heure de fin',
+    description: 'Description (optionnelle)',
+    order: 'Ordre d\'affichage',
+    edition: 'Édition',
+    interventions: 'Interventions',
+    tags: 'Tags',
+    organisations: 'Organisations associées',
+  },
+  'api::intervention.intervention': {
+    intervenant: 'Intervenant',
+    sequence: 'Séquence',
+    description: 'Description (optionnelle)',
+    presentation: 'Présentation (PDF, partagée après l\'événement)',
+    order: 'Ordre dans la séquence',
+  },
   'api::edition.edition': {
     title: 'Titre',
     slug: 'Identifiant URL',
@@ -1152,7 +1173,8 @@ const FRENCH_LABELS = {
     inscription_url: 'Lien d\'inscription',
     image: 'Image de couverture',
     lieux: 'Lieux',
-    programme_items: 'Éléments du programme',
+    programme_items: 'Éléments du programme (legacy)',
+    sequences: 'Séquences du programme',
     partenaires: 'Partenariats',
     gallery: 'Galerie photos',
     video_urls: 'URLs des vidéos',
@@ -1223,6 +1245,83 @@ async function runDataMigrations(strapi) {
 
   // 2026-04-30: ensure static-page entries exist with default content
   await ensureStaticPages(strapi);
+
+  // 2026-05-01: migrate programme_items → sequences + interventions
+  await migrateProgrammeItemsToSequences(strapi);
+}
+
+/**
+ * Migration one-shot programme-item → sequence + intervention.
+ *
+ * Pour chaque programme_item :
+ *   - une `sequence` est créée avec mêmes title/start_time/end_time/description/order/edition/tags/organisations
+ *   - pour chaque intervenant rattaché, une `intervention` est créée (description vide, sans présentation)
+ *
+ * Idempotent : le pivot est l'existence d'au moins une sequence en base.
+ * Les programme_items existants ne sont PAS supprimés (cohabitation des 2 modèles le temps
+ * de la validation en prod). Suppression manuelle ultérieure.
+ */
+async function migrateProgrammeItemsToSequences(strapi) {
+  const existingSeq = await strapi.documents('api::sequence.sequence').findMany({ limit: 1, status: 'published' });
+  if (existingSeq.length > 0) {
+    strapi.log.info('[migration] sequences already exist, skipping programme-item → sequence migration');
+    return;
+  }
+
+  const items = await strapi.documents('api::programme-item.programme-item').findMany({
+    populate: { edition: true, intervenants: true, organisations: true, tags: true },
+    status: 'published',
+  });
+
+  if (items.length === 0) {
+    strapi.log.info('[migration] no programme_items found, skipping');
+    return;
+  }
+
+  strapi.log.info(`[migration] migrating ${items.length} programme_items → sequences + interventions`);
+
+  let createdSequences = 0;
+  let createdInterventions = 0;
+
+  for (const item of items) {
+    const tags = (item.tags || []).map((t) => ({ documentId: t.documentId }));
+    const organisations = (item.organisations || []).map((o) => ({ documentId: o.documentId }));
+
+    const seqData = {
+      title: item.title,
+      start_time: item.start_time,
+      end_time: item.end_time || null,
+      description: item.description || null,
+      order: item.order ?? null,
+      tags,
+      organisations,
+    };
+    if (item.edition?.documentId) {
+      seqData.edition = { documentId: item.edition.documentId };
+    }
+
+    const seq = await strapi.documents('api::sequence.sequence').create({
+      data: seqData,
+      status: 'published',
+    });
+    createdSequences++;
+
+    let order = 0;
+    for (const intervenant of (item.intervenants || [])) {
+      if (!intervenant?.documentId) continue;
+      await strapi.documents('api::intervention.intervention').create({
+        data: {
+          intervenant: { documentId: intervenant.documentId },
+          sequence: { documentId: seq.documentId },
+          order: order++,
+        },
+        status: 'published',
+      });
+      createdInterventions++;
+    }
+  }
+
+  strapi.log.info(`[migration] done — ${createdSequences} sequences and ${createdInterventions} interventions created`);
 }
 
 async function ensureStaticPages(strapi) {

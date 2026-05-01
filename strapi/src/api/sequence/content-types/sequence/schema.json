@@ -1,0 +1,54 @@
+{
+  "kind": "collectionType",
+  "collectionName": "sequences",
+  "info": {
+    "singularName": "sequence",
+    "pluralName": "sequences",
+    "displayName": "Séquence",
+    "description": "Les séquences (créneaux horaires) du programme d'une édition. Une séquence regroupe une ou plusieurs interventions."
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "attributes": {
+    "title": {
+      "type": "string",
+      "required": true
+    },
+    "start_time": {
+      "type": "string",
+      "required": true
+    },
+    "end_time": {
+      "type": "string"
+    },
+    "description": {
+      "type": "richtext"
+    },
+    "order": {
+      "type": "integer"
+    },
+    "edition": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::edition.edition",
+      "inversedBy": "sequences"
+    },
+    "interventions": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::intervention.intervention",
+      "mappedBy": "sequence"
+    },
+    "tags": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::tag.tag"
+    },
+    "organisations": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::organisation.organisation"
+    }
+  }
+}

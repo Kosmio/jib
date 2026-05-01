@@ -1,0 +1,38 @@
+{
+  "kind": "collectionType",
+  "collectionName": "interventions",
+  "info": {
+    "singularName": "intervention",
+    "pluralName": "interventions",
+    "displayName": "Intervention",
+    "description": "Une prise de parole d'un intervenant au sein d'une séquence du programme. Peut porter une description propre et un fichier de présentation partagé après l'événement."
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "attributes": {
+    "intervenant": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::intervenant.intervenant",
+      "inversedBy": "interventions"
+    },
+    "sequence": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::sequence.sequence",
+      "inversedBy": "interventions"
+    },
+    "description": {
+      "type": "richtext"
+    },
+    "presentation": {
+      "type": "media",
+      "multiple": false,
+      "allowedTypes": ["files", "images"]
+    },
+    "order": {
+      "type": "integer"
+    }
+  }
+}

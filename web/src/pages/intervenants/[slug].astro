@@ -20,10 +20,10 @@ if (intervenant.video_url) {
   videoId = match ? match[1] : null;
 }
 
-// Editions where this intervenant appears
-const editions = (intervenant.programme_items || [])
-  .filter((pi) => pi.edition)
-  .map((pi) => pi.edition!)
+// Editions where this intervenant appears (via interventions → sequence → edition)
+const editions = (intervenant.interventions || [])
+  .map((iv) => iv.sequence?.edition)
+  .filter((ed): ed is NonNullable<typeof ed> => !!ed)
   .filter((ed, i, arr) => arr.findIndex((e) => e.documentId === ed.documentId) === i);
 ---
 

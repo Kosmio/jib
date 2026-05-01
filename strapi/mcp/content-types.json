@@ -144,7 +144,12 @@
       "programme_items": {
         "type": "relation manyToMany",
         "target": "programme-items",
-        "description": "Éléments de programme dans lesquels l'intervenant prend la parole"
+        "description": "[LEGACY] Éléments de programme dans lesquels l'intervenant prend la parole. Conservé pour compatibilité — utilisez 'interventions' pour les nouvelles données"
+      },
+      "interventions": {
+        "type": "relation oneToMany",
+        "target": "interventions",
+        "description": "Interventions (prises de parole) de cet intervenant. Relation inverse — gérée côté intervention"
       }
     }
   },
@@ -252,7 +257,12 @@
       "programme_items": {
         "type": "relation oneToMany",
         "target": "programme-items",
-        "description": "Éléments du programme de cette édition (relation inverse)"
+        "description": "[LEGACY] Éléments du programme de cette édition (relation inverse). Conservé pour compatibilité — utilisez 'sequences' pour les nouvelles données"
+      },
+      "sequences": {
+        "type": "relation oneToMany",
+        "target": "sequences",
+        "description": "Séquences (créneaux horaires) du programme de cette édition (relation inverse)"
       },
       "partenaires": {
         "type": "relation manyToMany",
@@ -294,8 +304,8 @@
   },
   "programme-items": {
     "singularName": "programme-item",
-    "displayName": "Élément de programme",
-    "description": "Une intervention ou un moment du programme d'une édition (conférence, table ronde, pause, accueil). Liée à une seule édition, peut impliquer plusieurs intervenants et organisations.",
+    "displayName": "Élément de programme (LEGACY)",
+    "description": "[LEGACY — ne plus créer ici] Ancien modèle de programme. Conservé en lecture seule pour compatibilité. Pour toute création, utiliser 'sequences' (créneaux) + 'interventions' (prises de parole).",
     "draftAndPublish": true,
     "fields": {
       "title": {
@@ -339,6 +349,86 @@
         "type": "relation manyToMany",
         "target": "tags",
         "description": "Tags thématiques de l'élément"
+      }
+    }
+  },
+  "sequences": {
+    "singularName": "sequence",
+    "displayName": "Séquence",
+    "description": "Une séquence (créneau horaire) du programme d'une édition. Une séquence regroupe une ou plusieurs interventions. Remplace l'ancien 'programme-item'.",
+    "draftAndPublish": true,
+    "fields": {
+      "title": {
+        "type": "string",
+        "required": true,
+        "description": "Titre de la séquence (ex: 'La recherche au service de la filière', 'Le financement de l'innovation')"
+      },
+      "start_time": {
+        "type": "string",
+        "required": true,
+        "description": "Heure de début au format 'HHhMM' ou 'HH:MM' (ex: '10h15', '10:15')"
+      },
+      "end_time": {
+        "type": "string",
+        "description": "Heure de fin (même format que start_time). Optionnel — si vide, affichage 'À partir de {start_time}'"
+      },
+      "description": {
+        "type": "richtext",
+        "description": "Description optionnelle de la séquence en Markdown. Affichée sous le titre dans la carte. Si vide, n'apparaît pas"
+      },
+      "order": {
+        "type": "integer",
+        "description": "Ordre d'affichage dans le programme (les séquences sont triées par order croissant)"
+      },
+      "edition": {
+        "type": "relation manyToOne",
+        "target": "editions",
+        "description": "Édition à laquelle cette séquence appartient (obligatoire). Une séquence n'est rattachée qu'à une seule édition"
+      },
+      "interventions": {
+        "type": "relation oneToMany",
+        "target": "interventions",
+        "description": "Interventions (prises de parole) de cette séquence (relation inverse)"
+      },
+      "tags": {
+        "type": "relation manyToMany",
+        "target": "tags",
+        "description": "Tags thématiques de la séquence (ex: 'finance', 'recherche', 'pause')"
+      },
+      "organisations": {
+        "type": "relation manyToMany",
+        "target": "organisations",
+        "description": "Organisations associées à la séquence au-delà des intervenants (ex: animation par une organisation sans intervenant nommé). Optionnel"
+      }
+    }
+  },
+  "interventions": {
+    "singularName": "intervention",
+    "displayName": "Intervention",
+    "description": "Une prise de parole d'un intervenant au sein d'une séquence du programme. Peut porter une description propre et un fichier de présentation partagé après l'événement.",
+    "draftAndPublish": true,
+    "fields": {
+      "intervenant": {
+        "type": "relation manyToOne",
+        "target": "intervenants",
+        "description": "Intervenant qui prend la parole (obligatoire en pratique)"
+      },
+      "sequence": {
+        "type": "relation manyToOne",
+        "target": "sequences",
+        "description": "Séquence dans laquelle cette intervention prend place (obligatoire)"
+      },
+      "description": {
+        "type": "richtext",
+        "description": "Description propre de l'intervention en Markdown (ex: pitch du sujet abordé). Optionnelle — si vide, n'apparaît pas"
+      },
+      "presentation": {
+        "type": "media",
+        "description": "Fichier de présentation (PDF idéalement, images possibles). Affiché en téléchargement uniquement après l'événement (edition_status='passee'). Utilisez upload_media pour obtenir l'ID puis passez-le ici"
+      },
+      "order": {
+        "type": "integer",
+        "description": "Ordre d'affichage de l'intervention dans la séquence (ascendant)"
       }
     }
   }

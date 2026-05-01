@@ -497,6 +497,7 @@ export interface ApiEditionEdition extends Struct.CollectionTypeSchema {
       ]
     > &
       Schema.Attribute.Required;
+    sequences: Schema.Attribute.Relation<'oneToMany', 'api::sequence.sequence'>;
     slug: Schema.Attribute.UID<'title'>;
     summary: Schema.Attribute.RichText;
     testimonials: Schema.Attribute.RichText;
@@ -524,6 +525,10 @@ export interface ApiIntervenantIntervenant extends Struct.CollectionTypeSchema {
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
+    interventions: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::intervention.intervention'
+    >;
     linkedin_url: Schema.Attribute.String;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
@@ -551,6 +556,43 @@ export interface ApiIntervenantIntervenant extends Struct.CollectionTypeSchema {
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
     video_url: Schema.Attribute.String;
+  };
+}
+
+export interface ApiInterventionIntervention
+  extends Struct.CollectionTypeSchema {
+  collectionName: 'interventions';
+  info: {
+    description: "Une prise de parole d'un intervenant au sein d'une s\u00E9quence du programme. Peut porter une description propre et un fichier de pr\u00E9sentation partag\u00E9 apr\u00E8s l'\u00E9v\u00E9nement.";
+    displayName: 'Intervention';
+    pluralName: 'interventions';
+    singularName: 'intervention';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    description: Schema.Attribute.RichText;
+    intervenant: Schema.Attribute.Relation<
+      'manyToOne',
+      'api::intervenant.intervenant'
+    >;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::intervention.intervention'
+    > &
+      Schema.Attribute.Private;
+    order: Schema.Attribute.Integer;
+    presentation: Schema.Attribute.Media<'files' | 'images'>;
+    publishedAt: Schema.Attribute.DateTime;
+    sequence: Schema.Attribute.Relation<'manyToOne', 'api::sequence.sequence'>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
   };
 }
 
@@ -668,6 +710,49 @@ export interface ApiProgrammeItemProgrammeItem
     localizations: Schema.Attribute.Relation<
       'oneToMany',
       'api::programme-item.programme-item'
+    > &
+      Schema.Attribute.Private;
+    order: Schema.Attribute.Integer;
+    organisations: Schema.Attribute.Relation<
+      'manyToMany',
+      'api::organisation.organisation'
+    >;
+    publishedAt: Schema.Attribute.DateTime;
+    start_time: Schema.Attribute.String & Schema.Attribute.Required;
+    tags: Schema.Attribute.Relation<'manyToMany', 'api::tag.tag'>;
+    title: Schema.Attribute.String & Schema.Attribute.Required;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiSequenceSequence extends Struct.CollectionTypeSchema {
+  collectionName: 'sequences';
+  info: {
+    description: "Les s\u00E9quences (cr\u00E9neaux horaires) du programme d'une \u00E9dition. Une s\u00E9quence regroupe une ou plusieurs interventions.";
+    displayName: 'S\u00E9quence';
+    pluralName: 'sequences';
+    singularName: 'sequence';
+  };
+  options: {
+    draftAndPublish: true;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    description: Schema.Attribute.RichText;
+    edition: Schema.Attribute.Relation<'manyToOne', 'api::edition.edition'>;
+    end_time: Schema.Attribute.String;
+    interventions: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::intervention.intervention'
+    >;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::sequence.sequence'
     > &
       Schema.Attribute.Private;
     order: Schema.Attribute.Integer;
@@ -1272,9 +1357,11 @@ declare module '@strapi/strapi' {
       'admin::user': AdminUser;
       'api::edition.edition': ApiEditionEdition;
       'api::intervenant.intervenant': ApiIntervenantIntervenant;
+      'api::intervention.intervention': ApiInterventionIntervention;
       'api::organisation.organisation': ApiOrganisationOrganisation;
       'api::partenaire.partenaire': ApiPartenairePartenaire;
       'api::programme-item.programme-item': ApiProgrammeItemProgrammeItem;
+      'api::sequence.sequence': ApiSequenceSequence;
       'api::static-page.static-page': ApiStaticPageStaticPage;
       'api::tag.tag': ApiTagTag;
       'plugin::content-releases.release': PluginContentReleasesRelease;

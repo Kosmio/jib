@@ -34,10 +34,11 @@ const grouped = roleOrder.reduce((acc, role) => {
 const upcomingStatuses = new Set(["a-venir", "inscriptions-ouvertes", "complet"]);
 
 const editionsForIntervenant = (intervenant: Intervenant): Edition[] => {
-  const items = intervenant.programme_items ?? [];
+  const items = intervenant.interventions ?? [];
   const map = new Map<string, Edition>();
-  for (const it of items) {
-    if (it?.edition?.documentId) map.set(it.edition.documentId, it.edition);
+  for (const iv of items) {
+    const ed = iv?.sequence?.edition;
+    if (ed?.documentId) map.set(ed.documentId, ed);
   }
   return Array.from(map.values());
 };

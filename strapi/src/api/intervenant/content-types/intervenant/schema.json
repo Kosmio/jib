@@ -58,6 +58,12 @@
       "relation": "manyToMany",
       "target": "api::programme-item.programme-item",
       "mappedBy": "intervenants"
+    },
+    "interventions": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::intervention.intervention",
+      "mappedBy": "intervenant"
     }
   }
 }

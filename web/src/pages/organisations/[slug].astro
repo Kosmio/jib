@@ -11,14 +11,15 @@ if (!organisation) {
   return Astro.redirect("/404");
 }
 
-// Collect unique editions from partenariats and programme_items
+// Collect unique editions from partenariats and from intervenants → interventions → sequence → edition
 const editionsFromPartenariats = (organisation.partenariats || [])
   .flatMap((p) => p.editions || []);
-const editionsFromProgramme = (organisation.programme_items || [])
-  .filter((pi) => pi.edition)
-  .map((pi) => pi.edition!);
+const editionsFromIntervenants = (organisation.intervenants || [])
+  .flatMap((i) => i.interventions || [])
+  .map((iv) => iv.sequence?.edition)
+  .filter((ed): ed is NonNullable<typeof ed> => !!ed);
 
-const allEditions = [...editionsFromPartenariats, ...editionsFromProgramme]
+const allEditions = [...editionsFromPartenariats, ...editionsFromIntervenants]
   .filter((ed, i, arr) => arr.findIndex((e) => e.documentId === ed.documentId) === i);
 ---
 

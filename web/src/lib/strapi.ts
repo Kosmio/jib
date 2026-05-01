@@ -1,4 +1,4 @@
-import type { Edition, Intervenant, Organisation, Partenaire, ProgrammeItem, Responses, Tag } from "./types";
+import type { Edition, Intervenant, Organisation, Partenaire, ProgrammeItem, Responses, Sequence, Tag } from "./types";
 
 const strapiUrl = import.meta.env.STRAPI_URL || process.env.STRAPI_URL;
 const reactStrapiUrl = import.meta.env.REACT_STRAPI_URL || process.env.REACT_STRAPI_URL;
@@ -36,21 +36,34 @@ export const getEditions = (params?: {
 
 export const getEditionBySlug = (
   slug: string
-): Promise<Responses<Edition>> =>
-  strapiFetch(
-    `/editions?filters[slug][$eq]=${slug}&populate[0]=image&populate[1]=lieux&populate[2]=programme_items.intervenants.photo&populate[3]=programme_items.organisations.logo&populate[4]=programme_items.tags&populate[5]=partenaires.organisation.logo&populate[6]=gallery`
-  );
+): Promise<Responses<Edition>> => {
+  const populate = [
+    "image",
+    "lieux",
+    "sequences.interventions.intervenant.photo",
+    "sequences.interventions.intervenant.organisation.logo",
+    "sequences.interventions.presentation",
+    "sequences.tags",
+    "sequences.organisations.logo",
+    "partenaires.organisation.logo",
+    "gallery",
+  ];
+  const query = populate.map((p, i) => `populate[${i}]=${encodeURIComponent(p)}`).join("&");
+  return strapiFetch(`/editions?filters[slug][$eq]=${slug}&${query}`);
+};
 
 // --- Intervenants ---
 
 export const getIntervenants = (): Promise<Responses<Intervenant>> =>
-  strapiFetch("/intervenants?populate[0]=photo&populate[1]=organisation.logo&populate[2]=tags&populate[3]=programme_items.edition&sort=name:asc");
+  strapiFetch(
+    "/intervenants?populate[0]=photo&populate[1]=organisation.logo&populate[2]=tags&populate[3]=interventions.sequence.edition&sort=name:asc"
+  );
 
 export const getIntervenantBySlug = (
   slug: string
 ): Promise<Responses<Intervenant>> =>
   strapiFetch(
-    `/intervenants?filters[slug][$eq]=${slug}&populate[0]=photo&populate[1]=organisation.logo&populate[2]=tags&populate[3]=programme_items.edition`
+    `/intervenants?filters[slug][$eq]=${slug}&populate[0]=photo&populate[1]=organisation.logo&populate[2]=tags&populate[3]=interventions.sequence.edition&populate[4]=interventions.presentation`
   );
 
 // --- Partenaires ---
@@ -75,7 +88,7 @@ export const getOrganisationBySlug = (
   slug: string
 ): Promise<Responses<Organisation>> =>
   strapiFetch(
-    `/organisations?filters[slug][$eq]=${slug}&populate[0]=logo&populate[1]=tags&populate[2]=intervenants.photo&populate[3]=partenariats.editions&populate[4]=programme_items.edition`
+    `/organisations?filters[slug][$eq]=${slug}&populate[0]=logo&populate[1]=tags&populate[2]=intervenants.photo&populate[3]=intervenants.interventions.sequence.edition&populate[4]=partenariats.editions`
   );
 
 // --- Tags ---
@@ -83,7 +96,7 @@ export const getOrganisationBySlug = (
 export const getTags = (): Promise<Responses<Tag>> =>
   strapiFetch("/tags?sort=name:asc");
 
-// --- Programme Items ---
+// --- Programme Items (legacy, kept for compat) ---
 
 export const getProgrammeItems = (
   editionDocumentId: string
@@ -91,6 +104,24 @@ export const getProgrammeItems = (
   strapiFetch(
     `/programme-items?filters[edition][documentId][$eq]=${editionDocumentId}&populate[0]=intervenants.photo&populate[1]=organisations.logo&populate[2]=tags&sort=order:asc`
   );
+
+// --- Sequences ---
+
+export const getSequencesForEdition = (
+  editionDocumentId: string
+): Promise<Responses<Sequence>> => {
+  const populate = [
+    "interventions.intervenant.photo",
+    "interventions.intervenant.organisation.logo",
+    "interventions.presentation",
+    "tags",
+    "organisations.logo",
+  ];
+  const query = populate.map((p, i) => `populate[${i}]=${encodeURIComponent(p)}`).join("&");
+  return strapiFetch(
+    `/sequences?filters[edition][documentId][$eq]=${editionDocumentId}&${query}&sort=order:asc`
+  );
+};
 
 // --- Static Pages ---
 

@@ -75,6 +75,7 @@ export interface Intervenant extends Entity {
   tags?: Tag[];
   organisation?: Organisation | null;
   programme_items?: ProgrammeItem[];
+  interventions?: Intervention[];
 }
 
 export interface Partenaire extends Entity {
@@ -92,6 +93,35 @@ export interface ProgrammeItem extends Entity {
   order: number | null;
   edition?: Edition;
   intervenants?: Intervenant[];
+  organisations?: Organisation[];
+}
+
+export interface FileMedia {
+  id: number;
+  url: string;
+  name: string;
+  ext: string;
+  mime: string;
+  size: number;
+}
+
+export interface Intervention extends Entity {
+  description: string | null;
+  presentation: FileMedia | null;
+  order: number | null;
+  intervenant?: Intervenant | null;
+  sequence?: Sequence | null;
+}
+
+export interface Sequence extends Entity {
+  title: string;
+  start_time: string;
+  end_time: string | null;
+  description: string | null;
+  order: number | null;
+  edition?: Edition;
+  interventions?: Intervention[];
+  tags?: Tag[];
   organisations?: Organisation[];
 }
 
@@ -131,6 +161,7 @@ export interface Edition extends Entity {
   image: Image | null;
   lieux: Lieu[];
   programme_items?: ProgrammeItem[];
+  sequences?: Sequence[];
   partenaires?: Partenaire[];
   gallery: Image[];
   video_urls: string | null;

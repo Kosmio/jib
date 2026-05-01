@@ -81,6 +81,12 @@
       "target": "api::programme-item.programme-item",
       "mappedBy": "edition"
     },
+    "sequences": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::sequence.sequence",
+      "mappedBy": "edition"
+    },
     "partenaires": {
       "type": "relation",
       "relation": "manyToMany",
