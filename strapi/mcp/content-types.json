@@ -224,6 +224,10 @@
         "type": "media",
         "description": "Image principale de l'édition (bannière). Utilisez upload_media pour obtenir l'ID"
       },
+      "hero_bg_color": {
+        "type": "customField (plugin::color-picker.color)",
+        "description": "Couleur de fond du hero de la page édition. Hex (ex: '#3F2A14'). Si vide, fallback sur la couleur 'wood' de la charte. Attention au contraste : texte du hero en blanc, accents dorés"
+      },
       "gallery": {
         "type": "media multiple",
         "description": "Galerie photo (post-édition)"

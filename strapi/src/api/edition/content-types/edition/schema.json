@@ -70,6 +70,10 @@
       "multiple": false,
       "allowedTypes": ["images"]
     },
+    "hero_bg_color": {
+      "type": "customField",
+      "customField": "plugin::color-picker.color"
+    },
     "lieux": {
       "type": "component",
       "component": "edition.lieu",

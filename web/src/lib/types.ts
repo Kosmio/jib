@@ -145,6 +145,7 @@ export interface Edition extends Entity {
   description: string | null;
   inscription_url: string | null;
   image: Image | null;
+  hero_bg_color: string | null;
   lieux: Lieu[];
   sequences?: Sequence[];
   partenaires?: Partenaire[];
