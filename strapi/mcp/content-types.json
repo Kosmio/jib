@@ -348,6 +348,10 @@
         "type": "text",
         "description": "Sous-titre du hero (sous le logo JIB)"
       },
+      "hero_bg_color": {
+        "type": "customField (plugin::color-picker.color)",
+        "description": "Couleur de fond du hero. Hex (ex: '#3F2A14'). Si vide, le frontend retombe sur la couleur 'wood' de la charte. Attention au contraste : le texte du hero est blanc et les accents sont dorés"
+      },
       "pourquoi_title": {
         "type": "string",
         "description": "Section 'Pourquoi ?' — titre"

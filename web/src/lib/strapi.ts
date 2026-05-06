@@ -143,6 +143,7 @@ export type HomeFeatureCard = {
 
 export type HomePage = {
   hero_subtitle?: string;
+  hero_bg_color?: string;
   pourquoi_title?: string;
   pourquoi_intro?: string;
   pourquoi_cards?: HomeFeatureCard[];

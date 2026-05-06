@@ -106,7 +106,10 @@ const statusColors: Record<string, string> = {
 
 <Layout title="Journées de l'Innovation Filière Bois 2026 — Xylofutur" description="Journées de l'Innovation Filière Bois 2026 — Événements régionaux portés par Xylofutur réunissant TPE, PME, startups, chercheurs et financeurs. Pitchs innovation, ateliers et networking.">
   <!-- Hero -->
-  <section class="relative min-h-[75vh] bg-wood overflow-hidden flex items-center">
+  <section
+    class="relative min-h-[75vh] bg-wood overflow-hidden flex items-center"
+    style={home?.hero_bg_color ? `background-color: ${home.hero_bg_color}` : undefined}
+  >
     <!-- Wood texture overlay -->
     <div class="absolute inset-0 opacity-[0.08]" style="background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIj48ZmlsdGVyIGlkPSJuIj48ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iLjY1IiBudW1PY3RhdmVzPSI0IiBzdGl0Y2hUaWxlcz0ic3RpdGNoIi8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjIwMCIgaGVpZ2h0PSIyMDAiIGZpbHRlcj0idXJsKCNuKSIgb3BhY2l0eT0iMSIvPjwvc3ZnPg==');"></div>
 
