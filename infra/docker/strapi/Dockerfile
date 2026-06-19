@@ -2,7 +2,7 @@
 FROM node:22-alpine as build
 
 ENV CI=true
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@10.30.3 --activate
 WORKDIR /app
 
 COPY ./strapi /app
@@ -23,7 +23,7 @@ RUN pnpm build
 # ---> Runtime stage
 FROM node:22-alpine
 
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@10.30.3 --activate
 
 COPY --from=build /app /app
 
