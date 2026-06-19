@@ -454,6 +454,8 @@ export interface ApiEditionEdition extends Struct.CollectionTypeSchema {
       Schema.Attribute.Required &
       Schema.Attribute.DefaultTo<'a-venir'>;
     gallery: Schema.Attribute.Media<'images', true>;
+    hero_bg_color: Schema.Attribute.String &
+      Schema.Attribute.CustomField<'plugin::color-picker.color'>;
     image: Schema.Attribute.Media<'images'>;
     inscription_url: Schema.Attribute.String;
     lieux: Schema.Attribute.Component<'edition.lieu', true>;
@@ -525,6 +527,8 @@ export interface ApiHomePageHomePage extends Struct.SingleTypeSchema {
     dynamique_title: Schema.Attribute.String;
     editions_intro: Schema.Attribute.Text;
     editions_title: Schema.Attribute.String;
+    hero_bg_color: Schema.Attribute.String &
+      Schema.Attribute.CustomField<'plugin::color-picker.color'>;
     hero_subtitle: Schema.Attribute.Text;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
@@ -564,7 +568,7 @@ export interface ApiIntervenantIntervenant extends Struct.CollectionTypeSchema {
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
     interventions: Schema.Attribute.Relation<
-      'oneToMany',
+      'manyToMany',
       'api::intervention.intervention'
     >;
     linkedin_url: Schema.Attribute.String;
@@ -610,8 +614,8 @@ export interface ApiInterventionIntervention
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
     description: Schema.Attribute.RichText;
-    intervenant: Schema.Attribute.Relation<
-      'manyToOne',
+    intervenants: Schema.Attribute.Relation<
+      'manyToMany',
       'api::intervenant.intervenant'
     >;
     locale: Schema.Attribute.String & Schema.Attribute.Private;

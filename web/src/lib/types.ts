@@ -95,7 +95,7 @@ export interface Intervention extends Entity {
   description: string | null;
   presentation: FileMedia | null;
   order: number | null;
-  intervenant?: Intervenant | null;
+  intervenants?: Intervenant[];
   sequence?: Sequence | null;
 }
 

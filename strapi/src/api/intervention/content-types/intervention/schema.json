@@ -11,9 +11,9 @@
     "draftAndPublish": true
   },
   "attributes": {
-    "intervenant": {
+    "intervenants": {
       "type": "relation",
-      "relation": "manyToOne",
+      "relation": "manyToMany",
       "target": "api::intervenant.intervenant",
       "inversedBy": "interventions"
     },

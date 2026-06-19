@@ -25,20 +25,23 @@ const sequences = (edition.sequences || []).slice().sort(
 
 const totalInterventions = sequences.reduce((n, s) => n + (s.interventions?.length || 0), 0);
 
+const byName = (a: { name: string }, b: { name: string }) =>
+  a.name.localeCompare(b.name, "fr", { sensitivity: "base" });
+
 const dedupedIntervenants = [...new Map(
   sequences
     .flatMap((s) => s.interventions || [])
-    .map((iv) => iv.intervenant)
+    .flatMap((iv) => iv.intervenants || [])
     .filter((i) => !!i)
     .map((i) => [i!.id, i!])
-).values()];
+).values()].sort(byName);
 
 const dedupedOrganisations = [...new Map(
   [
     ...sequences.flatMap((s) => s.organisations || []),
-    ...sequences.flatMap((s) => (s.interventions || []).map((iv) => iv.intervenant?.organisation)).filter((o) => !!o) as any[],
+    ...sequences.flatMap((s) => (s.interventions || []).flatMap((iv) => (iv.intervenants || []).map((p) => p.organisation))).filter((o) => !!o) as any[],
   ].map((o) => [o.id, o])
-).values()];
+).values()].sort(byName);
 
 const editionPassed = edition.edition_status === "passee";
 
@@ -327,60 +330,67 @@ const eventJsonLd: Record<string, unknown> = {
                   {interventions.length > 0 && (
                     <ul class="divide-y divide-surface-alt -mx-1">
                       {interventions.map((iv) => {
-                        const intervenant = iv.intervenant;
-                        if (!intervenant) return null;
-                        const org = intervenant.organisation;
+                        const speakers = iv.intervenants || [];
+                        if (speakers.length === 0 && !iv.description) return null;
+                        const presLabel = speakers.map((s) => s.name).join(", ");
                         return (
-                          <li class="flex gap-4 py-4 first:pt-0 last:pb-0 px-1">
-                            <a href={`/intervenants/${intervenant.slug}`} class="flex-shrink-0">
-                              {intervenant.photo ? (
-                                <img
-                                  src={buildImageUrl(intervenant.photo.url)}
-                                  alt={intervenant.name}
-                                  class="w-16 h-16 md:w-20 md:h-20 rounded-full object-cover border border-white shadow-sm"
-                                />
-                              ) : (
-                                <div class="w-16 h-16 md:w-20 md:h-20 rounded-full bg-primary/10 flex items-center justify-center border border-white shadow-sm">
-                                  <span class="text-xl font-bold text-primary/40">{intervenant.name.split(" ").map((p) => p[0]).join("").slice(0, 2)}</span>
-                                </div>
-                              )}
-                            </a>
-                            <div class="flex-1 min-w-0">
-                              <div class="flex items-start justify-between gap-3 flex-wrap">
-                                <div>
-                                  <a href={`/intervenants/${intervenant.slug}`} class="font-semibold hover:text-primary transition-colors">
-                                    {intervenant.name}
-                                  </a>
-                                  <p class="text-sm text-muted">
-                                    {intervenant.title}
-                                    {intervenant.title && org?.name && <span class="text-muted">, </span>}
-                                    {org?.name && (
-                                      <a href={`/organisations/${org.slug}`} class="text-primary-dark hover:text-primary underline-offset-2 hover:underline transition-colors font-medium">
-                                        {org.name}
+                          <li class="py-4 first:pt-0 last:pb-0 px-1">
+                            <div class="flex items-start justify-between gap-3 flex-wrap">
+                              <div class="flex-1 min-w-0 space-y-4">
+                                {speakers.map((intervenant) => {
+                                  const org = intervenant.organisation;
+                                  return (
+                                    <div class="flex gap-4">
+                                      <a href={`/intervenants/${intervenant.slug}`} class="flex-shrink-0">
+                                        {intervenant.photo ? (
+                                          <img
+                                            src={buildImageUrl(intervenant.photo.url)}
+                                            alt={intervenant.name}
+                                            class="w-16 h-16 md:w-20 md:h-20 rounded-full object-cover border border-white shadow-sm"
+                                          />
+                                        ) : (
+                                          <div class="w-16 h-16 md:w-20 md:h-20 rounded-full bg-primary/10 flex items-center justify-center border border-white shadow-sm">
+                                            <span class="text-xl font-bold text-primary/40">{intervenant.name.split(" ").map((p) => p[0]).join("").slice(0, 2)}</span>
+                                          </div>
+                                        )}
                                       </a>
-                                    )}
-                                  </p>
-                                </div>
-                                {iv.presentation && editionPassed && (
-                                  <a
-                                    href={buildImageUrl(iv.presentation.url)}
-                                    target="_blank"
-                                    rel="noopener"
-                                    download
-                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-surface-alt text-xs font-medium text-primary-dark hover:text-primary hover:border-primary/40 transition-colors"
-                                    aria-label={`Télécharger la présentation de ${intervenant.name}`}
-                                  >
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V20a2 2 0 01-2 2z"/>
-                                    </svg>
-                                    PDF
-                                  </a>
-                                )}
+                                      <div class="min-w-0">
+                                        <a href={`/intervenants/${intervenant.slug}`} class="font-semibold hover:text-primary transition-colors">
+                                          {intervenant.name}
+                                        </a>
+                                        <p class="text-sm text-muted">
+                                          {intervenant.title}
+                                          {intervenant.title && org?.name && <span class="text-muted">, </span>}
+                                          {org?.name && (
+                                            <a href={`/organisations/${org.slug}`} class="text-primary-dark hover:text-primary underline-offset-2 hover:underline transition-colors font-medium">
+                                              {org.name}
+                                            </a>
+                                          )}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
-                              {iv.description && (
-                                <div class="mt-2 text-sm text-muted prose prose-sm max-w-none" set:html={iv.description} />
+                              {iv.presentation && editionPassed && (
+                                <a
+                                  href={buildImageUrl(iv.presentation.url)}
+                                  target="_blank"
+                                  rel="noopener"
+                                  download
+                                  class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-surface-alt text-xs font-medium text-primary-dark hover:text-primary hover:border-primary/40 transition-colors"
+                                  aria-label={`Télécharger la présentation${presLabel ? ` de ${presLabel}` : ""}`}
+                                >
+                                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V20a2 2 0 01-2 2z"/>
+                                  </svg>
+                                  PDF
+                                </a>
                               )}
                             </div>
+                            {iv.description && (
+                              <div class="mt-3 text-sm text-muted prose prose-sm max-w-none" set:html={iv.description} />
+                            )}
                           </li>
                         );
                       })}

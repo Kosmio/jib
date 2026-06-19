@@ -1081,7 +1081,7 @@ async function seedData(strapi) {
           await strapi.documents('api::intervention.intervention').create({
             data: {
               sequence: { documentId: sequence.documentId },
-              intervenant: { documentId: intervenant.documentId },
+              intervenants: [{ documentId: intervenant.documentId }],
               order: order++,
             },
             status: 'published',
@@ -1154,7 +1154,7 @@ const FRENCH_LABELS = {
     organisations: 'Organisations associées',
   },
   'api::intervention.intervention': {
-    intervenant: 'Intervenant',
+    intervenants: 'Intervenants',
     sequence: 'Séquence',
     description: 'Description (optionnelle)',
     presentation: 'Présentation (PDF, partagée après l\'événement)',

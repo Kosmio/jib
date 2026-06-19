@@ -55,9 +55,9 @@
     },
     "interventions": {
       "type": "relation",
-      "relation": "oneToMany",
+      "relation": "manyToMany",
       "target": "api::intervention.intervention",
-      "mappedBy": "intervenant"
+      "mappedBy": "intervenants"
     }
   }
 }

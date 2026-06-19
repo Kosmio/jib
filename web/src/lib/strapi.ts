@@ -40,8 +40,8 @@ export const getEditionBySlug = (
   const populate = [
     "image",
     "lieux",
-    "sequences.interventions.intervenant.photo",
-    "sequences.interventions.intervenant.organisation.logo",
+    "sequences.interventions.intervenants.photo",
+    "sequences.interventions.intervenants.organisation.logo",
     "sequences.interventions.presentation",
     "sequences.tags",
     "sequences.organisations.logo",
@@ -102,8 +102,8 @@ export const getSequencesForEdition = (
   editionDocumentId: string
 ): Promise<Responses<Sequence>> => {
   const populate = [
-    "interventions.intervenant.photo",
-    "interventions.intervenant.organisation.logo",
+    "interventions.intervenants.photo",
+    "interventions.intervenants.organisation.logo",
     "interventions.presentation",
     "tags",
     "organisations.logo",

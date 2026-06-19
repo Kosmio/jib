@@ -137,7 +137,7 @@
         "description": "Tags thématiques de l'intervenant"
       },
       "interventions": {
-        "type": "relation oneToMany",
+        "type": "relation manyToMany",
         "target": "interventions",
         "description": "Interventions (prises de parole) de cet intervenant. Relation inverse — gérée côté intervention"
       }
@@ -416,10 +416,10 @@
     "description": "Une prise de parole d'un intervenant au sein d'une séquence du programme. Peut porter une description propre et un fichier de présentation partagé après l'événement.",
     "draftAndPublish": true,
     "fields": {
-      "intervenant": {
-        "type": "relation manyToOne",
+      "intervenants": {
+        "type": "relation manyToMany",
         "target": "intervenants",
-        "description": "Intervenant qui prend la parole (obligatoire en pratique)"
+        "description": "Un ou plusieurs intervenants qui prennent la parole sur cette intervention (co-intervention possible). Au moins un en pratique"
       },
       "sequence": {
         "type": "relation manyToOne",
