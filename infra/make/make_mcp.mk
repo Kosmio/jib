@@ -22,7 +22,7 @@ docker-skeleton-mcp-lint:
 	@docker run --rm -i hadolint/hadolint hadolint - < ${SKELETON_MCP_DOCKERFILE}
 
 docker-skeleton-mcp-build:
-	@docker build --no-cache=true \
+	@docker build --pull --no-cache=true \
 		-f ${SKELETON_MCP_DOCKERFILE} -t ${SKELETON_MCP_IMG} .
 
 docker-skeleton-mcp-stage:

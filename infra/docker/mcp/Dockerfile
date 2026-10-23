@@ -1,8 +1,8 @@
 # ---> Build stage
-FROM node:22-alpine AS build
+FROM node:24-alpine AS build
 
 ENV CI=true
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable
 WORKDIR /app
 
 COPY ./strapi/mcp /app
@@ -10,9 +10,9 @@ COPY ./strapi/mcp /app
 RUN pnpm install --frozen-lockfile
 
 # ---> Runtime stage
-FROM node:22-alpine
+FROM node:24-alpine
 
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable
 
 COPY --from=build /app /app
 

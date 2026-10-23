@@ -1,8 +1,8 @@
 # ---> Build stage
-FROM node:22-bullseye AS node-build
+FROM node:24-trixie AS node-build
 
 ENV CI=true
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable
 WORKDIR /usr/src/app
 COPY ./web /usr/src/app/
 
@@ -14,12 +14,13 @@ ENV NODE_ENV=production
 RUN pnpm build
 
 # ---> Serve stage
-FROM node:22-alpine AS node-server
+FROM node:24-alpine AS node-server
 ENV NODE_ENV=production
 COPY --from=node-build /usr/src/app/dist /usr/share/web/html/dist
 COPY --from=node-build /usr/src/app/package.json /usr/share/web/html/package.json
 COPY --from=node-build /usr/src/app/pnpm-lock.yaml /usr/share/web/html/pnpm-lock.yaml
-RUN corepack enable && corepack prepare pnpm@latest --activate
+COPY --from=node-build /usr/src/app/pnpm-workspace.yaml /usr/share/web/html/pnpm-workspace.yaml
+RUN corepack enable
 WORKDIR /usr/share/web/html
 RUN pnpm install --prod --frozen-lockfile
 EXPOSE 80

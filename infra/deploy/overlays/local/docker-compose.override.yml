@@ -11,7 +11,7 @@ services:
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - ~/DockerVolumes/jib/postgres:/var/lib/postgresql
+      - ~/DockerVolumes/jib/postgres:/var/lib/postgresql/data
 
   # Disable services meant for remote deployments — run locally via pnpm dev
   strapi:

@@ -74,7 +74,7 @@ If the user picks **option 3** (code-only), skip all runtime checks (equivalent 
    - If 200: good, proceed.
    - If not and target is local (`http://localhost:4321`): tell the user to start it with `cd web && pnpm dev` and wait.
    - If not and target is remote: warn the user the server is unreachable. Offer to fall back to code-only mode.
-2. **Check Node.js is available.** Run `node --version`. Must be 18+.
+2. **Check Node.js is available.** Run `node --version`. Must be 22.19+.
 3. **Check previous audit exists.** Look for `.claude/skills/ecoconception/last-audit.json`. If found, use for delta comparison.
 
 ### Step 3: EcoIndex measurement (lighthouse-plugin-ecoindex)
@@ -227,7 +227,7 @@ docker images | grep -E "(strapi|web)" | head -5
 ```
 
 If images aren't built locally, analyze the Dockerfiles:
-- `infra/docker/website/Dockerfile`: Check build stage base image, runtime stage (node:22-alpine is good). Check what's copied to runtime stage.
+- `infra/docker/website/Dockerfile`: Check build stage base image, runtime stage (node:24-alpine is good). Check what's copied to runtime stage.
 - `infra/docker/strapi/Dockerfile`: Check if entire `/app` is copied (including node_modules dev deps, source, build cache). Recommend copying only runtime-necessary files.
 - **RGESN mapping**: RGESN 7.1 (optimize server resource usage)
 

@@ -15,23 +15,23 @@
 
 | Couche          | Technologie          | Version     |
 |-----------------|----------------------|-------------|
-| CMS             | Strapi               | 5.40        |
+| CMS             | Strapi               | 5.59        |
 | Frontend        | Astro (SSR, Node.js) | 6.0         |
 | UI              | React                | 19          |
 | Styling         | Tailwind CSS         | 4.2         |
-| Base de données | PostgreSQL           | 15          |
+| Base de données | PostgreSQL           | 17          |
 | Emails          | Brevo                | SDK v5      |
 | Anti-bot        | Altcha               | (self-hosted) |
 | Analytics       | Matomo               | (optionnel) |
-| Package manager | pnpm                 | —           |
+| Package manager | pnpm                 | 12          |
 | Conteneurs      | Docker Compose       | —           |
 
 ## Démarrage rapide
 
 ### Prérequis
 
-- **Node.js** 20+
-- **pnpm** (`corepack enable`)
+- **Node.js** 22.19+
+- **pnpm** 12 (`npm install -g pnpm@12`) — la version exacte est fixée par le champ `packageManager` de chaque `package.json`
 - **Docker** (pour PostgreSQL)
 
 ### 1. Installer les dépendances

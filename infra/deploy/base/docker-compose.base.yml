@@ -10,7 +10,7 @@ services:
   # REVERSE PROXY
   # =============================================================================
   traefik:
-    image: traefik:${TRAEFIK_VERSION:-v3.6.1}
+    image: traefik:${TRAEFIK_VERSION:-v3.7.16}
     container_name: jib-traefik
     command:
       - "--accesslog=true"
@@ -32,7 +32,7 @@ services:
   # DATABASE
   # =============================================================================
   postgres:
-    image: postgres:${POSTGRES_VERSION:-15-alpine}
+    image: postgres:${POSTGRES_VERSION:-17-alpine}
     platform: linux/amd64
     container_name: jib-postgres
     environment:
@@ -121,6 +121,5 @@ networks:
     external: true
 
 volumes:
-  postgres-data:
   traefik-certificates:
   strapi-uploads:

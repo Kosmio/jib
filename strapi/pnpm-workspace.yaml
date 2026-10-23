@@ -1,0 +1,6 @@
+allowBuilds:
+  "@swc/core": false
+  better-sqlite3: true
+  core-js-pure: false
+  esbuild: true
+  sharp: true

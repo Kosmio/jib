@@ -9,10 +9,10 @@ This file provides guidance to Claude Code when working with code in this reposi
 Full-stack project combining a Strapi v5 headless CMS with an Astro 6 SSR frontend.
 
 **Key Technologies:**
-- **Backend**: Strapi v5.40 (Node.js headless CMS, REST API, PostgreSQL)
+- **Backend**: Strapi v5.59 (Node.js headless CMS, REST API, PostgreSQL)
 - **Frontend**: Astro 6 SSR with Node.js adapter, React 19 for interactive components
 - **Styling**: Tailwind CSS v4 (CSS-based config via `@tailwindcss/vite`)
-- **Package Manager**: pnpm
+- **Package Manager**: pnpm 12, pinned by the `packageManager` field of each `package.json`; build-script approval lives in `allowBuilds` of each package's `pnpm-workspace.yaml`
 - **Infrastructure**: Docker Compose with base + overlay pattern, multi-stage Dockerfiles
 
 ## Project Structure

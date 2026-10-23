@@ -12,7 +12,7 @@ services:
 
   postgres:
     volumes:
-      - postgres-data:/var/lib/postgresql
+      - ~/jib/data/postgres:/var/lib/postgresql/data
     restart: unless-stopped
     ports:
       - "127.0.0.1:5432:5432"
@@ -60,7 +60,5 @@ services:
     restart: unless-stopped
 
 volumes:
-  postgres-data:
-    name: jib-postgres-data
   traefik-certificates:
     name: jib-traefik-certificates

@@ -22,7 +22,7 @@ docker-jib-web-lint:
 	@docker run --rm -i hadolint/hadolint hadolint - < ${JIB_WEB_DOCKERFILE}
 
 docker-jib-web-build:
-	@docker build --no-cache=true \
+	@docker build --pull --no-cache=true \
 		-f ${JIB_WEB_DOCKERFILE} -t ${JIB_WEB_IMG} .
 
 docker-jib-web-stage:

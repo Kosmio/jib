@@ -26,8 +26,9 @@ infra/
 │   └── scripts/
 │       └── deploy.sh                   # Unified deployment script
 ├── docker/
-│   ├── strapi/Dockerfile               # Strapi multi-stage build
-│   └── website/Dockerfile              # Astro multi-stage build
+│   ├── strapi/Dockerfile               # Strapi two-stage build (Node 24)
+│   ├── website/Dockerfile              # Astro two-stage build (Node 24)
+│   └── mcp/Dockerfile                  # MCP server two-stage build (Node 24)
 └── make/
     ├── make_strapi.mk                  # Strapi build targets
     └── make_web.mk                     # Web build targets
@@ -60,7 +61,7 @@ This means a single domain serves the frontend, CMS, and MCP. Example:
 ### Configuration
 
 Traefik-related env vars:
-- `TRAEFIK_VERSION` — Traefik image version (default: `v3.6.1`)
+- `TRAEFIK_VERSION` — Traefik image version (default: `v3.7.16`)
 - `ACME_EMAIL` — email for Let's Encrypt certificate notifications
 - `HOST_NAME` — the domain name for routing rules
 
@@ -86,6 +87,8 @@ Each environment directory has:
 - `docker-compose.override.yml` — service overrides (ports, volumes, restart policies, resource limits)
 - `.env.<env>` — environment variables for that deployment
 
+Postgres data mounts at the image's `PGDATA`, `/var/lib/postgresql/data` for PostgreSQL 17 and below. A mount on any other path leaves the data in an anonymous volume that the next `docker compose down` orphans. From PostgreSQL 18 the image moves `PGDATA` to `/var/lib/postgresql/18/docker` and its `VOLUME` to `/var/lib/postgresql`, so a major-version bump moves the mount with it. A major-version bump also needs a dump and restore: see `infra/deploy/POSTGRES_17_UPGRADE.md`.
+
 **Local overlay:**
 - Only Postgres runs in Docker
 - Strapi and web are disabled (`profiles: [disabled]`) — they run on the host via `pnpm`
@@ -95,7 +98,7 @@ Each environment directory has:
 **Dev overlay:**
 - All services run in Docker
 - `version: '3.8'` header (required for some Docker Compose versions)
-- Named volumes for data persistence
+- Postgres data bind-mounted to `~/jib/data/postgres` on the host, outside `~/jib/infra/deploy` where each deploy extracts its files; the other services use named volumes
 - `restart: unless-stopped`
 - Postgres bound to `127.0.0.1:5432` (localhost only)
 
@@ -103,7 +106,7 @@ Each environment directory has:
 - All services run in Docker
 - `restart: always`
 - Memory limits on all services (e.g., postgres 2G, strapi 1G, web 1G)
-- Named volumes
+- Postgres data bind-mounted to `~/jib/data/postgres` on the host, as in dev; the other services use named volumes
 - Postgres bound to `127.0.0.1:5432`
 
 ---
@@ -112,26 +115,30 @@ Each environment directory has:
 
 ### Multi-stage builds
 
-Both services use multi-stage Dockerfiles to minimize image size:
+Every service uses a two-stage Dockerfile: a build stage that installs dependencies and builds, and a runtime stage that copies the result.
 
 ```dockerfile
-# Build stage: install deps and build
-FROM node:20-alpine as build
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# Build stage
+FROM node:24-alpine AS build
+RUN corepack enable
 WORKDIR /app
 COPY ./<service> /app
 RUN pnpm install
 # ... build step
 
-# Runtime stage: copy built output only
-FROM node:20-alpine
+# Runtime stage
+FROM node:24-alpine
 COPY --from=build /app /app
+CMD ["node_modules/.bin/strapi", "start"]
 ```
 
 **Rules:**
-- Use `node:20-alpine` for Strapi (lightweight, native deps compile fine on Alpine)
-- Use `node:20-bullseye` for web if native dependencies need glibc (otherwise Alpine is fine)
-- Always enable pnpm via corepack in both stages
+- Use `node:24-alpine` for Strapi and MCP (lightweight, native deps compile fine on Alpine)
+- Use `node:24-trixie` for the web build stage (full toolchain), `node:24-alpine` for its runtime stage
+- Never use a base tag suffixed with a distribution or Alpine version that is no longer current (`bullseye`, `alpine3.19`): those tags stop receiving Node updates
+- Enable pnpm via corepack (`RUN corepack enable`) in every stage that runs `pnpm`, without naming a version: corepack takes it from the `packageManager` field of the package's `package.json`
+- `CMD` starts the app without pnpm (`node …` or the package's `node_modules/.bin` entry): pnpm 12 downloads its native binary on first use, which would make every container start depend on the npm registry
+- pnpm settings, such as `allowBuilds`, live in each package's `pnpm-workspace.yaml`: copy it into every stage that runs `pnpm install`
 - `EXPOSE` the correct port (1337 for Strapi, 80 for web)
 - Set `NODE_ENV` via build arg, not hardcoded
 

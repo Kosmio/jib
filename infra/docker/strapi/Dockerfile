@@ -1,8 +1,8 @@
 # ---> Build stage
-FROM node:22-alpine as build
+FROM node:24-alpine AS build
 
 ENV CI=true
-RUN corepack enable && corepack prepare pnpm@10.30.3 --activate
+RUN corepack enable
 WORKDIR /app
 
 COPY ./strapi /app
@@ -21,9 +21,7 @@ ENV STRAPI_ADMIN_BACKEND_URL=${STRAPI_ADMIN_BACKEND_URL}
 RUN pnpm build
 
 # ---> Runtime stage
-FROM node:22-alpine
-
-RUN corepack enable && corepack prepare pnpm@10.30.3 --activate
+FROM node:24-alpine
 
 COPY --from=build /app /app
 
@@ -32,4 +30,4 @@ EXPOSE 1337
 WORKDIR /app
 ENV NODE_ENV=production
 
-CMD ["pnpm", "start"]
+CMD ["node_modules/.bin/strapi", "start"]
