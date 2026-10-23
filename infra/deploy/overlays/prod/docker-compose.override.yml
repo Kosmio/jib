@@ -87,5 +87,3 @@ services:
 volumes:
   traefik-certificates:
     name: jib-traefik-certificates
-  strapi-uploads:
-    name: jib-strapi-uploads

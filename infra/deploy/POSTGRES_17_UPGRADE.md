@@ -7,13 +7,13 @@ For jib deployments that ran `postgres:15-alpine`.
 - A PostgreSQL 15 data directory cannot be opened by PostgreSQL 17: the data has to be dumped and restored.
 - The PostgreSQL 15 overlays mounted the `jib-postgres-data` volume at `/var/lib/postgresql`, while the image keeps its data in `/var/lib/postgresql/data`. The database therefore lives in an **anonymous volume**, and `jib-postgres-data` only holds an empty `data/` directory.
 
-The dev and prod overlays now bind-mount `~/jib/data/postgres` on the host at `/var/lib/postgresql/data`. The procedure fills that folder with a PostgreSQL 17 copy of the database **before** deploying, so the new `jib-postgres` container starts on the restored data and Strapi never runs on an empty database. The PostgreSQL 15 data is never modified: it stays in its anonymous volume until the last step.
+The dev and prod overlays now bind-mount `~/jib/data/postgres` on the host at `/var/lib/postgresql/data`. The procedure fills that folder with a PostgreSQL 17 copy of the database **before** deploying, so the new `jib-postgres` container starts on the restored data and Strapi never runs on an empty database. The PostgreSQL 15 data is never modified: it stays in its anonymous volume until the last step. The same deploy moves Strapi uploads from the `jib-strapi-uploads` volume to `~/jib/data/uploads`, so step 4 copies them.
 
-Deploying without the procedure loses nothing either: PostgreSQL 17 starts on an empty `~/jib/data/postgres`, Strapi seeds its initial content, and the real data waits in the anonymous volume. See [Recovering after an unprepared deploy](#recovering-after-an-unprepared-deploy).
+Deploying without the procedure loses nothing either: PostgreSQL 17 starts on an empty `~/jib/data/postgres`, Strapi seeds its initial content, media files answer 404, and the real data waits in the anonymous volume and in `jib-strapi-uploads`. See [Recovering after an unprepared deploy](#recovering-after-an-unprepared-deploy).
 
 ## Remote environments (dev, prod)
 
-Run on the deploy server over SSH. Strapi and MCP stay stopped from step 1 until the deploy in step 4, so no edit can land between the dump and the switch: the site is down for that window.
+Run on the deploy server over SSH. Strapi and MCP stay stopped from step 1 until the deploy in step 4, so no edit or upload can land between the copies and the switch: the site is down for that window.
 
 ### 1. Dump the database
 
@@ -72,9 +72,19 @@ Then stop the temporary container. The data stays in `~/jib/data/postgres`.
 docker stop jib-pg17-restore && docker rm jib-pg17-restore
 ```
 
-### 4. Deploy the new version
+### 4. Copy the uploads into their host folder
 
-Run the **Deploy** GitHub Actions workflow with the new version, `reset_db` unchecked. The deploy recreates `jib-postgres` on PostgreSQL 17 with `~/jib/data/postgres`, and Strapi starts on the restored data.
+Strapi is already stopped, so the volume no longer changes.
+
+```sh
+test ! -e ~/jib/data/uploads && mkdir -p ~/jib/data/uploads
+docker run --rm -v jib-strapi-uploads:/from:ro -v ~/jib/data/uploads:/to alpine cp -a /from/. /to/
+docker run --rm -v jib-strapi-uploads:/from:ro -v ~/jib/data/uploads:/to:ro alpine diff -r /from /to && echo identical
+```
+
+### 5. Deploy the new version
+
+Run the **Deploy** GitHub Actions workflow with the new version, `reset_db` unchecked. The deploy recreates `jib-postgres` on PostgreSQL 17 with `~/jib/data/postgres`, and Strapi starts on the restored data and uploads.
 
 ```sh
 docker exec jib-postgres psql -U strapi -d strapi -Atc "show server_version"   # 17.x
@@ -82,18 +92,18 @@ docker exec jib-postgres psql -U strapi -d strapi -Atc "show server_version"   #
 
 Check the content in the Strapi admin and on the site.
 
-### 5. Clean up
+### 6. Clean up
 
-Once the content is verified, remove the PostgreSQL 15 anonymous volume noted in step 2 and the `jib-postgres-data` volume, which only held an empty `data/` directory. Keep the dump off the server or delete it.
+Once the content and its images are verified, remove the PostgreSQL 15 anonymous volume noted in step 2, the `jib-postgres-data` volume, which only held an empty `data/` directory, and the `jib-strapi-uploads` volume. Keep the dump off the server or delete it.
 
 ```sh
 docker run --rm -v jib-postgres-data:/d alpine find /d -mindepth 2   # must print nothing
-docker volume rm <anonymous volume name> jib-postgres-data
+docker volume rm <anonymous volume name> jib-postgres-data jib-strapi-uploads
 ```
 
 ### Rolling back
 
-Until step 5 the PostgreSQL 15 anonymous volume and the dump are untouched. Deploy the previous release, then restore the dump into its fresh PostgreSQL 15 database:
+Until step 6 the PostgreSQL 15 anonymous volume, the uploads volume and the dump are untouched. Deploy the previous release, then restore the dump into its fresh PostgreSQL 15 database:
 
 ```sh
 docker stop jib-strapi jib-mcp
@@ -138,13 +148,15 @@ docker exec pg15-rescue pg_dump -U strapi -d strapi -Fc > $B/strapi-pg15.dump
 docker rm -f pg15-rescue
 ```
 
-Then restore it over the seeded database:
+Stop Strapi, copy the uploads into their folder, which already holds the seed's images (`diff` lists those as `Only in /to`), then restore the dump over the seeded database:
 
 ```sh
 docker stop jib-strapi jib-mcp
+docker run --rm -v jib-strapi-uploads:/from:ro -v ~/jib/data/uploads:/to alpine cp -a /from/. /to/
+docker run --rm -v jib-strapi-uploads:/from:ro -v ~/jib/data/uploads:/to:ro alpine diff -r /from /to
 docker exec jib-postgres psql -U strapi -d strapi -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
 docker exec -i jib-postgres pg_restore -U strapi -d strapi --no-owner --exit-on-error < $B/strapi-pg15.dump
 docker start jib-strapi jib-mcp
 ```
 
-The seed's images stay in the `jib-strapi-uploads` volume, referenced by no media entry.
+The seed's images stay in `~/jib/data/uploads`, referenced by no media entry.

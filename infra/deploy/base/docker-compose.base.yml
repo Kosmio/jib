@@ -73,7 +73,7 @@ services:
       ALTCHA_HMAC_KEY: ${ALTCHA_HMAC_KEY:-}
       RESTORE_MISSING_MEDIA: ${RESTORE_MISSING_MEDIA:-}
     volumes:
-      - strapi-uploads:/app/public/uploads
+      - ~/jib/data/uploads:/app/public/uploads
     depends_on:
       - postgres
     networks:
@@ -122,4 +122,3 @@ networks:
 
 volumes:
   traefik-certificates:
-  strapi-uploads:

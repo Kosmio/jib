@@ -141,6 +141,47 @@ show_info() {
   echo "============================================="
 }
 
+# Fail unless every running container keeps its data in a host folder. A named
+# volume dies with `kill --volumes`, and an anonymous one is left behind by the
+# next recreate, which is where data lands when a mount misses the image's
+# VOLUME path (Postgres PGDATA).
+check_data_mounts() {
+  local project="jib-$ENVIRONMENT"
+  local failed=false
+  local container mounts path type dest best best_type where
+  for container in $(docker ps --filter "label=com.docker.compose.project=$project" --format '{{.Names}}'); do
+    mounts=$(docker inspect "$container" \
+      --format '{{range .Mounts}}{{.Type}} {{.Destination}} {{.Name}}{{println}}{{end}}')
+
+    while read -r type dest _; do
+      echo "Error: $container keeps $dest in an anonymous volume"
+      failed=true
+    done < <(grep -E '^volume [^ ]+ [0-9a-f]{64}$' <<< "$mounts" || true)
+
+    case "$container" in
+      "jib-postgres")
+        path=$(docker inspect "$container" --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^PGDATA=//p') ;;
+      "jib-strapi") path=/app/public/uploads ;;
+      *) continue ;;
+    esac
+    best="" best_type=""
+    while read -r type dest _; do
+      if [[ "$path" == "$dest" || "$path" == "$dest"/* ]] && (( ${#dest} > ${#best} )); then
+        best=$dest best_type=$type
+      fi
+    done <<< "$mounts"
+    if [[ "$best_type" != bind ]]; then
+      where=${best_type:+a $best_type}
+      echo "Error: $container keeps $path in ${where:-the container layer}, not a host folder"
+      failed=true
+    fi
+  done
+  if $failed; then
+    echo "Bind-mount a host folder on each path above in the compose files."
+    exit 1
+  fi
+}
+
 # Main actions
 case "$ACTION" in
   up)
@@ -160,6 +201,7 @@ case "$ACTION" in
     # Without this, `up` keeps the cached image when the tag (e.g. 0.1.0) hasn't changed.
     compose_cmd pull $SERVICES 2>/dev/null || true
     compose_cmd up -d --force-recreate $NO_DEPS $SERVICES ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
+    check_data_mounts
     echo "Services started. Use './deploy.sh $ENVIRONMENT ps' to see status."
     ;;
 

@@ -87,6 +87,12 @@ Each environment directory has:
 - `docker-compose.override.yml` — service overrides (ports, volumes, restart policies, resource limits)
 - `.env.<env>` — environment variables for that deployment
 
+Data the project cannot recreate lives in host folders, never in Docker volumes, so `deploy.sh kill --volumes` cannot delete it. On the deploy server they sit under `~/jib/data`, outside `~/jib/infra/deploy` which every deploy rewrites:
+- Postgres: `~/jib/data/postgres`, mounted in the dev and prod overlays (locally `~/DockerVolumes/jib/postgres`)
+- Strapi uploads: `~/jib/data/uploads` at `/app/public/uploads`, mounted in the base compose
+
+`deploy.sh up` fails when either is not on a host folder, or when any container keeps data in an anonymous volume.
+
 Postgres data mounts at the image's `PGDATA`, `/var/lib/postgresql/data` for PostgreSQL 17 and below. A mount on any other path leaves the data in an anonymous volume that the next `docker compose down` orphans. From PostgreSQL 18 the image moves `PGDATA` to `/var/lib/postgresql/18/docker` and its `VOLUME` to `/var/lib/postgresql`, so a major-version bump moves the mount with it. A major-version bump also needs a dump and restore: see `infra/deploy/POSTGRES_17_UPGRADE.md`.
 
 **Local overlay:**
@@ -98,7 +104,7 @@ Postgres data mounts at the image's `PGDATA`, `/var/lib/postgresql/data` for Pos
 **Dev overlay:**
 - All services run in Docker
 - `version: '3.8'` header (required for some Docker Compose versions)
-- Postgres data bind-mounted to `~/jib/data/postgres` on the host, outside `~/jib/infra/deploy` where each deploy extracts its files; the other services use named volumes
+- Postgres data and uploads in host folders under `~/jib/data`; a named volume for TLS certificates
 - `restart: unless-stopped`
 - Postgres bound to `127.0.0.1:5432` (localhost only)
 
@@ -106,7 +112,7 @@ Postgres data mounts at the image's `PGDATA`, `/var/lib/postgresql/data` for Pos
 - All services run in Docker
 - `restart: always`
 - Memory limits on all services (e.g., postgres 2G, strapi 1G, web 1G)
-- Postgres data bind-mounted to `~/jib/data/postgres` on the host, as in dev; the other services use named volumes
+- Postgres data and uploads in host folders under `~/jib/data`, as in dev
 - Postgres bound to `127.0.0.1:5432`
 
 ---
