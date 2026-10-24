@@ -10,7 +10,7 @@ COPY ./strapi/mcp /app
 RUN pnpm install --frozen-lockfile
 
 # ---> Runtime stage
-FROM node:24-alpine
+FROM node:24.22.1-alpine
 
 RUN corepack enable
 
