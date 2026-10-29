@@ -3,8 +3,7 @@
 /**
  * Données de test de l'espace (phase 1, lot 3), créées par le Document Service sur la base de test : éditions,
  * programme, Attendee. Toutes les personnes et adresses sont fictives (@example.org). Les modèles viennent des
- * schémas du lot 2 (02-modele-donnees.md) : tant qu'ils n'existent pas, ces fonctions échouent, et seuls des tests
- * `pending('lot …')` les appellent.
+ * schémas du lot 2 (02-modele-donnees.md).
  */
 
 const recette = require('../../scripts/espace/fixtures/recette.json');

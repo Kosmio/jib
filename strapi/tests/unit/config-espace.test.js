@@ -3,7 +3,8 @@
 /**
  * Configuration de l'espace en phase 1 (section 4.3 du plan, A-04, A-05, A-08, NF-06, NF-52, I-23) : `config/server.js`
  * (proxy, cron, espace, helloasso), `config/middlewares.js` (CORS restreint aux origines du front), `config/cron-tasks.js`
- * et `.env.example`. Lue par l'aide `env` simulée, sans démarrer Strapi. Tests d'abord : lot 2 (configuration), lot 4 (tâches).
+ * et `.env.example`. Lue par l'aide `env` simulée, sans démarrer Strapi. Les tâches de `cron-tasks.js` n'appellent que des
+ * services (purge avec délai de grâce : A-21, lot 6b).
  */
 
 const { describe, it } = require('node:test');
@@ -12,13 +13,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { makeEnv } = require('../helpers/config-env');
-const { pending } = require('../helpers/pending');
 
 const CONFIG = path.resolve(__dirname, '../../config');
 const server = (vars = {}) => require('../../config/server')({ env: makeEnv(vars) });
 const middlewares = (vars = {}) => require('../../config/middlewares')({ env: makeEnv(vars) });
 
-describe('config/server.js : section espace (A-05, I-23, NF-06)', pending('lot 2'), () => {
+describe('config/server.js : section espace (A-05, I-23, NF-06)', () => {
   it('donne les valeurs locales par défaut : localhost:4321, aucun organisateur', () => {
     assert.deepEqual(server().espace, { publicUrl: 'http://localhost:4321', organizerEmails: [], corsOrigins: ['http://localhost:4321'] });
   });
@@ -39,7 +39,7 @@ describe('config/server.js : section espace (A-05, I-23, NF-06)', pending('lot 2
   });
 });
 
-describe('config/server.js : HelloAsso (I-10, NF-53)', pending('lot 2'), () => {
+describe('config/server.js : HelloAsso (I-10, NF-53)', () => {
   it('est vide par défaut : une synchronisation sans réglage écrit un SyncRun HELLOASSO_NOT_CONFIGURED', () => {
     const { helloasso } = server();
     assert.ok(!helloasso.apiBase && !helloasso.clientId && !helloasso.clientSecret);
@@ -51,7 +51,7 @@ describe('config/server.js : HelloAsso (I-10, NF-53)', pending('lot 2'), () => {
   });
 });
 
-describe('config/server.js : proxy et tâches planifiées (A-04, A-08)', pending('lot 2'), () => {
+describe('config/server.js : proxy et tâches planifiées (A-04, A-08)', () => {
   it('ne fait pas confiance à X-Forwarded-For par défaut', () => {
     assert.equal(server().proxy.koa, false);
   });
@@ -80,7 +80,7 @@ describe('config/server.js : acquis de la phase 0 conservés', () => {
   });
 });
 
-describe('config/middlewares.js : CORS restreint (A-05, NF-04)', pending('lot 2'), () => {
+describe('config/middlewares.js : CORS restreint (A-05, NF-04)', () => {
   const cors = (vars) => middlewares(vars).find((entry) => entry?.name === 'strapi::cors');
 
   it('est une fonction de { env } qui rend la liste des intergiciels de Strapi dans le même ordre', () => {
@@ -113,14 +113,14 @@ function scheduleOf(tasks) {
   });
 }
 
-describe('config/cron-tasks.js : fichier prévu par le lot 2', pending('lot 2'), () => {
+describe('config/cron-tasks.js : fichier prévu par le lot 2', () => {
   it('existe et s’importe sans rien exécuter', () => {
     assert.ok(fs.existsSync(path.join(CONFIG, 'cron-tasks.js')));
     assert.equal(typeof require('../../config/cron-tasks'), 'object');
   });
 });
 
-describe('config/cron-tasks.js : synchronisation toutes les 15 minutes et purge quotidienne (A-08, I-12, I-20)', pending('lot 4'), () => {
+describe('config/cron-tasks.js : synchronisation toutes les 15 minutes et purge quotidienne (A-08, I-12, I-20)', () => {
   const tasks = () => scheduleOf(require('../../config/cron-tasks'));
 
   it('planifie la synchronisation HelloAsso `*/15 * * * *` en Europe/Paris', () => {
@@ -142,7 +142,68 @@ describe('config/cron-tasks.js : synchronisation toutes les 15 minutes et purge 
   });
 });
 
-describe('.env.example : variables de la phase 1 (NF-06)', pending('lot 2'), () => {
+describe('config/cron-tasks.js : les tâches n’appellent que des services, aucune logique dans le cron (section 4.3 du plan)', () => {
+  const taskOf = (rule) => scheduleOf(require('../../config/cron-tasks')).find((entry) => entry.rule === rule).task;
+
+  /**
+   * Strapi simulé : `service(uid)` rend un service enregistreur, `log.error` consigne ; tout autre accès (`db`, `documents`,
+   * `entityService`…) lève, ce qui prouve que la tâche ne fait pas elle-même de requête.
+   */
+  function fakeStrapi({ failWith } = {}) {
+    const calls = [];
+    const errors = [];
+    const run = (name) => async (...args) => {
+      calls.push([name, args]);
+      if (failWith) throw failWith;
+      return 3;
+    };
+    const services = { 'api::espace.sync': { runAll: run('sync.runAll') }, 'api::espace.tokens': { purgeExpired: run('tokens.purgeExpired') } };
+    const target = { service: (uid) => services[uid], log: { error: (message) => errors.push(String(message)) } };
+    const strapi = new Proxy(target, {
+      get(object, property) {
+        if (property in object) return object[property];
+        throw new Error(`accès inattendu à strapi.${String(property)} : la tâche doit passer par un service`);
+      },
+    });
+    return { strapi, calls, errors };
+  }
+
+  it('la synchronisation appelle sync.runAll() sans argument et rien d’autre', async () => {
+    const { strapi, calls, errors } = fakeStrapi();
+    await taskOf('*/15 * * * *')({ strapi });
+    assert.deepEqual(calls, [['sync.runAll', []]]);
+    assert.deepEqual(errors, []);
+  });
+
+  it('la purge appelle tokens.purgeExpired() sans argument (le délai de grâce de 7 jours est celui du service, A-21) et rien d’autre', async () => {
+    const { strapi, calls, errors } = fakeStrapi();
+    await taskOf('0 4 * * *')({ strapi });
+    assert.deepEqual(calls, [['tokens.purgeExpired', []]]);
+    assert.deepEqual(errors, [], 'la tâche a accédé à autre chose qu’un service');
+  });
+
+  it('une erreur de la synchronisation est journalisée et ne remonte jamais', async () => {
+    const { strapi, errors } = fakeStrapi({ failWith: new Error('HelloAsso en panne') });
+    await assert.doesNotReject(taskOf('*/15 * * * *')({ strapi }));
+    assert.equal(errors.length, 1);
+    assert.match(errors[0], /HelloAsso en panne/);
+  });
+
+  it('une erreur de la purge est journalisée et ne remonte jamais', async () => {
+    const { strapi, calls, errors } = fakeStrapi({ failWith: new Error('base indisponible') });
+    await assert.doesNotReject(taskOf('0 4 * * *')({ strapi }));
+    assert.equal(calls.length, 1, 'la purge doit appeler le service avant d’échouer');
+    assert.equal(errors.length, 1);
+    assert.match(errors[0], /base indisponible/);
+  });
+
+  it('le fichier ne contient plus aucune requête : ni strapi.db, ni query, ni Document Service, ni new Date()', () => {
+    const source = fs.readFileSync(path.join(CONFIG, 'cron-tasks.js'), 'utf8');
+    assert.doesNotMatch(source, /strapi\.db|\.query\(|deleteMany|\.documents\(|entityService|new Date\(/);
+  });
+});
+
+describe('.env.example : variables de la phase 1 (NF-06)', () => {
   const text = fs.readFileSync(path.resolve(__dirname, '../../.env.example'), 'utf8');
   const value = (key) => text.match(new RegExp(`^${key}=(.*)$`, 'm'))?.[1];
 
@@ -177,7 +238,7 @@ describe('.env.example : aucun secret réel (NF-06)', () => {
  * `infra/deploy/base/docker-compose.base.yml`, réglée dans les overlays dev et prod, et le secret HelloAsso est fusionné par
  * `deploy.yml`. Une variable oubliée ne casse rien en test et reste vide sur le serveur : ces tests la rattrapent.
  */
-describe('déploiement : variables de l’espace transmises à Strapi (NF-06)', pending('lot 2'), () => {
+describe('déploiement : variables de l’espace transmises à Strapi (NF-06)', () => {
   const REPO = path.resolve(__dirname, '../../..');
   const read = (file) => fs.readFileSync(path.join(REPO, file), 'utf8');
   const SPACE_VARIABLES = ['PUBLIC_URL', 'ORGANIZER_EMAILS', 'CORS_ORIGINS', 'IS_PROXIED', 'CRON_ENABLED', 'HELLOASSO_API_BASE', 'HELLOASSO_CLIENT_ID', 'HELLOASSO_CLIENT_SECRET'];

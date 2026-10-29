@@ -10,7 +10,6 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { pending } = require('../helpers/pending');
 
 const limiter = (options) => require('../../src/api/espace/lib/rate-limit').createRateLimiter(options);
 
@@ -23,7 +22,7 @@ function clock(startMs = Date.UTC(2026, 9, 29, 10, 0, 0)) {
 
 const MINUTE = 60_000;
 
-describe('createRateLimiter : valeurs par défaut (5 demandes par 15 minutes)', pending('lot 5'), () => {
+describe('createRateLimiter : valeurs par défaut (5 demandes par 15 minutes)', () => {
   it('admet 5 demandes puis refuse la 6e (T-04)', () => {
     const { now } = clock();
     const limit = limiter({ now });
@@ -58,7 +57,7 @@ describe('createRateLimiter : valeurs par défaut (5 demandes par 15 minutes)', 
   });
 });
 
-describe('createRateLimiter : fenêtre glissante', pending('lot 5'), () => {
+describe('createRateLimiter : fenêtre glissante', () => {
   it('libère les demandes une à une, pas toutes à la fois', () => {
     const time = clock();
     const limit = limiter({ now: time.now });
@@ -73,7 +72,7 @@ describe('createRateLimiter : fenêtre glissante', pending('lot 5'), () => {
   });
 });
 
-describe('createRateLimiter : réglages et remise à zéro', pending('lot 5'), () => {
+describe('createRateLimiter : réglages et remise à zéro', () => {
   it('respecte max et windowMs', () => {
     const time = clock();
     const limit = limiter({ max: 2, windowMs: 1000, now: time.now });

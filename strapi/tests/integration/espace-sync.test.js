@@ -1,23 +1,26 @@
 'use strict';
 
 /**
- * Synchronisation HelloAsso, lot 4 de la phase 1 (tests d'abord) : I-10 à I-12, I-14, Q-03, Q-15, R-18, R-31, NF-11, NF-13,
+ * Synchronisation HelloAsso, lot 4 de la phase 1 : I-10 à I-12, I-14, Q-03, Q-15, R-18, R-31, NF-11, NF-13,
  * T-05, T-06, A-16, A-17, A-19, plus le socle d'envoi (I-30, I-31) et les tâches planifiées (A-08).
  *
  * Les tests appellent les services (`api::espace.sync` `run(editionDocumentId, { now })`, `api::espace.meetings`
  * `cancelForAttendee`, `api::espace.mailer` `send`) contre le faux HelloAsso démarré en module : aucun réseau hors localhost,
  * aucun e-mail réel. Le parcours par les routes, en session organisateur, est dans `espace-admin.test.js` (lots 4 et 5).
+ *
+ * Corrections de la revue, lot 6b (section 11 du plan), livrées : rachat d'un billet par un Attendee annulé
+ * (A-22), édition fermée et `meeting-cancelled` (NF-52), délai de réponse de HelloAsso (FETCH_FAILED).
  */
 
-const { describe, it } = require('node:test');
+const { after, before, describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const http = require('node:http');
 
 const { buildEdgeCaseItems } = require('../../scripts/espace/fake-helloasso');
 const defaultItems = require('../../scripts/espace/fixtures/helloasso-items.json');
-const { sleep, useEspace } = require('../helpers/espace');
+const { sleep, startEspace, useEspace } = require('../helpers/espace');
 const { UID, createAttendee, createEdition, createProgram, link } = require('../helpers/espace-data');
-const { pending } = require('../helpers/pending');
 
 const clone = (value) => structuredClone(value);
 const itemFrom = (id) => clone(defaultItems.find((item) => item.id === id));
@@ -40,7 +43,7 @@ describe('synchronisation HelloAsso contre le faux (lot 4)', { timeout: 300_000 
   const useItems = (items) => espace().fake.setItems(items);
   const counts = (result) => [result.created, result.updated, result.cancelled];
 
-  describe('première synchronisation et idempotence (I-11, I-12, T-05, Q-15)', pending('lot 4'), () => {
+  describe('première synchronisation et idempotence (I-11, I-12, T-05, Q-15)', () => {
     it('importe les 16 billets actifs du jeu de recette et ignore le billet Canceled inconnu, sans erreur', async () => {
       useItems(defaultItems);
       const edition = await newEdition();
@@ -182,7 +185,7 @@ describe('synchronisation HelloAsso contre le faux (lot 4)', { timeout: 300_000 
     });
   });
 
-  describe('annulation et réactivation (Q-15, R-18)', pending('lot 4'), () => {
+  describe('annulation et réactivation (Q-15, R-18)', () => {
     it('un billet passé à Canceled annule l’Attendee (status cancelled), une seule fois', async () => {
       useItems(defaultItems);
       const edition = await newEdition({ enabled: false });
@@ -236,7 +239,7 @@ describe('synchronisation HelloAsso contre le faux (lot 4)', { timeout: 300_000 
     });
   });
 
-  describe('mises à jour : champs édités et champs réservés (R-31)', pending('lot 4'), () => {
+  describe('mises à jour : champs édités et champs réservés (R-31)', () => {
     const withAnswer = (item, name, answer) => {
       item.customFields.find((field) => field.name === name).answer = answer;
       return item;
@@ -295,7 +298,7 @@ describe('synchronisation HelloAsso contre le faux (lot 4)', { timeout: 300_000 
     });
   });
 
-  describe('verrou de synchronisation (A-16)', pending('lot 4'), () => {
+  describe('verrou de synchronisation (A-16)', () => {
     const isRunning = (error) => error?.code === 'SYNC_RUNNING' || error?.status === 409;
 
     it('deux synchronisations simultanées : l’une réussit, l’autre est refusée SYNC_RUNNING (409)', async () => {
@@ -344,7 +347,7 @@ describe('synchronisation HelloAsso contre le faux (lot 4)', { timeout: 300_000 
     });
   });
 
-  describe('A-17 : e-mail welcome', pending('lot 4'), () => {
+  describe('A-17 : e-mail welcome', () => {
     const welcomeMails = (edition, attendees, since) => espace().outbox().slice(since).filter((mail) => attendees.some((attendee) => attendee.email === mail.to.email) && /\/espace\/verifier/.test(mail.text));
 
     it('part une fois vers chaque Attendee créé quand l’espace est ouvert, avec un lien de 72 heures vers l’accueil de l’édition', async () => {
@@ -375,12 +378,15 @@ describe('synchronisation HelloAsso contre le faux (lot 4)', { timeout: 300_000 
     it('ne part pas deux fois : la seconde synchronisation n’envoie rien de plus (EmailLog et boîte de sortie)', async () => {
       useItems(defaultItems);
       const edition = await newEdition();
+      const since = espace().outbox().length;
       await run(edition);
       await sleep(500);
-      const sent = espace().outbox().length;
+      const attendees = await attendeesOf(edition);
+      const sent = welcomeMails(edition, attendees, since).length;
+      assert.equal(sent, 16);
       await run(edition);
       await sleep(500);
-      assert.equal(espace().outbox().length, sent);
+      assert.equal(welcomeMails(edition, attendees, since).length, sent);
       assert.equal((await logsOf(edition, 'welcome')).length, 16);
     });
 
@@ -391,7 +397,7 @@ describe('synchronisation HelloAsso contre le faux (lot 4)', { timeout: 300_000 
       const since = espace().outbox().length;
       await run(edition);
       await sleep(500);
-      assert.equal(espace().outbox().length, since, 'e-mail envoyé alors que l’espace est fermé');
+      assert.deepEqual(welcomeMails(edition, await attendeesOf(edition), since), [], 'e-mail envoyé alors que l’espace est fermé');
       assert.equal((await logsOf(edition, 'welcome')).length, 0);
 
       await app.documents(UID.edition).update({ documentId: edition.documentId, data: { participantSpaceEnabled: true } });
@@ -446,16 +452,166 @@ describe('synchronisation HelloAsso contre le faux (lot 4)', { timeout: 300_000 
     });
   });
 
-  describe('T-06, R-18 : annulation et rendez-vous annulés avec meeting-cancelled', pending('lot 4'), () => {
+  describe('A-22 : un Attendee annulé qui rachète un billet est réactivé (lot 6b, section 11 du plan, défaut 3)', () => {
+    const LEA = 'lea.ducasse@example.org';
+    /** Les billets de recette, le billet 100001 de Léa annulé, et ses billets de rachat (même adresse, même bénéficiaire). */
+    const withCancelledLea = (...extra) => [...defaultItems.map((item) => (item.id === 100001 ? { ...clone(item), state: 'Canceled' } : item)), ...extra];
+    const purchase = (id, overrides = {}) => {
+      const ticket = itemFrom(100001);
+      Object.assign(ticket, { id, ...overrides });
+      ticket.order = { ...ticket.order, id: 300000 + id };
+      return ticket;
+    };
+    const lea = async (edition) => (await attendeesOf(edition)).find((attendee) => attendee.email === LEA);
+    const welcomesTo = (edition, since) => espace().outbox().slice(since).filter((mail) => mail.to.email === LEA && /\/espace\/verifier/.test(mail.text) && /72/.test(mail.text));
+
+    /** Édition ouverte, billets importés, Léa personnalisée puis annulée côté HelloAsso (billet 100001 Canceled). */
+    async function cancelledLea() {
+      const { app } = espace();
+      useItems(defaultItems);
+      const edition = await newEdition();
+      await run(edition);
+      await sleep(400);
+      const before = await lea(edition);
+      await app.documents(UID.attendee).update({
+        documentId: before.documentId,
+        data: { directoryOptIn: true, meetingsOptIn: true, newsOptIn: false, consentAt: '2026-10-01T08:00:00.000Z', editedFields: ['jobTitle'], jobTitle: 'Titre choisi par Léa', bio: 'Présentation de Léa.' },
+      });
+      useItems(withCancelledLea());
+      assert.equal((await run(edition)).cancelled, 1);
+      return { app, edition, documentId: before.documentId };
+    }
+
+    it('rattache l’Attendee annulé au nouveau billet : 0 création, 1 mise à jour, aucune erreur, aucun doublon', async () => {
+      const { edition } = await cancelledLea();
+      useItems(withCancelledLea(purchase(100099)));
+      const result = await run(edition);
+      assert.deepEqual(counts(result), [0, 1, 0]);
+      assert.deepEqual(result.errors, []);
+      assert.equal((await attendeesOf(edition)).length, 16, 'aucun Attendee de plus');
+    });
+
+    it('l’Attendee redevient actif sur le nouveau billet ; profil, consentements, rôle et editedFields intacts', async () => {
+      const { app, edition, documentId } = await cancelledLea();
+      useItems(withCancelledLea(purchase(100099)));
+      await run(edition);
+      const after = await app.documents(UID.attendee).findOne({ documentId });
+      assert.equal(after.status, 'active');
+      assert.equal(String(after.helloassoItemId), '100099');
+      assert.equal(after.email, LEA);
+      assert.deepEqual([after.directoryOptIn, after.meetingsOptIn, after.newsOptIn], [true, true, false]);
+      assert.equal(new Date(after.consentAt).toISOString(), '2026-10-01T08:00:00.000Z');
+      assert.deepEqual(after.editedFields, ['jobTitle']);
+      assert.equal(after.jobTitle, 'Titre choisi par Léa', 'champ édité écrasé');
+      assert.equal(after.bio, 'Présentation de Léa.');
+      assert.equal(after.role, 'participant');
+    });
+
+    it('prend l’identifiant de commande du nouveau billet', async () => {
+      const { app, edition, documentId } = await cancelledLea();
+      useItems(withCancelledLea(purchase(100099)));
+      await run(edition);
+      assert.equal(String((await app.documents(UID.attendee).findOne({ documentId })).helloassoOrderId), String(300000 + 100099));
+    });
+
+    it('n’envoie aucun welcome de plus : l’EmailLog existe déjà', async () => {
+      const { edition } = await cancelledLea();
+      const since = espace().outbox().length;
+      const logsBefore = (await logsOf(edition, 'welcome')).length;
+      useItems(withCancelledLea(purchase(100099)));
+      await run(edition);
+      await sleep(500);
+      assert.deepEqual(welcomesTo(edition, since), []);
+      assert.equal((await logsOf(edition, 'welcome')).length, logsBefore);
+    });
+
+    it('la synchronisation suivante donne 0, 0, 0 sans erreur (l’ancien billet annulé est ignoré)', async () => {
+      const { edition } = await cancelledLea();
+      useItems(withCancelledLea(purchase(100099)));
+      await run(edition);
+      const next = await run(edition);
+      assert.deepEqual(counts(next), [0, 0, 0]);
+      assert.deepEqual(next.errors, []);
+    });
+
+    it('ses rendez-vous annulés le restent', async () => {
+      const { app } = espace();
+      useItems(defaultItems);
+      const edition = await newEdition();
+      await run(edition);
+      await sleep(400);
+      const attendees = await attendeesOf(edition);
+      const [leaRow, other] = [attendees.find((a) => a.email === LEA), attendees.find((a) => a.email === 'mathis.lagrange@example.org')];
+      const [, , pause] = await createProgram(app, edition);
+      const slot = await app.documents(UID.slot).create({ data: { edition: link(edition), session: link(pause), startsAt: '2026-12-03T09:45:00.000Z', endsAt: '2026-12-03T10:00:00.000Z', label: '10h45' } });
+      const held = await app.documents(UID.meeting).create({ data: { edition: link(edition), slot: link(slot), requester: link(leaRow), targetAttendee: link(other), status: 'pending' } });
+      useItems(withCancelledLea());
+      await run(edition);
+      assert.equal((await app.documents(UID.meeting).findOne({ documentId: held.documentId })).status, 'cancelled');
+      useItems(withCancelledLea(purchase(100099)));
+      await run(edition);
+      assert.equal((await app.documents(UID.meeting).findOne({ documentId: held.documentId })).status, 'cancelled');
+      assert.equal((await lea(edition)).status, 'active');
+    });
+
+    it('la personne peut de nouveau se connecter : sans lien tant qu’elle est annulée, avec un lien après le rachat', async () => {
+      const { edition } = await cancelledLea();
+      const { request, mailsSince, outbox, signIn } = espace();
+      const since = outbox().length;
+      assert.equal((await request('/api/espace/auth/request-link', { method: 'POST', json: { editionSlug: edition.slug, email: LEA } })).status, 202);
+      assert.deepEqual(await mailsSince(since, { to: LEA }), [], 'lien envoyé à un inscrit annulé');
+      useItems(withCancelledLea(purchase(100099)));
+      await run(edition);
+      const session = await signIn(edition.slug, LEA);
+      assert.equal(session.me.firstName, 'Léa');
+    });
+
+    it('avec deux billets actifs B et C à cette adresse : B rattaché, C en DUPLICATE_EMAIL, puis mêmes erreurs et 0, 0, 0', async () => {
+      const { edition } = await cancelledLea();
+      useItems(withCancelledLea(purchase(100098), purchase(100099)));
+      const first = await run(edition);
+      assert.deepEqual(counts(first), [0, 1, 0]);
+      assert.deepEqual(sortedPairs(first.errors), [['100099', 'DUPLICATE_EMAIL']]);
+      assert.equal(String((await lea(edition)).helloassoItemId), '100098');
+      const second = await run(edition);
+      assert.deepEqual(counts(second), [0, 0, 0]);
+      assert.deepEqual(sortedPairs(second.errors), [['100099', 'DUPLICATE_EMAIL']]);
+    });
+
+    it('un Attendee annulé pendant cette synchronisation n’est rattaché qu’à la suivante', async () => {
+      useItems(defaultItems);
+      const edition = await newEdition({ enabled: false });
+      await run(edition); // Léa active sur 100001
+      useItems(withCancelledLea(purchase(100099)));
+      const first = await run(edition);
+      assert.deepEqual(counts(first), [0, 0, 1]);
+      assert.deepEqual(sortedPairs(first.errors), [['100099', 'DUPLICATE_EMAIL']]);
+      assert.equal((await lea(edition)).status, 'cancelled');
+      const second = await run(edition);
+      assert.deepEqual(counts(second), [0, 1, 0]);
+      assert.deepEqual(second.errors, []);
+      assert.equal((await lea(edition)).status, 'active');
+    });
+
+    it('un billet annulé qui redevient actif réactive le même billet, sans rattachement à un autre (Q-15, inchangé)', async () => {
+      const { edition } = await cancelledLea();
+      useItems(defaultItems);
+      const result = await run(edition);
+      assert.deepEqual(counts(result), [0, 1, 0]);
+      assert.equal(String((await lea(edition)).helloassoItemId), '100001');
+    });
+  });
+
+  describe('T-06, R-18 : annulation et rendez-vous annulés avec meeting-cancelled', () => {
     /**
      * Édition ouverte (NF-52 coupe tout envoi d'une édition fermée, meeting-cancelled compris), billets de recette importés,
      * un créneau, et un exposant à 2 représentants (R-14).
      */
-    async function scene() {
+    async function scene({ enabled = true } = {}) {
       const { app } = espace();
       useItems(defaultItems);
-      const edition = await newEdition();
-      await run(edition); // importe les billets de recette et envoie les welcome
+      const edition = await newEdition({ enabled });
+      await run(edition); // importe les billets de recette et envoie les welcome (espace ouvert seulement)
       await sleep(500);
       const attendees = Object.fromEntries((await attendeesOf(edition)).map((attendee) => [attendee.email, attendee]));
       const [, , pause] = await createProgram(app, edition);
@@ -547,9 +703,84 @@ describe('synchronisation HelloAsso contre le faux (lot 4)', { timeout: 300_000 
       assert.equal(espace().outbox().length, sent);
       assert.equal((await logsOf(edition, 'meeting-cancelled')).length, 1);
     });
+
+    describe('édition fermée (NF-52, section 11 du plan, point 7 et défaut 6)', () => {
+      const attendeesMails = (attendees, since) => espace().outbox().slice(since).filter((mail) => attendees.some((attendee) => attendee.email === mail.to.email));
+      const tokensOf = (edition) => espace().query(UID.magicToken).count({ where: { attendee: { edition: { documentId: edition.documentId } } } });
+
+      async function closedScene() {
+        const context = await scene({ enabled: false });
+        const { attendees, meeting, exhibitor } = context;
+        const lea = attendees['lea.ducasse@example.org'];
+        const mathis = attendees['mathis.lagrange@example.org'];
+        const meetings = {
+          sent: await meeting({ requester: link(lea), targetAttendee: link(mathis), status: 'pending' }),
+          received: await meeting({ requester: link(mathis), targetAttendee: link(lea), status: 'accepted', tableNumber: 1, tableKey: 'tk:closed-1', location: 'Table 1' }),
+          toStand: await meeting({ requester: link(lea), targetExhibitor: link(exhibitor), status: 'pending' }),
+        };
+        return { ...context, lea, mathis, meetings };
+      }
+
+      it('annule les rendez-vous de l’inscrit annulé (tableKey à null) sans écrire une ligne dans la boîte de sortie', async () => {
+        const { app, edition, attendees, meetings } = await closedScene();
+        const since = espace().outbox().length;
+        espace().fake.updateItem(100001, { state: 'Canceled' });
+        assert.equal((await run(edition)).cancelled, 1);
+        await sleep(600);
+        for (const held of Object.values(meetings)) {
+          const stored = await app.documents(UID.meeting).findOne({ documentId: held.documentId });
+          assert.equal(stored.status, 'cancelled');
+          assert.equal(stored.cancelReason, 'Inscription annulée');
+          assert.equal(stored.tableKey ?? null, null);
+        }
+        assert.deepEqual(attendeesMails(Object.values(attendees), since), [], 'e-mail envoyé pour une édition fermée');
+      });
+
+      it('n’émet aucun lien d’action ni aucun EmailLog meeting-cancelled', async () => {
+        const { edition } = await closedScene();
+        const tokensBefore = await tokensOf(edition);
+        espace().fake.updateItem(100001, { state: 'Canceled' });
+        await run(edition);
+        await sleep(300);
+        assert.equal(await tokensOf(edition), tokensBefore, 'MagicToken créé pour une édition fermée');
+        assert.equal((await logsOf(edition, 'meeting-cancelled')).length, 0);
+      });
+
+      it('l’Attendee est quand même passé à cancelled et la synchronisation se clôt sans erreur', async () => {
+        const { app, edition, lea } = await closedScene();
+        espace().fake.updateItem(100001, { state: 'Canceled' });
+        const result = await run(edition);
+        assert.deepEqual(result.errors, []);
+        assert.equal((await app.documents(UID.attendee).findOne({ documentId: lea.documentId })).status, 'cancelled');
+      });
+
+      it('cancelForAttendee appelé directement sur une édition fermée : mêmes effets', async () => {
+        const { app, edition, attendees, meetings } = await closedScene();
+        const lea = await app.documents(UID.attendee).findOne({ documentId: attendees['lea.ducasse@example.org'].documentId, populate: ['edition', 'exhibitor'] });
+        const since = espace().outbox().length;
+        const tokensBefore = await tokensOf(edition);
+        await app.service('api::espace.meetings').cancelForAttendee(lea, { reason: 'Inscription annulée', now: new Date('2026-10-29T10:00:00.000Z') });
+        await sleep(400);
+        assert.equal((await app.documents(UID.meeting).findOne({ documentId: meetings.received.documentId })).status, 'cancelled');
+        assert.deepEqual(attendeesMails(Object.values(attendees), since), []);
+        assert.equal(await tokensOf(edition), tokensBefore);
+      });
+
+      it('rouverte, l’édition notifie de nouveau : le même scénario sur une édition ouverte envoie meeting-cancelled', async () => {
+        const { app, edition, attendees, meeting } = await scene();
+        const since = espace().outbox().length;
+        await meeting({ requester: link(attendees['lea.ducasse@example.org']), targetAttendee: link(attendees['mathis.lagrange@example.org']), status: 'pending' });
+        espace().fake.updateItem(100001, { state: 'Canceled' });
+        await run(edition);
+        await sleep(600);
+        assert.equal(attendeesMails(Object.values(attendees), since).filter((mail) => /Léa Ducasse/.test(mail.text)).length, 1);
+        assert.equal((await logsOf(edition, 'meeting-cancelled')).length, 1);
+        assert.ok(app);
+      });
+    });
   });
 
-  describe('HelloAsso en défaut : SyncRun d’erreur, Strapi debout, aucun secret dans les journaux (critère 6)', pending('lot 4'), () => {
+  describe('HelloAsso en défaut : SyncRun d’erreur, Strapi debout, aucun secret dans les journaux (critère 6)', () => {
     it('formulaire inconnu : SyncRun clos avec { code: FETCH_FAILED, status: 404 }, aucun Attendee touché', async () => {
       useItems(defaultItems);
       const edition = await newEdition({ enabled: false, settings: { helloassoFormSlug: 'formulaire-inexistant' } });
@@ -598,6 +829,120 @@ describe('synchronisation HelloAsso contre le faux (lot 4)', { timeout: 300_000 
   });
 });
 
+/**
+ * Faux HelloAsso qui ne répond jamais, local : `tokenOk` fait répondre à la seule demande de jeton. Il consigne ce qu'il reçoit
+ * (méthode et chemin) pour prouver que l'échec vient bien du délai, pas d'une connexion refusée.
+ */
+function startHangingHelloAsso() {
+  const sockets = new Set();
+  const state = { tokenOk: false, requests: [] };
+  const server = http.createServer((req, res) => {
+    state.requests.push(`${req.method} ${req.url.split('?')[0]}`);
+    req.resume();
+    if (state.tokenOk && req.url.startsWith('/oauth2/token')) {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ access_token: 'jeton-factice-0123456789abcdef', token_type: 'bearer', expires_in: 1800, refresh_token: 'renouvellement-factice' }));
+    }
+    // Toute autre requête reste sans réponse.
+  });
+  server.on('connection', (socket) => {
+    sockets.add(socket);
+    socket.on('close', () => sockets.delete(socket));
+  });
+  return new Promise((resolve) => {
+    server.listen(0, '127.0.0.1', () =>
+      resolve({
+        state,
+        apiBase: `http://127.0.0.1:${server.address().port}/v5`,
+        close: () => new Promise((done) => {
+          for (const socket of sockets) socket.destroy();
+          server.close(done);
+        }),
+      })
+    );
+  });
+}
+
+describe('HelloAsso qui ne répond pas : requête abandonnée, SyncRun clos en FETCH_FAILED (lot 6b, section 11 du plan, point 7)', { timeout: 180_000 }, () => {
+  let hanging;
+  let instance;
+  let failure;
+  const espace = () => {
+    if (failure) throw failure;
+    return instance;
+  };
+  let counter = 0;
+  const realTimeout = AbortSignal.timeout;
+
+  before(async () => {
+    hanging = await startHangingHelloAsso();
+    try {
+      instance = await startEspace({ overrides: { HELLOASSO_API_BASE: hanging.apiBase, HELLOASSO_CLIENT_ID: 'fake-client-id', HELLOASSO_CLIENT_SECRET: 'fake-client-secret' } });
+    } catch (error) {
+      failure = error;
+    }
+  });
+  after(async () => {
+    AbortSignal.timeout = realTimeout;
+    await instance?.stop();
+    await hanging?.close();
+  });
+
+  /**
+   * Le client abandonne chaque requête par `AbortSignal.timeout(timeoutMs)` (20 s par défaut). Le test ramène ce délai à 200 ms le temps
+   * d'une synchronisation, sans toucher à la configuration de Strapi ; il est rétabli aussitôt.
+   */
+  async function syncWithShortTimeout() {
+    counter += 1;
+    const edition = await createEdition(espace().app, { slug: `hang-${counter}`, title: `HelloAsso muet ${counter}`, enabled: false });
+    AbortSignal.timeout = () => realTimeout.call(AbortSignal, 200);
+    const started = Date.now();
+    try {
+      const result = await espace().app.service('api::espace.sync').run(edition.documentId);
+      return { edition, result, durationMs: Date.now() - started };
+    } finally {
+      AbortSignal.timeout = realTimeout;
+    }
+  }
+  const runsOf = (edition) => espace().query(UID.syncRun).findMany({ where: { edition: { documentId: edition.documentId } } });
+
+  it('jeton qui ne répond pas : SyncRun clos avec FETCH_FAILED sans statut, aucun Attendee, Strapi debout', { timeout: 30_000 }, async () => {
+    hanging.state.tokenOk = false;
+    const { edition, result } = await syncWithShortTimeout();
+    assert.deepEqual([result.created, result.updated, result.cancelled], [0, 0, 0]);
+    assert.ok(result.errors.some((error) => error.code === 'FETCH_FAILED' && (error.status ?? null) === null), JSON.stringify(result.errors));
+    assert.ok(hanging.state.requests.some((line) => line.startsWith('POST /oauth2/token')), `requêtes reçues : ${hanging.state.requests}`);
+    const [stored] = await runsOf(edition);
+    assert.ok(stored.endedAt, 'SyncRun non clos');
+    assert.equal((await espace().request('/api/espace/health')).status, 200);
+  });
+
+  it('billets qui ne répondent pas alors que le jeton est obtenu : même résultat', { timeout: 30_000 }, async () => {
+    hanging.state.tokenOk = true;
+    hanging.state.requests.length = 0;
+    const { edition, result } = await syncWithShortTimeout();
+    assert.ok(result.errors.some((error) => error.code === 'FETCH_FAILED' && (error.status ?? null) === null), JSON.stringify(result.errors));
+    assert.ok(hanging.state.requests.some((line) => /GET \/v5\/organizations\/.*\/items$/.test(line)), `requêtes reçues : ${hanging.state.requests}`);
+    assert.ok((await runsOf(edition))[0].endedAt);
+  });
+
+  it('la synchronisation suivante n’est pas bloquée : le SyncRun abandonné est clos, pas de SYNC_RUNNING', { timeout: 30_000 }, async () => {
+    hanging.state.tokenOk = true;
+    counter += 1;
+    const edition = await createEdition(espace().app, { slug: `hang-${counter}`, title: `HelloAsso muet ${counter}`, enabled: false });
+    const service = espace().app.service('api::espace.sync');
+    AbortSignal.timeout = () => realTimeout.call(AbortSignal, 150);
+    try {
+      await service.run(edition.documentId);
+      const second = await service.run(edition.documentId);
+      assert.ok(second.errors.some((error) => error.code === 'FETCH_FAILED'));
+    } finally {
+      AbortSignal.timeout = realTimeout;
+    }
+    assert.equal((await runsOf(edition)).length, 2);
+  });
+});
+
 describe('socle d’envoi et configuration absente, sans faux HelloAsso (lots 2 et 4)', { timeout: 180_000 }, () => {
   const espace = useEspace();
   let counter = 0;
@@ -606,7 +951,7 @@ describe('socle d’envoi et configuration absente, sans faux HelloAsso (lots 2 
     return createEdition(espace().app, { slug: `socle-${counter}`, title: `Socle ${counter}`, ...options });
   };
 
-  describe('services/mailer.js : send({ attendee, template, data, scenarioKey }) (I-30, I-31)', pending('lot 4'), () => {
+  describe('services/mailer.js : send({ attendee, template, data, scenarioKey }) (I-30, I-31)', () => {
     const data = (edition) => ({ edition: { slug: edition.slug, title: edition.title, themeColor: '#600e24' }, publicUrl: espace().publicUrl, firstName: 'Léa', url: `${espace().publicUrl}/espace/verifier?token=jeton-factice&next=%2Fespace%2F${edition.slug}%2F`, validityHours: 72 });
 
     it('rend le gabarit, écrit une ligne dans la boîte de sortie et un EmailLog sent, puis renvoie { status, messageId }', async () => {
@@ -649,7 +994,7 @@ describe('socle d’envoi et configuration absente, sans faux HelloAsso (lots 2 
     });
   });
 
-  describe('synchronisation sans réglage HelloAsso (HELLOASSO_* vides, 4.3 du plan)', pending('lot 4'), () => {
+  describe('synchronisation sans réglage HelloAsso (HELLOASSO_* vides, 4.3 du plan)', () => {
     it('écrit un SyncRun clos portant HELLOASSO_NOT_CONFIGURED, sans rien créer ni appeler', async () => {
       const { app } = espace();
       const edition = await newEdition({ enabled: false });
@@ -673,7 +1018,7 @@ describe('tâches planifiées (lot 4, A-08, critère 7)', { timeout: 180_000 }, 
   describe('CRON_ENABLED=true', () => {
     const espace = useEspace({ overrides: { CRON_ENABLED: 'true' } });
 
-    it('enregistre la synchronisation toutes les 15 minutes et la purge quotidienne à 4 h, en Europe/Paris', pending('lot 4'), () => {
+    it('enregistre la synchronisation toutes les 15 minutes et la purge quotidienne à 4 h, en Europe/Paris', () => {
       const rules = rulesOf(espace().app);
       assert.deepEqual(rules.map((entry) => entry.rule).sort(), ['*/15 * * * *', '0 4 * * *']);
       assert.ok(rules.every((entry) => entry.tz === 'Europe/Paris'));

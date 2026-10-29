@@ -17,7 +17,6 @@ const { queryDatabase } = require('../helpers/database');
 const { testDatabaseName } = require('../helpers/env');
 const { useEspace } = require('../helpers/espace');
 const { UID, createAttendee, createEdition, createProgram, link } = require('../helpers/espace-data');
-const { pending } = require('../helpers/pending');
 
 const DATABASE = testDatabaseName();
 const INDEX = 'espace_meetings_table_key_uq';
@@ -57,7 +56,7 @@ let initialSnapshot;
 describe('schéma, index et republication (lot 2)', { timeout: 300_000 }, () => {
   const espace = useEspace();
 
-  describe('index unique sur table_key (R-13, A-07)', pending('lot 2'), () => {
+  describe('index unique sur table_key (R-13, A-07)', () => {
     it(`${INDEX} existe après le démarrage : unique, sur espace_meetings(table_key)`, async () => {
       espace();
       const rows = await sql(`select indexname, indexdef from pg_indexes where tablename = 'espace_meetings' and indexname = $1`, [INDEX]);
@@ -100,7 +99,7 @@ describe('schéma, index et republication (lot 2)', { timeout: 300_000 }, () => 
     });
   });
 
-  describe('republication : aucun lien des types nouveaux n’est détaché (section 3 du plan)', pending('lot 2'), () => {
+  describe('republication : aucun lien des types nouveaux n’est détaché (section 3 du plan)', () => {
     before(async () => {
       // Pas de crochet qui échoue : un modèle absent fait échouer chaque test de ce groupe à son tour.
       try {
@@ -196,7 +195,7 @@ describe('schéma, index et republication (lot 2)', { timeout: 300_000 }, () => 
 describe('après un redémarrage sur la même base (lot 2)', { timeout: 300_000 }, () => {
   const restarted = useEspace({ reset: false });
 
-  describe('index et liens conservés', pending('lot 2'), () => {
+  describe('index et liens conservés', () => {
     it(`${INDEX} existe toujours, une seule fois, après le redémarrage`, async () => {
       restarted();
       const rows = await sql(`select indexname from pg_indexes where tablename = 'espace_meetings' and indexname = $1`, [INDEX]);

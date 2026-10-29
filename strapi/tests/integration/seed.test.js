@@ -25,7 +25,6 @@ const { queryDatabase, resetDatabase } = require('../helpers/database');
 const { startStrapi } = require('../helpers/strapi');
 const recette = require('../../scripts/espace/fixtures/recette.json');
 const helloassoItems = require('../../scripts/espace/fixtures/helloasso-items.json');
-const { pending } = require('../helpers/pending');
 
 const DATABASE = testDatabaseName();
 const SEED = path.join(STRAPI_DIR, 'scripts/espace/seed.js');
@@ -320,7 +319,7 @@ describe('seed de recette sur la base de test', { timeout: 600_000 }, () => {
   // Tests d'abord de la phase 1 (lot 3). Section 4.4 du plan, 10-recette.md.
   // ---------------------------------------------------------------------------------------------------------------
 
-  describe('seed de la phase 1, lot 2 : réglages, thèmes, pauses, exposants et créneaux (4.4, points 1 à 5)', pending('lot 2'), () => {
+  describe('seed de la phase 1, lot 2 : réglages, thèmes, pauses, exposants et créneaux (4.4, points 1 à 5)', () => {
     const kinds = recette.sequences.map(({ title, kind }) => ({ title, kind }));
 
     it('règle l’édition de recette : espace ouvert, formulaire HelloAsso du faux, 3 tables, créneaux de 15 min, fenêtre ouverte', () => {
@@ -406,7 +405,7 @@ describe('seed de recette sur la base de test', { timeout: 600_000 }, () => {
     });
   });
 
-  describe('seed de la phase 1, lot 4 : les 17 Attendee de la recette et leurs e-mails welcome (4.4, point 6)', pending('lot 4'), () => {
+  describe('seed de la phase 1, lot 4 : les 17 Attendee de la recette et leurs e-mails welcome (4.4, point 6)', () => {
     const emails = Object.keys(recette.attendees).sort(compare);
     const find = (state, email) => espaceOf(state).attendees.find((attendee) => attendee.email === email);
 

@@ -1,14 +1,18 @@
 'use strict';
 
 /**
- * Routes organisateur de la phase 1 (tests d'abord), en session organisateur :
+ * Routes organisateur de la phase 1, en session organisateur :
  *   - `POST /admin/:edition/slots/regenerate` (R-01, R-02, A-16) : créneaux, orphelins, avertissements, idempotence ;
  *   - `POST /admin/:edition/sync`, `GET /admin/:edition/sync-runs` (I-12, A-16, NF-01) ;
  *   - scénario de la porte de la phase 1 (section 7 du plan) : import idempotent sur le faux HelloAsso avec plus de 100 billets,
  *     renouvellement du jeton, T-06 (annulation, rendez-vous annulés, sessions refusées), synchronisations simultanées.
  *
- * Activation : lot 5 (la session organisateur vient du lot 5), avec le lot 2 pour les créneaux et le lot 4 pour la synchronisation.
+ * Activées au lot 5 (la session organisateur vient du lot 5), avec le lot 2 pour les créneaux et le lot 4 pour la synchronisation.
  * Faux HelloAsso en module avec `tokenTtlSeconds: 61` (cache du jeton ramené à 1 s). Aucun réseau hors localhost.
+ *
+ * Réponses de l'architecte (section 11 du plan, points 8 et 9) : une synchronisation manuelle sans formulaire HelloAsso renseigné
+ * répond 200 avec un SyncRun clos portant HELLOASSO_NOT_CONFIGURED ; `services/slots.js` expose `regenerate(editionDocumentId)` et
+ * l'édition publiée sans date donne 409 EDITION_DATE_MISSING.
  */
 
 const { describe, it } = require('node:test');
@@ -18,7 +22,6 @@ const { buildEdgeCaseItems } = require('../../scripts/espace/fake-helloasso');
 const defaultItems = require('../../scripts/espace/fixtures/helloasso-items.json');
 const { sleep, useEspace } = require('../helpers/espace');
 const { UID, createAttendee, createEdition, createProgram, link } = require('../helpers/espace-data');
-const { pending } = require('../helpers/pending');
 
 const PORTE_ITEMS = [...defaultItems, ...buildEdgeCaseItems({ padding: 120 })];
 const sortedPairs = (errors) => errors.map((error) => [String(error.itemId), error.code]).sort((a, b) => (a.join() < b.join() ? -1 : 1));
@@ -44,7 +47,7 @@ describe('routes organisateur (lots 2, 4 et 5)', { timeout: 600_000 }, () => {
   const slotsOf = (edition) =>
     espace().app.documents(UID.slot).findMany({ filters: { edition: { documentId: edition.documentId } }, populate: ['session'], sort: 'startsAt:asc', limit: 1000 });
 
-  describe('POST /admin/:edition/slots/regenerate : créneaux (R-01, R-02, A-16)', pending('lot 5'), () => {
+  describe('POST /admin/:edition/slots/regenerate : créneaux (R-01, R-02, A-16)', () => {
     const LABELS = ['10h45', '11h00', '12h30', '12h45', '13h00', '13h15', '13h30', '13h45', '15h30', '15h45'];
 
     async function editionWithProgram() {
@@ -160,6 +163,41 @@ describe('routes organisateur (lots 2, 4 et 5)', { timeout: 600_000 }, () => {
       assert.equal(response.json.created, 5);
     });
 
+    it('édition publiée sans date : 409 EDITION_DATE_MISSING, aucun créneau créé', async () => {
+      const edition = await newEdition({ settings: { date: null } });
+      await createProgram(espace().app, edition);
+      const organizer = await organizerOf(edition);
+      const response = await regenerate(edition, organizer.cookie);
+      assert.equal(response.status, 409);
+      assert.equal(response.json.error.code, 'EDITION_DATE_MISSING');
+      assert.ok(response.json.error.message.length > 0);
+      assert.equal((await slotsOf(edition)).length, 0);
+    });
+
+    describe('services/slots.js : regenerate(editionDocumentId), appelable sans passer par la route (section 11, point 9)', () => {
+      const service = () => espace().app.service('api::espace.slots');
+
+      it('rend le rapport de la route : 10 créneaux créés, puis 10 gardés au second passage', async () => {
+        const edition = await newEdition();
+        await createProgram(espace().app, edition);
+        assert.deepEqual(await service().regenerate(edition.documentId), { created: 10, kept: 0, removed: 0, orphans: [], warnings: [] });
+        assert.deepEqual(await service().regenerate(edition.documentId), { created: 0, kept: 10, removed: 0, orphans: [], warnings: [] });
+        assert.deepEqual((await slotsOf(edition)).map((slot) => slot.label), LABELS);
+      });
+
+      it('lève EDITION_DATE_MISSING (409) pour une édition publiée sans date', async () => {
+        const edition = await newEdition({ settings: { date: null } });
+        await assert.rejects(service().regenerate(edition.documentId), (error) => error.code === 'EDITION_DATE_MISSING' && error.status === 409);
+      });
+
+      it('plusieurs appels simultanés du service ne créent aucun doublon (verrou slots:, A-16)', async () => {
+        const edition = await newEdition();
+        await createProgram(espace().app, edition);
+        await Promise.all([1, 2, 3].map(() => service().regenerate(edition.documentId)));
+        assert.equal((await slotsOf(edition)).length, 10);
+      });
+    });
+
     it('refuse un participant (403 FORBIDDEN), une personne sans session (401) et l’organisateur d’une autre édition (403)', async () => {
       const { edition } = await editionWithProgram();
       const other = await newEdition();
@@ -181,7 +219,7 @@ describe('routes organisateur (lots 2, 4 et 5)', { timeout: 600_000 }, () => {
     });
   });
 
-  describe('POST /admin/:edition/sync et GET /admin/:edition/sync-runs (I-12, A-16, NF-01)', pending('lot 5'), () => {
+  describe('POST /admin/:edition/sync et GET /admin/:edition/sync-runs (I-12, A-16, NF-01)', () => {
     const syncRoute = (edition) => `/api/espace/admin/${edition.slug}/sync`;
     const runsRoute = (edition) => `/api/espace/admin/${edition.slug}/sync-runs`;
 
@@ -225,6 +263,52 @@ describe('routes organisateur (lots 2, 4 et 5)', { timeout: 600_000 }, () => {
       assert.ok(refused.json.error.message.length > 0);
     });
 
+    it('deux demandes simultanées ne créent qu’un SyncRun, et le perdant ne laisse aucune trace (A-16)', async () => {
+      espace().fake.setItems(PORTE_ITEMS);
+      const edition = await newEdition();
+      const organizer = await organizerOf(edition);
+      await Promise.all([post(syncRoute(edition), organizer.cookie), post(syncRoute(edition), organizer.cookie)]);
+      const runs = await espace().query(UID.syncRun).findMany({ where: { edition: { documentId: edition.documentId } } });
+      assert.equal(runs.length, 1);
+      assert.ok(runs[0].endedAt, 'SyncRun non clos');
+    });
+
+    describe('formulaire HelloAsso absent ou en défaut : réponse 200 et SyncRun clos (section 11, point 8)', () => {
+      it('édition sans formulaire HelloAsso renseigné : 200 avec HELLOASSO_NOT_CONFIGURED, rien créé', async () => {
+        espace().fake.setItems(defaultItems);
+        const edition = await newEdition({ settings: { helloassoOrgSlug: null, helloassoFormSlug: null } });
+        const organizer = await organizerOf(edition);
+        const response = await post(syncRoute(edition), organizer.cookie);
+        assert.equal(response.status, 200);
+        assert.deepEqual([response.json.created, response.json.updated, response.json.cancelled], [0, 0, 0]);
+        assert.deepEqual(response.json.errors, [{ code: 'HELLOASSO_NOT_CONFIGURED' }]);
+        assert.ok(response.json.endedAt, 'SyncRun non clos');
+        const attendees = await espace().app.documents(UID.attendee).count({ filters: { edition: { documentId: edition.documentId }, role: 'participant' } });
+        assert.equal(attendees, 0);
+      });
+
+      it('formulaire inconnu de HelloAsso : 200 avec FETCH_FAILED (statut 404), SyncRun clos, les autres routes répondent encore', async () => {
+        espace().fake.setItems(defaultItems);
+        const edition = await newEdition({ settings: { helloassoFormSlug: 'formulaire-inexistant' } });
+        const organizer = await organizerOf(edition);
+        const response = await post(syncRoute(edition), organizer.cookie);
+        assert.equal(response.status, 200);
+        assert.ok(response.json.errors.some((error) => error.code === 'FETCH_FAILED' && error.status === 404), JSON.stringify(response.json.errors));
+        assert.ok(response.json.endedAt);
+        const listed = await espace().request(runsRoute(edition), { cookie: organizer.cookie });
+        assert.equal(listed.json.length, 1);
+        assert.deepEqual(listed.json[0].errors, response.json.errors);
+      });
+
+      it('SyncRun d’erreur clos : la demande suivante n’est pas refusée en SYNC_RUNNING', async () => {
+        espace().fake.setItems(defaultItems);
+        const edition = await newEdition({ settings: { helloassoFormSlug: 'formulaire-inexistant' } });
+        const organizer = await organizerOf(edition);
+        assert.equal((await post(syncRoute(edition), organizer.cookie)).status, 200);
+        assert.equal((await post(syncRoute(edition), organizer.cookie)).status, 200);
+      });
+    });
+
     it('sync-runs : les 10 derniers SyncRun, du plus récent au plus ancien', async () => {
       espace().fake.setItems(defaultItems);
       const edition = await newEdition();
@@ -257,7 +341,7 @@ describe('routes organisateur (lots 2, 4 et 5)', { timeout: 600_000 }, () => {
     });
   });
 
-  describe('porte de la phase 1 : import du formulaire de test, idempotent (section 7, T-05, T-06)', pending('lot 5'), () => {
+  describe('porte de la phase 1 : import du formulaire de test, idempotent (section 7, T-05, T-06)', () => {
     it('trois synchronisations de suite : import, idempotence avec renouvellement du jeton, puis annulations (T-06)', async () => {
       const { app, fake, outbox, signIn } = espace();
       fake.setItems(PORTE_ITEMS);

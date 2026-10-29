@@ -11,10 +11,12 @@
 
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const { buildEdgeCaseItems, buildItem } = require('../../scripts/espace/fake-helloasso');
 const defaultItems = require('../../scripts/espace/fixtures/helloasso-items.json');
-const { pending } = require('../helpers/pending');
+const { addressOfLength } = require('../helpers/addresses');
 
 const imp = () => require('../../src/api/espace/lib/import');
 
@@ -43,7 +45,7 @@ function regionItem(id, { answers = {}, ...overrides } = {}) {
   });
 }
 
-describe('normalizeEmail (I-11)', pending('lot 4'), () => {
+describe('normalizeEmail (I-11)', () => {
   it('met en minuscules et retire les espaces autour', () => {
     assert.equal(imp().normalizeEmail('  Zoe.Garnier@Example.ORG  '), 'zoe.garnier@example.org');
   });
@@ -59,8 +61,44 @@ describe('normalizeEmail (I-11)', pending('lot 4'), () => {
   }
 });
 
-describe('mapItem : champs de l’Attendee (I-11, Q-03)', pending('lot 4'), () => {
-  const map = (item, fieldMap = FIELD_MAP) => imp().mapItem(item, fieldMap);
+describe('normalizeEmail : 254 caractères au plus, seule règle d’adresse de l’espace (A-23)', () => {
+  it('n’est définie qu’une fois dans strapi/src : services/auth.js l’importe et ne garde ni copie ni motif d’adresse', () => {
+    const sources = (directory) =>
+      fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+        const file = path.join(directory, entry.name);
+        return entry.isDirectory() ? sources(file) : /\.js$/.test(entry.name) ? [file] : [];
+      });
+    const definitions = sources(path.resolve(__dirname, '../../src'))
+      .filter((file) => /(function\s+normalizeEmail\b|(const|let|var)\s+normalizeEmail\s*=|\bnormalizeEmail\s*[:=]\s*(async\s*)?(\(|function))/.test(fs.readFileSync(file, 'utf8')))
+      .map((file) => path.relative(path.resolve(__dirname, '../../src'), file));
+    assert.deepEqual(definitions, ['api/espace/lib/import.js']);
+    const auth = fs.readFileSync(path.resolve(__dirname, '../../src/api/espace/services/auth.js'), 'utf8');
+    assert.match(auth, /normalizeEmail[^;]*require\('\.\.\/lib\/import'\)|require\('\.\.\/lib\/import'\)[^;]*normalizeEmail/);
+    assert.doesNotMatch(auth, /EMAIL_PATTERN/);
+  });
+
+  it('admet une adresse de 254 caractères', () => {
+    const address = addressOfLength(254);
+    assert.equal(address.length, 254);
+    assert.equal(imp().normalizeEmail(address), address);
+  });
+
+  it('refuse une adresse de 255 caractères', () => {
+    const address = addressOfLength(255);
+    assert.equal(address.length, 255);
+    assert.equal(imp().normalizeEmail(address), null);
+  });
+
+  it('mesure l’adresse après avoir retiré les espaces autour : 254 caractères entourés d’espaces restent admis', () => {
+    const address = addressOfLength(254);
+    assert.equal(imp().normalizeEmail(`  ${address}  `), address);
+  });
+});
+
+describe('mapItem : champs de l’Attendee (I-11, Q-03)', () => {
+  // La correspondance de Q-03 s'applique seulement quand l'appel n'en donne aucune : un `undefined` passé explicitement
+  // reste `undefined` (un paramètre par défaut le remplacerait, section 11 du plan, point 1).
+  const map = (item, ...fieldMap) => imp().mapItem(item, ...(fieldMap.length ? fieldMap : [FIELD_MAP]));
 
   it('reprend les champs du billet du tarif régional', () => {
     const mapped = map(itemById(100001));
@@ -123,12 +161,32 @@ describe('mapItem : champs de l’Attendee (I-11, Q-03)', pending('lot 4'), () =
     assert.equal(mapped.jobTitle, 'Directrice');
   });
 
-  it('ne plante pas sans correspondance de champs : e-mail du payeur, fonction et entreprise vides', () => {
+  describe('sans helloassoFieldMap (A-23, D-03) : aucun libellé par défaut', () => {
     for (const fieldMap of [{}, undefined, null]) {
-      const mapped = map(regionItem(930006), fieldMap);
-      assert.equal(mapped.email, 'payeur.930006@example.org');
-      assert.ok(!mapped.company);
+      const label = fieldMap === undefined ? 'undefined' : JSON.stringify(fieldMap);
+
+      it(`${label} : e-mail du payeur, fonction et entreprise vides, même si le billet porte « Email », « Organisation » et « Poste »`, () => {
+        const mapped = imp().mapItem(regionItem(930006), fieldMap);
+        assert.equal(mapped.email, 'payeur.930006@example.org');
+        assert.ok(!mapped.company, `entreprise ${mapped.company}`);
+        assert.ok(!mapped.jobTitle, `fonction ${mapped.jobTitle}`);
+      });
     }
+
+    it('garde le nom et le prénom du bénéficiaire, qui ne dépendent pas de la correspondance', () => {
+      const mapped = imp().mapItem(regionItem(930006), undefined);
+      assert.deepEqual([mapped.firstName, mapped.lastName], ['Léa', 'Ducasse']);
+    });
+  });
+
+  it('ne retient pas une adresse de 255 caractères du champ Email : repli sur le payeur (A-23)', () => {
+    const mapped = map(regionItem(930020, { answers: { Email: addressOfLength(255) } }));
+    assert.equal(mapped.email, 'payeur.930020@example.org');
+  });
+
+  it('renvoie email null quand le champ Email et le payeur dépassent 254 caractères (A-23)', () => {
+    const long = addressOfLength(255);
+    assert.equal(map(regionItem(930021, { answers: { Email: long }, payer: { email: long } })).email, null);
   });
 
   describe('rôle proposé selon le tarif (Q-03, I-11)', () => {
@@ -207,7 +265,7 @@ describe('mapItem : champs de l’Attendee (I-11, Q-03)', pending('lot 4'), () =
   });
 });
 
-describe('planSync : synchronisation idempotente (I-12, I-14, Q-15, R-18, R-31)', pending('lot 4'), () => {
+describe('planSync : synchronisation idempotente (I-12, I-14, Q-15, R-18, R-31)', () => {
   const plan = (items, attendees = [], fieldMap = FIELD_MAP) => imp().planSync({ items, attendees, fieldMap });
   const emailsOf = (list) => list.map((entry) => entry.email).sort();
   const codesOf = (result) => result.errors.map((error) => [String(error.itemId), error.code]);
@@ -303,11 +361,14 @@ describe('planSync : synchronisation idempotente (I-12, I-14, Q-15, R-18, R-31)'
       assert.ok(emailsOf(plan(edge).create).includes('zoe.garnier@example.org'));
     });
 
-    it('traite le champ Email invalide : création par l’adresse du payeur ou erreur INVALID_EMAIL (billet 910004)', () => {
+    it('champ Email invalide et payeur valable (billet 910004) : l’Attendee est créé sur l’adresse du payeur, sans erreur (I-11, A-23)', () => {
       const result = plan(edge);
-      const created = emailsOf(result.create).includes('payeur.910004@example.org');
-      const reported = codesOf(result).some(([id, code]) => id === '910004' && code === 'INVALID_EMAIL');
-      assert.ok(created || reported, 'le billet 910004 n’est ni créé ni signalé');
+      assert.ok(emailsOf(result.create).includes('payeur.910004@example.org'), 'billet 910004 non créé sur l’adresse du payeur');
+      assert.ok(!codesOf(result).some(([id]) => id === '910004'), 'erreur consignée pour le billet 910004');
+    });
+
+    it('le jeu de cas limites du faux ne contient aucun billet sans adresse valable : aucun INVALID_EMAIL', () => {
+      assert.ok(!codesOf(plan(edge)).some(([, code]) => code === 'INVALID_EMAIL'));
     });
 
     it('signale INVALID_EMAIL, sans créer, quand ni le champ ni le payeur n’ont d’adresse valable', () => {
@@ -342,25 +403,39 @@ describe('planSync : synchronisation idempotente (I-12, I-14, Q-15, R-18, R-31)'
       assert.deepEqual(codesOf(result), [['100', 'DUPLICATE_EMAIL']]);
     });
 
-    // Le plan distingue-t-il DUPLICATE_EMAIL (même lot) et EMAIL_TAKEN (adresse déjà en base) ? Le plan du lot 4 exige les
-    // mêmes erreurs à la seconde synchronisation, ce que garantit DUPLICATE_EMAIL ; les deux codes sont admis ici.
-    const REFUSAL_CODES = ['DUPLICATE_EMAIL', 'EMAIL_TAKEN'];
-
-    it('refuse de créer un billet dont l’adresse appartient déjà à un autre Attendee de l’édition', () => {
+    // planSync donne DUPLICATE_EMAIL pour toute adresse déjà en base ou déjà prise par un billet de plus petit id ;
+    // EMAIL_TAKEN ne sort que du contrôle sous verrou du service (A-16, section 11 du plan, point 3).
+    it('refuse de créer un billet dont l’adresse appartient déjà à un autre Attendee actif de l’édition : DUPLICATE_EMAIL', () => {
       const attendee = known({ helloassoItemId: '111111', email: 'lea.930100@example.org' });
       const result = plan([itemOfKnown()], [attendee]);
       assert.deepEqual(result.create, []);
-      assert.equal(result.errors.length, 1);
-      assert.equal(String(result.errors[0].itemId), '930100');
-      assert.ok(REFUSAL_CODES.includes(result.errors[0].code), result.errors[0].code);
+      assert.deepEqual(result.errors, [{ itemId: '930100', code: 'DUPLICATE_EMAIL', email: 'lea.930100@example.org' }]);
     });
 
-    it('reconnaît l’adresse déjà prise malgré les majuscules', () => {
+    it('reconnaît l’adresse déjà prise malgré les majuscules : DUPLICATE_EMAIL', () => {
       const attendee = known({ helloassoItemId: '111111', email: 'lea.930100@example.org' });
       const result = plan([regionItem(930100, { answers: { Email: 'LEA.930100@Example.ORG' } })], [attendee]);
       assert.deepEqual(result.create, []);
-      assert.ok(REFUSAL_CODES.includes(result.errors[0]?.code), JSON.stringify(result.errors));
+      assert.deepEqual(result.errors.map((error) => error.code), ['DUPLICATE_EMAIL']);
     });
+
+    it('ne produit jamais EMAIL_TAKEN, quels que soient les billets et les Attendee', () => {
+      const attendees = [known({ helloassoItemId: '111111', email: 'groupe@example.org' })];
+      const codes = [...plan(buildEdgeCaseItems({ padding: 0 }), attendees).errors, ...plan(defaultItems).errors].map((error) => error.code);
+      assert.ok(!codes.includes('EMAIL_TAKEN'), codes.join());
+    });
+  });
+
+  describe('sans helloassoFieldMap (A-23, D-03)', () => {
+    for (const fieldMap of [null, {}, undefined]) {
+      it(`${fieldMap === undefined ? 'undefined' : JSON.stringify(fieldMap)} : crée sur l’adresse du payeur, fonction et entreprise vides, aucune erreur`, () => {
+        const result = imp().planSync({ items: [regionItem(930300)], attendees: [], fieldMap });
+        assert.deepEqual(result.errors, []);
+        assert.equal(result.create.length, 1);
+        assert.equal(result.create[0].email, 'payeur.930300@example.org');
+        assert.ok(!result.create[0].jobTitle && !result.create[0].company);
+      });
+    }
   });
 
   describe('annulation (Q-15, R-18)', () => {
@@ -394,6 +469,102 @@ describe('planSync : synchronisation idempotente (I-12, I-14, Q-15, R-18, R-31)'
     it('n’annule pas un Attendee connu dont le billet est en attente (Waiting) : signalé, conservé', () => {
       const result = plan([itemOfKnown({ state: 'Waiting' })], [known()]);
       assert.deepEqual(result.cancel, []);
+    });
+  });
+
+  // A-22 : un Attendee annulé qui rachète un billet avec la même adresse est rattaché au nouveau billet (lot 6b).
+  describe('A-22 : rachat d’un billet par un Attendee annulé', () => {
+    // Billet A (930100, annulé) puis billet B (930101, Processed) à la même adresse, pour l'Attendee `known`.
+    const oldTicket = (overrides = {}) => itemOfKnown({ state: 'Canceled', ...overrides });
+    const newTicket = (id = 930101, { answers = {}, ...overrides } = {}) => regionItem(id, { answers: { Email: 'lea.930100@example.org', ...answers }, ...overrides });
+    const returning = (overrides = {}) => known({ status: 'cancelled', ...overrides });
+
+    it('rattache l’Attendee annulé au nouveau billet : 0 création, 1 mise à jour, aucune erreur', () => {
+      const result = plan([oldTicket(), newTicket()], [returning()]);
+      assert.deepEqual([result.create, result.cancel, result.errors], [[], [], []]);
+      assert.equal(result.update.length, 1);
+      assert.equal(result.update[0].documentId, 'att-1');
+    });
+
+    it('la mise à jour porte les identifiants du nouveau billet et le statut active', () => {
+      const [update] = plan([oldTicket(), newTicket()], [returning()]).update;
+      assert.equal(String(update.changes.helloassoItemId), '930101');
+      assert.equal(String(update.changes.helloassoOrderId), String(newTicket().order.id));
+      assert.equal(update.changes.status, 'active');
+    });
+
+    it('rafraîchit les champs importés qui ont changé, sauf ceux que le participant a édités (R-31)', () => {
+      const item = newTicket(930101, { answers: { Poste: 'Directrice', Organisation: 'Autre Société' } });
+      const [update] = plan([oldTicket(), item], [returning({ editedFields: ['jobTitle'] })]).update;
+      assert.equal(update.changes.company, 'Autre Société');
+      assert.ok(!('jobTitle' in update.changes), 'jobTitle édité par le participant');
+    });
+
+    it('ne touche ni au rôle, ni à l’e-mail, ni aux rattachements, ni aux consentements, ni à editedFields', () => {
+      const [update] = plan([oldTicket(), newTicket()], [returning({ role: 'speaker', directoryOptIn: true, consentAt: '2026-10-01T08:00:00.000Z' })]).update;
+      const allowed = ['helloassoItemId', 'helloassoOrderId', 'status', 'firstName', 'lastName', 'jobTitle', 'company'];
+      assert.deepEqual(Object.keys(update.changes).filter((key) => !allowed.includes(key)), []);
+    });
+
+    it('est idempotent : après le rattachement, la synchronisation suivante donne 0, 0, 0 (l’ancien billet annulé est ignoré sans erreur)', () => {
+      const first = plan([oldTicket(), newTicket()], [returning()]);
+      const attached = known({ helloassoItemId: String(first.update[0].changes.helloassoItemId), status: 'active', ...first.update[0].changes });
+      const second = plan([oldTicket(), newTicket()], [attached]);
+      assert.deepEqual([second.create, second.update, second.cancel, second.errors], [[], [], [], []]);
+    });
+
+    it('ne rattache qu’une fois par synchronisation : un second billet actif à la même adresse reste en DUPLICATE_EMAIL', () => {
+      const result = plan([oldTicket(), newTicket(930101), newTicket(930102)], [returning()]);
+      assert.equal(result.update.length, 1);
+      assert.equal(String(result.update[0].changes.helloassoItemId), '930101', 'le plus petit identifiant est rattaché');
+      assert.deepEqual(result.errors, [{ itemId: '930102', code: 'DUPLICATE_EMAIL', email: 'lea.930100@example.org' }]);
+      assert.deepEqual(result.create, []);
+    });
+
+    it('reconnaît l’adresse malgré les majuscules du champ Email du nouveau billet', () => {
+      const item = regionItem(930101, { answers: { Email: ' LEA.930100@Example.ORG ' } });
+      const result = plan([oldTicket(), item], [returning()]);
+      assert.equal(result.update.length, 1);
+      assert.deepEqual(result.errors, []);
+    });
+
+    it('ne rattache pas quand le nouveau billet est lui-même annulé ou en attente', () => {
+      assert.deepEqual(plan([oldTicket(), newTicket(930101, { state: 'Canceled' })], [returning()]).update, []);
+      const waiting = plan([oldTicket(), newTicket(930101, { state: 'Waiting' })], [returning()]);
+      assert.deepEqual(waiting.update, []);
+      assert.deepEqual(waiting.errors.map((error) => error.code), ['WAITING']);
+    });
+
+    it('ne rattache pas un billet à l’adresse d’un Attendee encore actif : DUPLICATE_EMAIL', () => {
+      const result = plan([newTicket()], [known({ status: 'active' })]);
+      assert.deepEqual(result.update, []);
+      assert.deepEqual(result.errors.map((error) => error.code), ['DUPLICATE_EMAIL']);
+    });
+
+    it('un Attendee annulé pendant cette synchronisation n’est rattaché qu’à la suivante : le billet B reste en DUPLICATE_EMAIL', () => {
+      const active = known({ status: 'active' });
+      const first = plan([oldTicket(), newTicket()], [active]);
+      assert.deepEqual(first.cancel, ['att-1']);
+      assert.deepEqual(first.update, []);
+      assert.deepEqual(first.errors.map((error) => error.code), ['DUPLICATE_EMAIL']);
+
+      const second = plan([oldTicket(), newTicket()], [returning()]);
+      assert.equal(second.update.length, 1);
+      assert.deepEqual(second.errors, []);
+    });
+
+    it('n’affecte pas un Attendee annulé à une autre adresse', () => {
+      const other = regionItem(930101, { answers: { Email: 'quelquun.d.autre@example.org' } });
+      const result = plan([oldTicket(), other], [returning()]);
+      assert.deepEqual(result.update, []);
+      assert.equal(result.create.length, 1);
+    });
+
+    it('réactive toujours le même billet quand il redevient actif (Q-15) : aucun rattachement à un autre', () => {
+      const result = plan([itemOfKnown()], [returning()]);
+      assert.equal(result.update.length, 1);
+      assert.equal(result.update[0].changes.status, 'active');
+      assert.ok(!('helloassoItemId' in result.update[0].changes));
     });
   });
 
@@ -432,6 +603,38 @@ describe('planSync : synchronisation idempotente (I-12, I-14, Q-15, R-18, R-31)'
     it('ne change pas le rôle quand seul le tarif a changé : aucune mise à jour', () => {
       const result = plan([itemOfKnown({ name: 'Exposant' })], [known({ role: 'participant' })]);
       assert.deepEqual(result.update, []);
+    });
+
+    describe('A-23 : l’e-mail est l’identifiant de connexion, une valeur vide ne vide rien', () => {
+      it('ne modifie jamais l’e-mail d’un Attendee existant, même si HelloAsso en donne une autre', () => {
+        const result = plan([itemOfKnown({ answers: { Email: 'autre.adresse@example.org' } })], [known()]);
+        assert.deepEqual([result.create, result.update, result.cancel, result.errors], [[], [], [], []]);
+      });
+
+      it('ne modifie pas l’e-mail quand un autre champ change en même temps', () => {
+        const result = plan([itemOfKnown({ answers: { Email: 'autre.adresse@example.org', Poste: 'Directrice' } })], [known()]);
+        assert.deepEqual(result.update, [{ documentId: 'att-1', changes: { jobTitle: 'Directrice' } }]);
+      });
+
+      for (const [field, answers] of [
+        ['jobTitle', { Poste: '' }],
+        ['company', { Organisation: '   ' }],
+      ]) {
+        it(`une réponse vide ne vide pas « ${field} » : aucune mise à jour`, () => {
+          const result = plan([itemOfKnown({ answers })], [known()]);
+          assert.deepEqual(result.update, []);
+        });
+      }
+
+      for (const [field, overrides] of [
+        ['firstName', { firstName: '' }],
+        ['lastName', { lastName: ' ' }],
+      ]) {
+        it(`un ${field} vide côté HelloAsso ne vide pas le champ`, () => {
+          const result = plan([itemOfKnown(overrides)], [known()]);
+          assert.deepEqual(result.update, []);
+        });
+      }
     });
   });
 

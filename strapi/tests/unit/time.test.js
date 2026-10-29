@@ -9,11 +9,10 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { pending } = require('../helpers/pending');
 
 const time = () => require('../../src/api/espace/lib/time');
 
-describe('parseProgramTime : formes admises du programme (R-01)', pending('lot 2'), () => {
+describe('parseProgramTime : formes admises du programme (R-01)', () => {
   for (const [text, expected] of [
     ['9h15', { hours: 9, minutes: 15 }],
     ['10h45', { hours: 10, minutes: 45 }],
@@ -36,7 +35,7 @@ describe('parseProgramTime : formes admises du programme (R-01)', pending('lot 2
   }
 });
 
-describe('zonedToUtc : date du jour et heure du programme en Europe/Paris', pending('lot 2'), () => {
+describe('zonedToUtc : date du jour et heure du programme en Europe/Paris', () => {
   const utc = (dateIso, hours, minutes, timeZone) => time().zonedToUtc(dateIso, { hours, minutes }, timeZone).toISOString();
 
   it('renvoie un objet Date', () => {
@@ -94,7 +93,7 @@ describe('zonedToUtc : date du jour et heure du programme en Europe/Paris', pend
   });
 });
 
-describe('formatTimeLabel : libellé « 9h45 » en Europe/Paris', pending('lot 2'), () => {
+describe('formatTimeLabel : libellé « 9h45 » en Europe/Paris', () => {
   const label = (iso, timeZone) => time().formatTimeLabel(new Date(iso), timeZone);
 
   it('écrit les heures sans zéro initial et les minutes sur deux chiffres', () => {

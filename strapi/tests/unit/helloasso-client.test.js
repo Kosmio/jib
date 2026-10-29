@@ -6,15 +6,15 @@
  * continuation jusqu'à `data: []` (50 pages au plus, 100 billets par page), erreurs sans secret ni jeton.
  *
  * `listFormItems` renvoie le tableau des billets. Les requêtes passent par un `fetch` enregistreur injecté.
- * Tests d'abord du lot 4 : le module est requis dans chaque test.
+ * Délai de réponse (`timeoutMs`, défaut 20 s, lot 6b) : chaque requête, jeton compris, est abandonnée au bout du délai et
+ * donne une HelloAssoError sans `status`, comme un HelloAsso injoignable. Ces tests n'ouvrent aucune connexion : le `fetch` est simulé.
  */
 
-const { describe, it, beforeEach, afterEach } = require('node:test');
+const { after, afterEach, before, beforeEach, describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
 const { startFakeHelloAsso, buildEdgeCaseItems, FORM } = require('../../scripts/espace/fake-helloasso');
 const defaultItems = require('../../scripts/espace/fixtures/helloasso-items.json');
-const { pending } = require('../helpers/pending');
 
 const lib = () => require('../../src/api/espace/lib/helloasso');
 
@@ -43,7 +43,7 @@ function recordingFetch(override) {
 
 const jsonResponse = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
-describe('client HelloAsso contre le faux (I-10, I-11)', pending('lot 4', { timeout: 60_000 }), () => {
+describe('client HelloAsso contre le faux (I-10, I-11)', { timeout: 60_000 }, () => {
   let fake;
   const make = (fetchImpl, options = {}) =>
     lib().createHelloAssoClient({ apiBase: fake.apiBase, clientId: CLIENT_ID, clientSecret: CLIENT_SECRET, fetch: fetchImpl, ...options });
@@ -209,5 +209,97 @@ describe('client HelloAsso contre le faux (I-10, I-11)', pending('lot 4', { time
         return true;
       });
     });
+  });
+});
+
+/** `fetch` qui ne répond jamais, sauf par l'abandon de la requête : il rejette alors avec la raison du signal. Sans signal, il reste suspendu. */
+function hangingFetch({ token = false } = {}) {
+  const calls = [];
+  const wrapped = (input, init) => {
+    const url = new URL(urlOf(input));
+    calls.push({ url, init });
+    if (token && url.pathname.endsWith('/oauth2/token')) return Promise.resolve(jsonResponse(200, { access_token: 'jeton-factice-0123456789abcdef', expires_in: 1800, token_type: 'bearer' }));
+    return new Promise((_, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(init.signal.reason), { once: true });
+    });
+  };
+  wrapped.calls = calls;
+  return wrapped;
+}
+
+/** La promesse, ou une erreur claire si elle reste suspendue au-delà de `ms` (requête jamais abandonnée). */
+async function within(promise, ms = 3000) {
+  let timer;
+  const expired = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`requête non abandonnée après ${ms} ms`)), ms);
+  });
+  try {
+    return await Promise.race([promise, expired]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+describe('délai de réponse : chaque requête est abandonnée après timeoutMs (lot 6b, section 11 du plan, point 7)', { timeout: 20_000 }, () => {
+  // `AbortSignal.timeout` n'a qu'un minuteur non retenant : avec un `fetch` simulé suspendu, rien d'autre ne garderait la boucle
+  // d'événements active et le processus sortirait sans rien afficher. Ce minuteur la garde active pendant le groupe.
+  let keepAlive;
+  before(() => {
+    keepAlive = setInterval(() => {}, 1000);
+  });
+  after(() => clearInterval(keepAlive));
+
+  const APIBASE = 'http://localhost:9/v5';
+  const make = (fetchImpl, options = {}) => lib().createHelloAssoClient({ apiBase: APIBASE, clientId: CLIENT_ID, clientSecret: CLIENT_SECRET, fetch: fetchImpl, ...options });
+  const unreachable = (error) => {
+    assert.ok([error.name, error.constructor.name].includes('HelloAssoError'), `${error.name} / ${error.constructor.name}`);
+    assert.equal(error.status, undefined, 'un dépassement de délai n’a pas de statut HTTP');
+    assert.ok(!error.message.includes(CLIENT_SECRET), 'secret du client dans le message');
+    return true;
+  };
+
+  it('jeton qui ne répond pas : HelloAssoError sans status après timeoutMs', async () => {
+    await assert.rejects(within(make(hangingFetch(), { timeoutMs: 80 }).listFormItems(FORM_ARGS)), unreachable);
+  });
+
+  it('billets qui ne répondent pas alors que le jeton est obtenu : HelloAssoError sans status', async () => {
+    const fetchImpl = hangingFetch({ token: true });
+    await assert.rejects(within(make(fetchImpl, { timeoutMs: 80 }).listFormItems(FORM_ARGS)), unreachable);
+    assert.equal(fetchImpl.calls.length, 2, 'une demande de jeton, puis une demande de billets');
+  });
+
+  it('commande qui ne répond pas (getOrder) : HelloAssoError sans status', async () => {
+    await assert.rejects(within(make(hangingFetch({ token: true }), { timeoutMs: 80 }).getOrder(123)), unreachable);
+  });
+
+  it('la demande de jeton et celle des billets reçoivent chacune un signal d’abandon', async () => {
+    const fetchImpl = hangingFetch({ token: true });
+    await within(make(fetchImpl, { timeoutMs: 50 }).listFormItems(FORM_ARGS)).catch(() => undefined);
+    assert.equal(fetchImpl.calls.length, 2);
+    for (const { url, init } of fetchImpl.calls) assert.ok(init?.signal instanceof AbortSignal, `aucun signal sur ${url.pathname}`);
+  });
+
+  it('sans timeoutMs, un délai par défaut s’applique tout de même : signal fourni, pas encore abandonné', async () => {
+    const fetchImpl = hangingFetch({ token: true });
+    const pendingCall = make(fetchImpl).listFormItems(FORM_ARGS).catch(() => undefined);
+    await sleep(50);
+    const [first] = fetchImpl.calls;
+    assert.ok(first.init?.signal instanceof AbortSignal, 'aucun signal par défaut');
+    assert.equal(first.init.signal.aborted, false);
+    for (const { init } of fetchImpl.calls) init?.signal?.dispatchEvent?.(new Event('abort')); // libère la promesse suspendue
+    await Promise.race([pendingCall, sleep(100)]);
+  });
+
+  it('une réponse plus rapide que le délai n’est pas abandonnée', async () => {
+    const quick = (input) => {
+      const url = new URL(urlOf(input));
+      return sleep(20).then(() => (url.pathname.endsWith('/oauth2/token') ? jsonResponse(200, { access_token: 'jeton-factice-0123456789abcdef', expires_in: 1800 }) : jsonResponse(200, { data: [] })));
+    };
+    assert.deepEqual(await make(quick, { timeoutMs: 2000 }).listFormItems(FORM_ARGS), []);
+  });
+
+  it('un HelloAsso qui refuse la connexion donne aussi une HelloAssoError sans status (régression : injoignable)', async () => {
+    const refusing = () => Promise.reject(new TypeError('fetch failed'));
+    await assert.rejects(make(refusing).listFormItems(FORM_ARGS), unreachable);
   });
 });

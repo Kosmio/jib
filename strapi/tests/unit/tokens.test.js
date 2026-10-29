@@ -9,11 +9,10 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 
-const { pending } = require('../helpers/pending');
 
 const tokens = () => require('../../src/api/espace/lib/tokens');
 
-describe('generateToken (I-20)', pending('lot 2'), () => {
+describe('generateToken (I-20)', () => {
   it('renvoie 43 caractères base64url (32 octets, sans remplissage)', () => {
     assert.match(tokens().generateToken(), /^[A-Za-z0-9_-]{43}$/);
   });
@@ -28,7 +27,7 @@ describe('generateToken (I-20)', pending('lot 2'), () => {
   });
 });
 
-describe('hashToken (I-20, NF-02)', pending('lot 2'), () => {
+describe('hashToken (I-20, NF-02)', () => {
   it('donne le SHA-256 du jeton en hexadécimal minuscule (vecteur de référence « abc »)', () => {
     assert.equal(tokens().hashToken('abc'), 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
   });
@@ -50,7 +49,7 @@ describe('hashToken (I-20, NF-02)', pending('lot 2'), () => {
   });
 });
 
-describe('linkUrl (I-20, I-21)', pending('lot 2'), () => {
+describe('linkUrl (I-20, I-21)', () => {
   const parse = (options) => new URL(tokens().linkUrl(options));
 
   it('construit {publicUrl}/espace/verifier?token=…&next=…', () => {

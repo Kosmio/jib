@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Accès à l'espace, lot 5 de la phase 1 (tests d'abord) : T-01 à T-04, I-20 à I-23, F-01 à F-04 (côté API), NF-01 à NF-04,
+ * Accès à l'espace, lot 5 de la phase 1 : T-01 à T-04, I-20 à I-23, F-01 à F-04 (côté API), NF-01 à NF-04,
  * NF-52, Q-13, A-16 à A-19, plus l'accès croisé de la section 7 du plan (NF-01 sur /me).
  *
  *   - demande de lien (T-01, T-02, T-04), états d'un lien (A-18, T-03), vérification et session (I-20 à I-22) ;
@@ -12,6 +12,9 @@
  *
  * Strapi démarre une fois sur TEST_DATABASE ; chaque requête choisit son IP par X-Forwarded-For (IS_PROXIED=true).
  * Les e-mails arrivent dans la boîte de sortie du fournisseur console. Aucun réseau hors localhost.
+ *
+ * Corrections de la revue, lot 6b (section 11 du plan), livrées : adresse de 255 caractères refusée (A-23),
+ * état d'un lien d'un inscrit annulé ou d'une édition fermée sans adresse (A-18), cookie `Secure` et rendu serveur en http interne (A-25).
  */
 
 const { describe, it } = require('node:test');
@@ -19,9 +22,9 @@ const assert = require('node:assert/strict');
 const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 
+const { addressOfLength } = require('../helpers/addresses');
 const { SESSION_COOKIE, cookieHeader, parseSetCookie, sha256, sleep, useEspace } = require('../helpers/espace');
 const { UID, createAttendee, createEdition, findAttendee } = require('../helpers/espace-data');
-const { pending } = require('../helpers/pending');
 
 const DAY = 24 * 3600 * 1000;
 // Plusieurs organisateurs : la limitation de débit compte les demandes par adresse (5 par 15 minutes), chaque test a la sienne.
@@ -60,7 +63,7 @@ describe('accès à l’espace (lot 5)', { timeout: 300_000 }, () => {
   };
   const linksOf = (attendee) => espace().query(UID.magicToken).findMany({ where: { attendee: { documentId: attendee.documentId }, kind: 'link' } });
 
-  describe('T-01 : demande de lien pour un inscrit (I-20, F-01, F-02)', pending('lot 5'), () => {
+  describe('T-01 : demande de lien pour un inscrit (I-20, F-01, F-02)', () => {
     it('répond 202 { status: accepted } et dépose un e-mail à l’inscrit dans la boîte de sortie', async () => {
       const { a } = await world();
       const { app, outbox, waitForMail } = espace();
@@ -154,6 +157,18 @@ describe('accès à l’espace (lot 5)', { timeout: 300_000 }, () => {
       assert.deepEqual(await mailsSince(since, { to: invalid }), []);
     });
 
+    it('refuse une adresse de 255 caractères (400 EMAIL_INVALID), sans envoi, et en accepte une de 254 (A-23)', async () => {
+      const { a } = await world();
+      const { outbox, mailsSince } = espace();
+      const since = outbox().length;
+      const tooLong = addressOfLength(255);
+      const refused = await askLink(a.slug, tooLong);
+      assert.equal(refused.status, 400);
+      assert.equal(refused.json.error.code, 'EMAIL_INVALID');
+      assert.deepEqual(await mailsSince(since, { to: tooLong }), []);
+      assert.equal((await askLink(a.slug, addressOfLength(254))).status, 202);
+    });
+
     it('exige un Origin admis : sans Origin, 403 ORIGIN_REFUSED et aucun envoi (NF-04)', async () => {
       const { a } = await world();
       const { app, outbox, mailsSince } = espace();
@@ -191,6 +206,13 @@ describe('accès à l’espace (lot 5)', { timeout: 300_000 }, () => {
         assert.equal(response.location, `${espace().publicUrl}/espace/${a.slug}/connexion?erreur=email`);
       });
 
+      it('adresse de 255 caractères : 303 vers ?erreur=email (A-23)', async () => {
+        const { a } = await world();
+        const response = await submit({ editionSlug: a.slug, email: addressOfLength(255) });
+        assert.equal(response.status, 303);
+        assert.equal(response.location, `${espace().publicUrl}/espace/${a.slug}/connexion?erreur=email`);
+      });
+
       it('trop de demandes : 303 vers ?erreur=trop', async () => {
         const { a } = await world();
         const email = 'rafale.formulaire@example.org';
@@ -210,7 +232,7 @@ describe('accès à l’espace (lot 5)', { timeout: 300_000 }, () => {
     });
   });
 
-  describe('T-02 : demande de lien sans suite (F-02, NF-52) : même réponse, aucun e-mail', pending('lot 5'), () => {
+  describe('T-02 : demande de lien sans suite (F-02, NF-52) : même réponse, aucun e-mail', () => {
     const sameAnswer = async (editionSlug, email) => {
       const { outbox, mailsSince } = espace();
       const since = outbox().length;
@@ -258,7 +280,7 @@ describe('accès à l’espace (lot 5)', { timeout: 300_000 }, () => {
     });
   });
 
-  describe('A-19 : la réponse n’attend pas l’envoi de l’e-mail (F-02)', pending('lot 5'), () => {
+  describe('A-19 : la réponse n’attend pas l’envoi de l’e-mail (F-02)', () => {
     // Le temps de réponse ne doit pas distinguer une adresse connue d'une adresse inconnue. On bloque donc l'envoi : la boîte de
     // sortie devient un tube nommé, où le fournisseur console n'écrit qu'une fois un lecteur ouvert. Une réponse qui attendrait
     // l'envoi ne reviendrait pas tant que le test ne lit pas le tube.
@@ -266,28 +288,30 @@ describe('accès à l’espace (lot 5)', { timeout: 300_000 }, () => {
       const { a } = await world();
       const { app, outboxFile } = espace();
       const attendee = await createAttendee(app, a);
+      await sleep(600); // les envois détachés (A-19) des tests précédents sont partis : ils ne tombent pas dans la fenêtre de celui-ci
       fs.rmSync(outboxFile, { force: true });
       execFileSync('mkfifo', [outboxFile]);
       let outcome;
       let received = '';
+      const lines = () => received.split('\n').filter(Boolean).map((line) => JSON.parse(line));
       try {
         outcome = await Promise.race([askLink(a.slug, attendee.email), sleep(3000).then(() => 'bloquée')]);
       } finally {
-        // Lève le blocage : lire le tube laisse le fournisseur écrire sa ligne.
-        for await (const chunk of fs.createReadStream(outboxFile)) {
-          received += chunk;
-          if (received.includes('\n')) break;
+        // Lève le blocage : lire le tube laisse le fournisseur écrire sa ligne (celle de cette demande, quelle que soit l'arrivée des autres).
+        // Le tube se ferme quand l'écrivain qui l'a ouvert le referme : on le rouvre jusqu'à lire la ligne de cette demande.
+        while (!lines().some((mail) => mail.to.email === attendee.email)) {
+          for await (const chunk of fs.createReadStream(outboxFile)) received += chunk;
         }
         await sleep(100);
         fs.rmSync(outboxFile, { force: true });
       }
       assert.notEqual(outcome, 'bloquée', 'la réponse attend l’envoi de l’e-mail');
       assert.equal(outcome.status, 202);
-      assert.equal(JSON.parse(received.split('\n')[0]).to.email, attendee.email);
+      assert.ok(lines().some((mail) => mail.to.email === attendee.email), 'l’e-mail de la demande n’est pas parti');
     });
   });
 
-  describe('T-04 : limitation de débit de la demande de lien (NF-03, F-02)', pending('lot 5'), () => {
+  describe('T-04 : limitation de débit de la demande de lien (NF-03, F-02)', () => {
     it('refuse la 6e demande en 15 minutes pour une même adresse : 429 RATE_LIMITED', async () => {
       const { a } = await world();
       const attendee = await createAttendee(espace().app, a);
@@ -349,7 +373,7 @@ describe('accès à l’espace (lot 5)', { timeout: 300_000 }, () => {
     });
   });
 
-  describe('A-18 : état d’un lien sans le consommer (GET /auth/link)', pending('lot 5'), () => {
+  describe('A-18 : état d’un lien sans le consommer (GET /auth/link)', () => {
     async function freshLink(edition) {
       const { app, outbox, waitForMail, linkOf } = espace();
       const attendee = await createAttendee(app, edition);
@@ -405,9 +429,66 @@ describe('accès à l’espace (lot 5)', { timeout: 300_000 }, () => {
       const response = await espace().request('/api/espace/auth/link?token=abc', { origin: null });
       assert.equal(response.status, 200);
     });
+
+    // Lot 6b : l'adresse n'est renvoyée que pour un lien expiré ou utilisé d'un Attendee actif dans une édition ouverte.
+    describe('inscrit annulé ou édition fermée : { valid: false, editionSlug }, jamais d’adresse (lot 6b, section 11 du plan, point 7)', () => {
+      const setEnabled = async (edition, enabled) => {
+        const { app } = espace();
+        await app.documents(UID.edition).update({ documentId: edition.documentId, data: { participantSpaceEnabled: enabled } });
+        await app.documents(UID.edition).publish({ documentId: edition.documentId });
+      };
+      const expire = (token) => espace().query(UID.magicToken).update({ where: { tokenHash: sha256(token) }, data: { expiresAt: new Date(Date.now() - 60_000) } });
+      const use = (token) => espace().query(UID.magicToken).update({ where: { tokenHash: sha256(token) }, data: { usedAt: new Date() } });
+      const cancel = (attendee) => espace().app.documents(UID.attendee).update({ documentId: attendee.documentId, data: { status: 'cancelled' } });
+      const withoutAddress = (response, edition) => {
+        assert.equal(response.status, 200);
+        assert.deepEqual(response.json, { valid: false, editionSlug: edition.slug });
+        assert.ok(!('email' in response.json), 'adresse dans la réponse');
+      };
+
+      for (const [index, [label, makeUnusable]] of [
+        ['utilisé', use],
+        ['expiré', expire],
+        ['encore valable', async () => undefined],
+      ].entries()) {
+        it(`lien ${label} d’un inscrit annulé : aucune adresse`, async () => {
+          const { a } = await world();
+          const { attendee, token } = await freshLink(a);
+          await makeUnusable(token);
+          await cancel(attendee);
+          withoutAddress(await state(token), a);
+        });
+
+        it(`lien ${label} d’une édition fermée : aucune adresse`, async () => {
+          const edition = await createEdition(espace().app, { slug: `edition-lien-${index}`, title: 'Édition lien' });
+          const { token } = await freshLink(edition);
+          await makeUnusable(token);
+          await setEnabled(edition, false);
+          withoutAddress(await state(token), edition);
+        });
+      }
+
+      it('l’adresse revient pour un lien expiré dès que l’édition est rouverte et l’inscrit actif (A-18 inchangé)', async () => {
+        const edition = await createEdition(espace().app, { slug: 'edition-lien-rouverte', title: 'Édition lien rouverte' });
+        const { attendee, token } = await freshLink(edition);
+        await expire(token);
+        await setEnabled(edition, false);
+        await setEnabled(edition, true);
+        assert.deepEqual((await state(token)).json, { valid: false, editionSlug: edition.slug, email: attendee.email });
+      });
+
+      it('un lien valable d’un inscrit annulé ou d’une édition fermée ne se vérifie pas non plus (400 TOKEN_INVALID)', async () => {
+        const { a } = await world();
+        const { attendee, token } = await freshLink(a);
+        await cancel(attendee);
+        const refused = await espace().request('/api/espace/auth/verify', { method: 'POST', json: { token } });
+        assert.equal(refused.status, 400);
+        assert.equal(refused.json.error.code, 'TOKEN_INVALID');
+      });
+    });
   });
 
-  describe('T-03, I-20, I-21 : vérification du lien et ouverture de session (POST /auth/verify)', pending('lot 5'), () => {
+  describe('T-03, I-20, I-21 : vérification du lien et ouverture de session (POST /auth/verify)', () => {
     async function freshLink(edition, fields = {}) {
       const { app, outbox, waitForMail, linkOf } = espace();
       const attendee = await createAttendee(app, edition, fields);
@@ -595,7 +676,7 @@ describe('accès à l’espace (lot 5)', { timeout: 300_000 }, () => {
     });
   });
 
-  describe('I-22 : cookie de session jib_espace', pending('lot 5'), () => {
+  describe('I-22 : cookie de session jib_espace', () => {
     it('est HttpOnly, SameSite=Lax, Path=/, signé, valable 30 jours, sans Secure en http local', async () => {
       const { a } = await world();
       const { setCookies } = (await person(a)).response;
@@ -738,7 +819,7 @@ describe('accès à l’espace (lot 5)', { timeout: 300_000 }, () => {
     });
   });
 
-  describe('I-23 : organisateurs', pending('lot 5'), () => {
+  describe('I-23 : organisateurs', () => {
     it('une adresse de ORGANIZER_EMAILS sans billet reçoit un lien et devient Attendee organizer : invisible et sans consentement', async () => {
       const { a } = await world();
       const { app, signIn } = espace();
@@ -820,7 +901,7 @@ describe('accès à l’espace (lot 5)', { timeout: 300_000 }, () => {
     });
   });
 
-  describe('NF-01 sur /me : accès croisés entre A, B (même édition) et C (autre édition), section 7 du plan', pending('lot 5'), () => {
+  describe('NF-01 sur /me : accès croisés entre A, B (même édition) et C (autre édition), section 7 du plan', () => {
     it('A ne voit que lui-même sur GET /me ; B et C voient le leur', async () => {
       const { a, c } = await world();
       const A = await person(a, { firstName: 'Anna', lastName: 'Alpha' });
@@ -1024,7 +1105,7 @@ describe('accès à l’espace (lot 5)', { timeout: 300_000 }, () => {
     });
   });
 
-  describe('NF-52 : gel de l’édition (participantSpaceEnabled)', pending('lot 5'), () => {
+  describe('NF-52 : gel de l’édition (participantSpaceEnabled)', () => {
     const setEnabled = async (edition, enabled) => {
       const { app } = espace();
       await app.documents(UID.edition).update({ documentId: edition.documentId, data: { participantSpaceEnabled: enabled } });
@@ -1076,7 +1157,7 @@ describe('I-22 : cookie Secure quand PUBLIC_URL est en https (lot 5)', { timeout
   const HTTPS = 'https://journees.example.org';
   const secure = useEspace({ overrides: { PUBLIC_URL: HTTPS, CORS_ORIGINS: HTTPS } });
 
-  it('pose le cookie jib_espace avec l’attribut Secure et redirige vers une URL https', pending('lot 5'), async () => {
+  it('pose le cookie jib_espace avec l’attribut Secure et redirige vers une URL https', async () => {
     const { app, request, waitForMail, linkOf, outbox } = secure();
     const edition = await createEdition(app, { slug: 'edition-https', title: 'Édition https' });
     const attendee = await createAttendee(app, edition);
@@ -1094,5 +1175,110 @@ describe('I-22 : cookie Secure quand PUBLIC_URL est en https (lot 5)', { timeout
     assert.equal(cookie.attributes.secure, true);
     assert.equal(cookie.attributes.httponly, true);
     assert.ok(cookieHeader(verified.setCookies).includes(SESSION_COOKIE));
+  });
+
+  // A-25 (lot 6b). Le rendu serveur d'Astro appelle Strapi en http interne, sans X-Forwarded-Proto, en relayant le cookie : Koa refuse alors
+  // de poser un cookie Secure (500). Les appels du navigateur passent par Traefik, donc en https. Les tests simulent les deux par l'en-tête.
+  describe('A-25 : cookie Secure et appel http interne du rendu serveur (lot 6b, section 11 du plan, point 1)', () => {
+    const PROTO = { 'x-forwarded-proto': 'https' };
+    const DAY = 24 * 3600 * 1000;
+    let counter = 0;
+
+    /** Session ouverte comme le navigateur le fait (https), dont l'échéance est ramenée à 20 jours : la prochaine requête doit la prolonger. */
+    async function sessionDueToSlide({ slid = true } = {}) {
+      counter += 1;
+      const { app, request, waitForMail, linkOf, outbox, query } = secure();
+      const edition = await createEdition(app, { slug: `edition-https-glissement-${counter}`, title: 'Édition https glissement' });
+      const attendee = await createAttendee(app, edition, { consentAt: new Date().toISOString() });
+      const since = outbox().length;
+      assert.equal((await request('/api/espace/auth/request-link', { method: 'POST', json: { editionSlug: edition.slug, email: attendee.email }, headers: PROTO })).status, 202);
+      const { token } = linkOf(await waitForMail((mail) => mail.to.email === attendee.email, { since }));
+      const verified = await request('/api/espace/auth/verify', { method: 'POST', json: { token }, headers: PROTO });
+      assert.equal(verified.status, 200);
+      const cookie = cookieHeader(verified.setCookies);
+      const rows = () => query(UID.magicToken).findMany({ where: { attendee: { documentId: attendee.documentId }, kind: 'session' } });
+      if (slid) for (const row of await rows()) await query(UID.magicToken).update({ where: { id: row.id }, data: { expiresAt: new Date(Date.now() + 20 * DAY) } });
+      const expiry = async () => new Date((await rows())[0].expiresAt).getTime();
+      return { attendee, cookie, rows, expiry, startExpiry: await expiry() };
+    }
+    const me = (cookie, headers) => secure().request('/api/espace/me', { cookie, headers });
+    const sessionCookies = (response) => response.setCookies.filter((line) => line.startsWith(`${SESSION_COOKIE}=`));
+
+    it('GET /me sans X-Forwarded-Proto sur une session à prolonger : 200, aucun Set-Cookie, échéance inchangée en base', async () => {
+      const { cookie, expiry, startExpiry } = await sessionDueToSlide();
+      const response = await me(cookie);
+      assert.equal(response.status, 200, response.text);
+      assert.deepEqual(sessionCookies(response), [], 'cookie posé sur une requête http');
+      assert.equal(await expiry(), startExpiry, 'échéance modifiée sans cookie correspondant');
+    });
+
+    it('GET /me avec X-Forwarded-Proto: https : 200, Set-Cookie Secure, échéance repoussée à 30 jours', async () => {
+      const { cookie, expiry, startExpiry } = await sessionDueToSlide();
+      const response = await me(cookie, PROTO);
+      assert.equal(response.status, 200, response.text);
+      const [line] = sessionCookies(response);
+      assert.ok(line, 'cookie renouvelé absent');
+      assert.equal(parseSetCookie(line).attributes.secure, true);
+      const extended = await expiry();
+      assert.ok(extended > startExpiry && Math.abs(extended - (Date.now() + 30 * DAY)) < 5 * 60_000, `prolongée jusqu’à ${new Date(extended).toISOString()}`);
+    });
+
+    it('le glissement refusé en http interne n’est pas perdu : il a lieu à l’appel suivant du navigateur', async () => {
+      const { cookie, expiry, startExpiry } = await sessionDueToSlide();
+      assert.equal((await me(cookie)).status, 200);
+      assert.equal(await expiry(), startExpiry);
+      assert.equal((await me(cookie, PROTO)).status, 200);
+      assert.ok((await expiry()) > startExpiry);
+    });
+
+    it('GET /me sans X-Forwarded-Proto sur une session récente : 200 sans Set-Cookie, comme avec https', async () => {
+      const { cookie, expiry, startExpiry } = await sessionDueToSlide({ slid: false });
+      const http = await me(cookie);
+      assert.equal(http.status, 200);
+      assert.deepEqual(sessionCookies(http), []);
+      const https = await me(cookie, PROTO);
+      assert.equal(https.status, 200);
+      assert.deepEqual(sessionCookies(https), []);
+      assert.equal(await expiry(), startExpiry);
+    });
+
+    it('la réponse de /me est la même avec et sans X-Forwarded-Proto', async () => {
+      const { cookie } = await sessionDueToSlide({ slid: false });
+      assert.deepEqual((await me(cookie)).json, (await me(cookie, PROTO)).json);
+    });
+
+    it('POST /auth/logout sans X-Forwarded-Proto : 204, session supprimée en base, aucun Set-Cookie', async () => {
+      const { cookie, rows } = await sessionDueToSlide({ slid: false });
+      const response = await secure().request('/api/espace/auth/logout', { method: 'POST', cookie });
+      assert.equal(response.status, 204, response.text);
+      assert.equal((await rows()).length, 0);
+      assert.deepEqual(sessionCookies(response), [], 'cookie posé sur une requête http');
+    });
+
+    it('après cette déconnexion, le même cookie reçoit 401', async () => {
+      const { cookie } = await sessionDueToSlide({ slid: false });
+      await secure().request('/api/espace/auth/logout', { method: 'POST', cookie });
+      assert.equal((await me(cookie, PROTO)).status, 401);
+    });
+
+    it('POST /auth/logout avec X-Forwarded-Proto: https : 204, cookie effacé (Secure), session supprimée', async () => {
+      const { cookie, rows } = await sessionDueToSlide({ slid: false });
+      const response = await secure().request('/api/espace/auth/logout', { method: 'POST', cookie, headers: PROTO });
+      assert.equal(response.status, 204, response.text);
+      assert.equal((await rows()).length, 0);
+      const [line] = sessionCookies(response);
+      assert.ok(line, 'cookie non effacé');
+      assert.ok(/max-age=0|expires=Thu, 01 Jan 1970/i.test(line) || line.startsWith(`${SESSION_COOKIE}=;`), line);
+      assert.equal(parseSetCookie(line).attributes.secure, true);
+    });
+
+    it('formulaire de déconnexion sans X-Forwarded-Proto : 303 vers la connexion de l’édition sur PUBLIC_URL, session supprimée', async () => {
+      const { cookie, rows, attendee } = await sessionDueToSlide({ slid: false });
+      const edition = await secure().app.documents(UID.attendee).findOne({ documentId: attendee.documentId, populate: ['edition'] });
+      const response = await secure().request('/api/espace/auth/logout', { method: 'POST', cookie, form: { editionSlug: edition.edition.slug } });
+      assert.equal(response.status, 303, response.text);
+      assert.equal(response.location, `${HTTPS}/espace/${edition.edition.slug}/connexion?deconnecte=1`);
+      assert.equal((await rows()).length, 0);
+    });
   });
 });

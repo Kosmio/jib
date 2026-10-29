@@ -11,12 +11,14 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { pending } = require('../helpers/pending');
 
 const slots = () => require('../../src/api/espace/lib/slots');
 
 const iso = (value) => new Date(value).toISOString();
+// `kind` vaut `b2b_break` seulement quand l'appel ne le donne pas : un `undefined` explicite prendrait ce défaut. Une séquence
+// « sans kind » s'écrit donc par `withoutKind`, jamais par `sequence(…, undefined, …)`.
 const sequence = (documentId, start_time, end_time, kind = 'b2b_break', title = `Séquence ${documentId}`) => ({ documentId, title, start_time, end_time, kind });
+const withoutKind = (documentId, start_time, end_time, title = `Séquence ${documentId}`) => ({ documentId, title, start_time, end_time });
 
 // Les trois pauses du programme Nouvelle-Aquitaine (10-recette.md).
 const RECETTE = [
@@ -25,7 +27,7 @@ const RECETTE = [
   sequence('pause-apres-midi', '15h30', '16h00', 'b2b_break', 'Pause et B2B'),
   sequence('accueil', '9h15', '9h45', 'other', 'Accueil et ouverture'),
   sequence('foret', '9h45', '10h45', 'talk', 'Forêt et adaptation'),
-  { documentId: 'sans-kind', title: 'Sans kind', start_time: '11h15', end_time: '12h30' }, // aucun champ kind
+  withoutKind('sans-kind', '11h15', '12h30', 'Sans kind'), // aucun champ kind
   sequence('kind-null', '14h00', '15h30', null, 'Kind nul'),
 ];
 
@@ -34,7 +36,7 @@ const compute = (sessions, { date = '2026-12-03', durationMinutes = 15, timeZone
 const byStart = (list) => [...list].sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt));
 const labels = (result) => byStart(result.slots).map((slot) => slot.label);
 
-describe('computeSlots : exemple de R-01 (Nouvelle-Aquitaine, pas de 15 min)', pending('lot 2'), () => {
+describe('computeSlots : exemple de R-01 (Nouvelle-Aquitaine, pas de 15 min)', () => {
   it('donne les 10 créneaux 10h45, 11h00 ; 12h30 à 13h45 ; 15h30, 15h45', () => {
     assert.deepEqual(labels(compute(RECETTE)), ['10h45', '11h00', '12h30', '12h45', '13h00', '13h15', '13h30', '13h45', '15h30', '15h45']);
   });
@@ -44,6 +46,8 @@ describe('computeSlots : exemple de R-01 (Nouvelle-Aquitaine, pas de 15 min)', p
   });
 
   it('ignore les séquences talk, other, sans kind et à kind nul (valeur nulle traitée comme talk)', () => {
+    assert.ok(!('kind' in RECETTE.find((s) => s.documentId === 'sans-kind')), 'la séquence « sans kind » porte un champ kind');
+    assert.equal(RECETTE.find((s) => s.documentId === 'kind-null').kind, null);
     const result = compute(RECETTE.filter((s) => s.kind !== 'b2b_break'));
     assert.deepEqual(result, { slots: [], warnings: [] });
   });
@@ -95,7 +99,7 @@ describe('computeSlots : exemple de R-01 (Nouvelle-Aquitaine, pas de 15 min)', p
   });
 });
 
-describe('computeSlots : durée du pas et bornes (R-01)', pending('lot 2'), () => {
+describe('computeSlots : durée du pas et bornes (R-01)', () => {
   it('ne garde pas un dernier créneau qui dépasserait la fin : 10h45 à 11h10, pas de 15 min, un seul créneau', () => {
     assert.deepEqual(labels(compute([sequence('a', '10h45', '11h10')])), ['10h45']);
   });
@@ -113,7 +117,7 @@ describe('computeSlots : durée du pas et bornes (R-01)', pending('lot 2'), () =
   });
 });
 
-describe('computeSlots : avertissements pour l’organisateur (R-01, R-02)', pending('lot 2'), () => {
+describe('computeSlots : avertissements pour l’organisateur (R-01, R-02)', () => {
   const warningsOf = (sessions) => compute(sessions).warnings;
 
   it('MISSING_END : pause sans heure de fin (absente, nulle ou vide), aucun créneau', () => {
@@ -175,7 +179,7 @@ describe('computeSlots : avertissements pour l’organisateur (R-01, R-02)', pen
  * planSlots (R-02). `existing` : créneaux déjà en base, avec le nombre de rendez-vous `pending` ou `accepted`
  * (`activeMeetings`). Les créneaux voulus viennent de computeSlots, donc dans la même représentation.
  */
-describe('planSlots : régénération idempotente (R-02)', pending('lot 2'), () => {
+describe('planSlots : régénération idempotente (R-02)', () => {
   const wantedSlots = () => compute(RECETTE).slots;
   const asExisting = (list, overrides = {}) =>
     list.map((slot, index) => ({ ...slot, id: `s${index}`, documentId: `s${index}`, activeMeetings: 0, ...overrides }));

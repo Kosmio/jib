@@ -8,14 +8,13 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { pending } = require('../helpers/pending');
 
 const session = () => require('../../src/api/espace/lib/session');
 
 const SLUG = 'nouvelle-aquitaine-test';
 const HOME = `/espace/${SLUG}/`;
 
-describe('safeNextPath : aucune redirection ouverte (I-21, A-04)', pending('lot 5'), () => {
+describe('safeNextPath : aucune redirection ouverte (I-21, A-04)', () => {
   const safe = (next, slug = SLUG) => session().safeNextPath(next, slug);
 
   for (const next of [HOME, `/espace/${SLUG}/profil`, `/espace/${SLUG}/rendez-vous`, `/espace/${SLUG}/rendez-vous?onglet=recus`, `/espace/${SLUG}/annuaire/p/abc123`]) {
@@ -59,7 +58,7 @@ describe('safeNextPath : aucune redirection ouverte (I-21, A-04)', pending('lot 
   });
 });
 
-describe('sessionCookieOptions : cookie jib_espace (I-22)', pending('lot 5'), () => {
+describe('sessionCookieOptions : cookie jib_espace (I-22)', () => {
   const THIRTY_DAYS = 30 * 24 * 3600 * 1000;
   const options = (publicUrl, maxAgeMs = THIRTY_DAYS) => session().sessionCookieOptions({ publicUrl, maxAgeMs });
 

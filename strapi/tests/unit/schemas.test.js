@@ -18,7 +18,6 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { pending } = require('../helpers/pending');
 const frozen = require('../fixtures/existing-schemas.json');
 
 const API_DIR = path.resolve(__dirname, '../../src/api');
@@ -106,7 +105,7 @@ describe('types de l’espace : règles communes (A-03, 02-modele-donnees.md)', 
   }
 });
 
-describe('modèle du lot 2 : les 10 types nouveaux (section 3 du plan)', pending('lot 2'), () => {
+describe('modèle du lot 2 : les 10 types nouveaux (section 3 du plan)', () => {
   const EXPECTED = {
     topic: { table: 'espace_topics', relations: { edition: 'api::edition.edition', sessions: 'api::sequence.sequence' } },
     slot: { table: 'espace_slots', relations: { edition: 'api::edition.edition', session: 'api::sequence.sequence' } },

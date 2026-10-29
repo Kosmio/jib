@@ -9,7 +9,6 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { pending } = require('../helpers/pending');
 
 const errors = () => require('../../src/api/espace/lib/errors');
 const guards = () => require('../../src/api/espace/lib/guards');
@@ -30,7 +29,7 @@ const refusal = (status, code) => (error) => {
   return true;
 };
 
-describe('EspaceError', pending('lot 2'), () => {
+describe('EspaceError', () => {
   it('est une Error qui porte status, code et message', () => {
     const error = new (errors().EspaceError)(409, 'SLOT_TAKEN', 'Ce créneau n’est plus disponible.');
     assert.ok(error instanceof Error);
@@ -48,7 +47,7 @@ describe('EspaceError', pending('lot 2'), () => {
   });
 });
 
-describe('requireSession (NF-01)', pending('lot 2'), () => {
+describe('requireSession (NF-01)', () => {
   it('renvoie ctx.state.espace quand une session est chargée', () => {
     const espace = session();
     assert.equal(guards().requireSession(ctxWith(espace)), espace);
@@ -63,7 +62,7 @@ describe('requireSession (NF-01)', pending('lot 2'), () => {
   });
 });
 
-describe('requireOrganizer (I-23, NF-01)', pending('lot 2'), () => {
+describe('requireOrganizer (I-23, NF-01)', () => {
   it('laisse passer un organisateur de la même édition', () => {
     const espace = session({ isOrganizer: true });
     assert.equal(guards().requireOrganizer(ctxWith(espace), 'nouvelle-aquitaine-test'), espace);
