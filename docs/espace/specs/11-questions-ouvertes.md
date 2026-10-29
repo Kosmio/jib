@@ -32,6 +32,9 @@ Tant qu'une question n'est pas tranchée par Xylofutur, les agents appliquent l'
 | Q-09 | Même compte et même domaine d'envoi Brevo que le site actuel (formulaire de contact, newsletter). | Mathieu |
 | Q-11 | Même domaine confirmé : Traefik sert le site sur `/` et Strapi sur `/strapi`. Le cookie de session (I-22) est posé sur le domaine du site, sans proxy supplémentaire. | constat |
 | Q-03 | Libellés relevés sur le formulaire Nouvelle-Aquitaine : « Email », « Organisation », « Poste », tous obligatoires. `helloassoFieldMap` de l'édition : `{ "email": "Email", "company": "Organisation", "jobTitle": "Poste" }`. Les autres questions (Type d'organisation, N° de téléphone, Code Postal, Accès PMR) ne sont pas importées (NF-11). | capture de Nétih, 29 octobre |
+| Q-13 | Hypothèse par défaut validée : la page de vérification affiche le bouton « Ouvrir mon espace », le jeton n'est consommé qu'au clic. | Mathieu, 29 octobre |
+| Q-14 | Hypothèse par défaut validée : l'espace sert Sora et Source Sans 3 depuis `web/public/fonts` (fontes variables, sous-ensemble latin), sans Google Fonts ; le site public reste inchangé. | Mathieu, 29 octobre |
+| Mention E0 | « Vos données restent hébergées par Xylofutur » (maquette 01) remplacée par « Vos données servent uniquement à l’organisation de la journée. » ; à faire confirmer par Xylofutur avant la recette. | Mathieu, 29 octobre |
 | Q-08 | Demandé à Xylofutur (Nétih), avec les identifiants API HelloAsso de production. En attendant, le développement se fait contre une organisation créée sur le bac à sable HelloAsso. | en attente |
 
 | Id | Décision | Source |
