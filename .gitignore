@@ -42,6 +42,7 @@ spec/mail-html/
 # Playwright (web)
 web/test-results/
 web/playwright-report/
+web/dist-e2e/
 
 # Accessibility audit artifacts
 .claude/skills/accessibility/a11y-audit/last-audit.json

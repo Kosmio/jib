@@ -9,7 +9,8 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "test:visual": "playwright test --project=visual"
+    "test:visual": "playwright test --project=visual",
+    "test:e2e": "PLAYWRIGHT_E2E=1 playwright test --project=e2e"
   },
   "dependencies": {
     "@astrojs/node": "^10.0.4",
