@@ -7,6 +7,12 @@
  * Preuves recherchées : le seed crée exactement les données de recette ; deux passages donnent le même
  * état (idempotence) ; il n'efface que les données de recette ; sur une base vide il ne crée aucune édition
  * de démonstration ni image (DEMO_SEED=false imposé).
+ *
+ * Phase 1 (lot 3, tests d'abord) : les types de l'espace, lus dans les mêmes démarrages (section 4.4 du plan) :
+ *   - lot 2 : réglages de l'édition, 5 Topic, `kind` des 9 séquences et rattachement aux thèmes, 2 Exhibitor, 10 Slot ;
+ *   - lot 4 : 17 Attendee issus des billets du faux HelloAsso, réglages de `recette.json`, 17 EmailLog `welcome`.
+ * La lecture de ces types ne fait pas échouer le `before` tant que les modèles manquent : l'erreur est gardée et relancée
+ * par chaque test d'abord.
  */
 
 const { describe, it, before } = require('node:test');
@@ -18,6 +24,8 @@ const { buildTestEnv, STRAPI_DIR, testDatabaseName } = require('../helpers/env')
 const { queryDatabase, resetDatabase } = require('../helpers/database');
 const { startStrapi } = require('../helpers/strapi');
 const recette = require('../../scripts/espace/fixtures/recette.json');
+const helloassoItems = require('../../scripts/espace/fixtures/helloasso-items.json');
+const { pending } = require('../helpers/pending');
 
 const DATABASE = testDatabaseName();
 const SEED = path.join(STRAPI_DIR, 'scripts/espace/seed.js');
@@ -60,6 +68,79 @@ async function readState(app) {
   };
 }
 
+const ESPACE = {
+  edition: 'api::edition.edition',
+  sequence: 'api::sequence.sequence',
+  topic: 'api::espace.topic',
+  slot: 'api::espace.slot',
+  exhibitor: 'api::espace.exhibitor',
+  attendee: 'api::espace.attendee',
+  emailLog: 'api::espace.email-log',
+};
+// Tri en JavaScript (ordre des unités de code), identique pour l'état lu et l'état attendu : pas de dépendance à la collation de Postgres.
+const compare = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+const SETTINGS = ['participantSpaceEnabled', 'helloassoOrgSlug', 'helloassoFormType', 'helloassoFormSlug', 'helloassoFieldMap', 'slotDurationMinutes', 'tablesCount', 'meetingRequestsOpenAt', 'meetingRequestsCloseAt'];
+
+/** Données de l'espace de l'édition de recette, sans identifiants ni dates de création : comparables d'un passage à l'autre. */
+async function readEspace(app) {
+  const edition = await app.documents(ESPACE.edition).findFirst({ filters: { slug: recette.edition.slug }, status: 'published' });
+  const filters = { edition: { documentId: edition.documentId } };
+  const many = (uid, options = {}) => app.documents(uid).findMany({ filters, limit: 1000, ...options });
+  const iso = (value) => (value ? new Date(value).toISOString() : null);
+  const names = (list = []) => list.map((entry) => entry.name ?? entry.title ?? entry.slug).sort();
+
+  const sequences = await many(ESPACE.sequence, { status: 'published', sort: 'order:asc' });
+  const topics = await many(ESPACE.topic, { populate: ['sessions'], sort: 'name:asc' });
+  const slots = await many(ESPACE.slot, { populate: ['session'], sort: 'startsAt:asc' });
+  const exhibitors = await many(ESPACE.exhibitor, { populate: ['organisation', 'topics', 'representatives'] });
+  const attendees = await many(ESPACE.attendee, { populate: ['speaker', 'exhibitor', 'topics'] });
+  const logs = await app.db.query(ESPACE.emailLog).findMany({ where: { attendee: { edition: { documentId: edition.documentId } } }, populate: ['attendee'] });
+
+  return {
+    settings: Object.fromEntries(SETTINGS.map((key) => [key, SETTINGS.slice(-2).includes(key) ? iso(edition[key]) : edition[key]])),
+    sequences: sequences.map((sequence) => ({ title: sequence.title, kind: sequence.kind })),
+    topics: topics.map((topic) => ({ name: topic.name, sessions: names(topic.sessions) })),
+    slots: slots.map((slot) => ({ label: slot.label, startsAt: iso(slot.startsAt), endsAt: iso(slot.endsAt), session: slot.session?.title, sessionStart: slot.session?.start_time })),
+    exhibitors: exhibitors
+      .map((exhibitor) => ({
+        standNumber: exhibitor.standNumber,
+        organisation: exhibitor.organisation?.slug,
+        topics: names(exhibitor.topics),
+        representatives: (exhibitor.representatives ?? []).map((rep) => rep.email).sort(),
+      }))
+      .sort((a, b) => compare(a.standNumber, b.standNumber)),
+    attendees: attendees
+      .map((attendee) => ({
+      email: attendee.email,
+      helloassoItemId: String(attendee.helloassoItemId),
+      helloassoOrderId: String(attendee.helloassoOrderId),
+      firstName: attendee.firstName,
+      lastName: attendee.lastName,
+      jobTitle: attendee.jobTitle ?? null,
+      company: attendee.company ?? null,
+      role: attendee.role,
+      status: attendee.status,
+      speaker: attendee.speaker?.slug ?? null,
+      exhibitor: attendee.exhibitor?.standNumber ?? null,
+      directoryOptIn: attendee.directoryOptIn,
+      meetingsOptIn: attendee.meetingsOptIn,
+      newsOptIn: attendee.newsOptIn,
+      topics: names(attendee.topics),
+      activatedAt: iso(attendee.activatedAt),
+      consentAt: iso(attendee.consentAt),
+    }))
+      .sort((a, b) => compare(a.email, b.email)),
+    emailLogs: logs.map((log) => ({ email: log.attendee?.email, template: log.template, status: log.status })).sort((a, b) => compare(a.email, b.email)),
+  };
+}
+
+const safeReadEspace = (app) => readEspace(app).catch((error) => ({ error: `${error.message}` }));
+/** L'état de l'espace, ou l'erreur de lecture (modèle du lot 2 absent) relancée dans le test d'abord qui l'attend. */
+const espaceOf = (state) => {
+  assert.ok(!state?.error, `lecture de l’espace impossible : ${state?.error}`);
+  return state;
+};
+
 const countDocuments = async (table, where = 'true') =>
   (await queryDatabase(DATABASE, `select count(distinct document_id)::int as n from ${table} where ${where}`)).rows[0].n;
 
@@ -69,6 +150,9 @@ describe('seed de recette sur la base de test', { timeout: 600_000 }, () => {
   let stateAfterFirst;
   let stateAfterSecond;
   let foreignAfterSecond;
+  let espaceAfterFirst;
+  let espaceAfterSecond;
+  let foreignEspaceAfterSecond;
 
   before(async () => {
     await resetDatabase(DATABASE);
@@ -79,10 +163,18 @@ describe('seed de recette sur la base de test', { timeout: 600_000 }, () => {
     const strapi = await startStrapi({ database: DATABASE, reset: false });
     try {
       stateAfterFirst = await readState(strapi.app);
-      await strapi.app.documents('api::edition.edition').create({
+      espaceAfterFirst = await safeReadEspace(strapi.app);
+      const foreignEdition = await strapi.app.documents('api::edition.edition').create({
         data: { title: 'Édition étrangère', slug: 'edition-etrangere', year: 2025, region: 'normandie', city: 'Ailleurs', edition_status: 'passee' },
         status: 'published',
       });
+      // Donnée d'espace d'une autre édition : le seed ne l'efface pas (section 4.4 : « données espace_* de l'édition de recette »).
+      // Sans le modèle du lot 2, `documents()` lève tout de suite : ce `before` ne doit pas en faire échouer les tests actifs.
+      try {
+        await strapi.app.documents(ESPACE.topic).create({ data: { name: 'Sujet étranger', edition: { documentId: foreignEdition.documentId } } });
+      } catch {
+        // modèle absent : les tests d'abord du lot 2 échouent pour cette raison
+      }
       await strapi.app.documents('api::organisation.organisation').create({
         data: { name: 'Organisation étrangère', slug: 'organisation-etrangere' },
         status: 'published',
@@ -96,6 +188,12 @@ describe('seed de recette sur la base de test', { timeout: 600_000 }, () => {
     const strapiAgain = await startStrapi({ database: DATABASE, reset: false });
     try {
       stateAfterSecond = await readState(strapiAgain.app);
+      espaceAfterSecond = await safeReadEspace(strapiAgain.app);
+      try {
+        foreignEspaceAfterSecond = await strapiAgain.app.documents(ESPACE.topic).findMany({ filters: { name: 'Sujet étranger' } });
+      } catch {
+        foreignEspaceAfterSecond = [];
+      }
       foreignAfterSecond = {
         edition: await strapiAgain.app.documents('api::edition.edition').findFirst({ filters: { slug: 'edition-etrangere' }, status: 'published' }),
         organisation: await strapiAgain.app.documents('api::organisation.organisation').findFirst({ filters: { slug: 'organisation-etrangere' }, status: 'published' }),
@@ -215,6 +313,190 @@ describe('seed de recette sur la base de test', { timeout: 600_000 }, () => {
     it('n’a créé ni tag ni fichier téléversé', async () => {
       assert.equal(await countDocuments('tags'), 0);
       assert.equal(await countDocuments('files'), 0);
+    });
+  });
+
+  // ---------------------------------------------------------------------------------------------------------------
+  // Tests d'abord de la phase 1 (lot 3). Section 4.4 du plan, 10-recette.md.
+  // ---------------------------------------------------------------------------------------------------------------
+
+  describe('seed de la phase 1, lot 2 : réglages, thèmes, pauses, exposants et créneaux (4.4, points 1 à 5)', pending('lot 2'), () => {
+    const kinds = recette.sequences.map(({ title, kind }) => ({ title, kind }));
+
+    it('règle l’édition de recette : espace ouvert, formulaire HelloAsso du faux, 3 tables, créneaux de 15 min, fenêtre ouverte', () => {
+      const { settings } = espaceOf(espaceAfterFirst);
+      assert.deepEqual(settings, {
+        ...recette.editionSettings,
+        meetingRequestsOpenAt: '2026-10-01T08:00:00.000Z',
+        meetingRequestsCloseAt: '2026-12-02T17:00:00.000Z',
+      });
+    });
+
+    it('crée les 5 thèmes de la recette', () => {
+      assert.deepEqual(espaceOf(espaceAfterFirst).topics.map((topic) => topic.name).sort(), [...recette.topics].sort());
+    });
+
+    it('rétablit le kind des 9 séquences : 3 pauses b2b_break, 5 talk, 1 other', () => {
+      const { sequences } = espaceOf(espaceAfterFirst);
+      assert.deepEqual(sequences, kinds);
+      assert.equal(sequences.filter((sequence) => sequence.kind === 'b2b_break').length, 3);
+    });
+
+    it('rattache chaque séquence thématique à son thème par Topic.sessions (A-15)', () => {
+      const { topics } = espaceOf(espaceAfterFirst);
+      for (const name of recette.topics) {
+        assert.deepEqual(topics.find((topic) => topic.name === name).sessions, [name], `thème ${name}`);
+      }
+    });
+
+    it('crée les 2 exposants : stands 4 et 12, organisations et sujets de la recette', () => {
+      const { exhibitors } = espaceOf(espaceAfterFirst);
+      assert.deepEqual(
+        exhibitors.map(({ standNumber, organisation, topics }) => ({ standNumber, organisation, topics })),
+        recette.exhibitors
+          .map(({ organisation, standNumber, topics }) => ({ standNumber, organisation, topics: [...topics].sort() }))
+          .sort((a, b) => compare(a.standNumber, b.standNumber))
+      );
+    });
+
+    it('génère les 10 créneaux de R-01 par le service de génération', () => {
+      const { slots } = espaceOf(espaceAfterFirst);
+      assert.deepEqual(slots.map((slot) => slot.label), ['10h45', '11h00', '12h30', '12h45', '13h00', '13h15', '13h30', '13h45', '15h30', '15h45']);
+    });
+
+    it('place les créneaux le 3 décembre 2026 (UTC+1) et les rattache à leur pause', () => {
+      const { slots } = espaceOf(espaceAfterFirst);
+      assert.equal(slots[0].startsAt, '2026-12-03T09:45:00.000Z');
+      assert.equal(slots.at(-1).endsAt, '2026-12-03T15:00:00.000Z');
+      assert.ok(slots.every((slot) => new Date(slot.endsAt) - new Date(slot.startsAt) === 15 * 60_000));
+      assert.deepEqual(
+        slots.map((slot) => slot.sessionStart),
+        ['10h45', '10h45', '12h30', '12h30', '12h30', '12h30', '12h30', '12h30', '15h30', '15h30']
+      );
+    });
+
+    it('rappelle dans le résumé que l’organisateur se connecte par ORGANIZER_EMAILS (Q-17)', () => {
+      assert.match(first.stdout, /ORGANIZER_EMAILS/);
+    });
+
+    it('second passage : mêmes comptes, 5 thèmes, 9 séquences dont 3 pauses, 2 exposants, 10 créneaux (critère 5 du lot 2)', () => {
+      const second = espaceOf(espaceAfterSecond);
+      assert.equal(second.topics.length, 5);
+      assert.equal(second.sequences.length, 9);
+      assert.equal(second.sequences.filter((sequence) => sequence.kind === 'b2b_break').length, 3);
+      assert.equal(second.exhibitors.length, 2);
+      assert.equal(second.slots.length, 10);
+    });
+
+    it('second passage : état identique au premier, thèmes, exposants et créneaux compris (idempotence)', () => {
+      const comparable = ({ settings, sequences, topics, slots, exhibitors }) => ({ settings, sequences, topics, slots, exhibitors });
+      assert.deepEqual(comparable(espaceOf(espaceAfterSecond)), comparable(espaceOf(espaceAfterFirst)));
+    });
+
+    it('second passage : le seed ne touche pas aux thèmes d’une autre édition', () => {
+      assert.equal(foreignEspaceAfterSecond?.length, 1);
+    });
+
+    it('aucun doublon en base : une ligne de table par thème, exposant et créneau de recette', async () => {
+      const rows = async (query) => (await queryDatabase(DATABASE, query)).rows[0].n;
+      const names = recette.topics.map((name) => `'${name.replace(/'/g, "''")}'`).join(',');
+      assert.equal(await rows(`select count(*)::int as n from espace_topics where name in (${names})`), 5);
+      assert.equal(await rows('select count(*)::int as n from espace_slots'), 10);
+      assert.equal(await rows('select count(*)::int as n from espace_exhibitors'), 2);
+    });
+  });
+
+  describe('seed de la phase 1, lot 4 : les 17 Attendee de la recette et leurs e-mails welcome (4.4, point 6)', pending('lot 4'), () => {
+    const emails = Object.keys(recette.attendees).sort(compare);
+    const find = (state, email) => espaceOf(state).attendees.find((attendee) => attendee.email === email);
+
+    it('crée les 17 Attendee, dont 12 participants, 2 intervenants et 3 représentants d’exposants (Q-17)', () => {
+      const { attendees } = espaceOf(espaceAfterFirst);
+      assert.deepEqual(attendees.map((attendee) => attendee.email), emails);
+      assert.deepEqual(
+        Object.fromEntries(Object.entries(Object.groupBy(attendees, (attendee) => attendee.role)).map(([role, list]) => [role, list.length])),
+        { participant: 12, speaker: 2, exhibitor_rep: 3 }
+      );
+    });
+
+    it('n’applique pas Q-15 : Lucas Darrigade (billet Canceled) est créé, au statut cancelled', () => {
+      const lucas = find(espaceAfterFirst, 'lucas.darrigade@example.org');
+      assert.equal(lucas.status, 'cancelled');
+      assert.equal(espaceOf(espaceAfterFirst).attendees.filter((attendee) => attendee.status === 'active').length, 16);
+    });
+
+    it('reprend nom, prénom, fonction et entreprise des billets (mapItem), en distinguant le bénéficiaire du payeur', () => {
+      const lea = find(espaceAfterFirst, 'lea.ducasse@example.org');
+      assert.deepEqual([lea.firstName, lea.lastName, lea.company, lea.jobTitle], ['Léa', 'Ducasse', 'Charpentes du Pibal', 'Responsable bureau d’études']);
+      const ines = find(espaceAfterFirst, 'ines.castaing@example.org');
+      assert.equal(ines.helloassoItemId, '100003');
+      assert.deepEqual([ines.firstName, ines.lastName], ['Inès', 'Castaing']);
+    });
+
+    it('conserve les identifiants HelloAsso de chaque billet, et seulement eux', () => {
+      const ids = espaceOf(espaceAfterFirst).attendees.map((attendee) => attendee.helloassoItemId).sort();
+      assert.deepEqual(ids, helloassoItems.map((item) => String(item.id)).sort());
+    });
+
+    it('applique les réglages de recette : rôle, rattachements, consentements et sujets', () => {
+      const { attendees } = espaceOf(espaceAfterFirst);
+      for (const [email, settings] of Object.entries(recette.attendees)) {
+        const attendee = attendees.find((candidate) => candidate.email === email);
+        assert.equal(attendee.role, settings.role, email);
+        assert.equal(attendee.status, settings.status, email);
+        assert.equal(attendee.directoryOptIn, settings.directoryOptIn, `${email} directoryOptIn`);
+        assert.equal(attendee.meetingsOptIn, settings.meetingsOptIn, `${email} meetingsOptIn`);
+        assert.equal(attendee.newsOptIn, settings.newsOptIn, `${email} newsOptIn`);
+        assert.deepEqual(attendee.topics, [...settings.topics].sort(), `${email} sujets`);
+        assert.equal(attendee.speaker, settings.speaker ?? null, `${email} intervenant`);
+      }
+    });
+
+    it('rattache les représentants aux exposants : 2 au stand 4, 1 au stand 12', () => {
+      const { exhibitors, attendees } = espaceOf(espaceAfterFirst);
+      assert.deepEqual(exhibitors.map((exhibitor) => [exhibitor.standNumber, exhibitor.representatives.length]), [['12', 1], ['4', 2]]);
+      assert.equal(attendees.find((attendee) => attendee.email === 'benoit.tastet@example.org').exhibitor, '4');
+      assert.equal(attendees.find((attendee) => attendee.email === 'pierre.haurie@example.org').exhibitor, '12');
+    });
+
+    it('compte 2 participants sans consentement annuaire et 1 annulé parmi les 12 (10-recette.md)', () => {
+      const participants = espaceOf(espaceAfterFirst).attendees.filter((attendee) => attendee.role === 'participant');
+      assert.equal(participants.filter((attendee) => !attendee.directoryOptIn).length, 2);
+      assert.equal(participants.filter((attendee) => attendee.status === 'cancelled').length, 1);
+    });
+
+    it('fixe activatedAt et consentAt à l’ouverture de la fenêtre pour les personnes activées, et les laisse vides pour Tom Laffitte', () => {
+      const { attendees } = espaceOf(espaceAfterFirst);
+      for (const [email, settings] of Object.entries(recette.attendees)) {
+        const attendee = attendees.find((candidate) => candidate.email === email);
+        const expected = settings.activated ? recette.editionSettings.meetingRequestsOpenAt : null;
+        assert.equal(attendee.activatedAt, expected, `${email} activatedAt`);
+        assert.equal(attendee.consentAt, expected, `${email} consentAt`);
+      }
+    });
+
+    it('ne crée pas l’organisateur : organisation@example.org se connecte par ORGANIZER_EMAILS', () => {
+      assert.equal(espaceOf(espaceAfterFirst).attendees.find((attendee) => attendee.email === 'organisation@example.org'), undefined);
+    });
+
+    it('crée un EmailLog welcome (sent) par Attendee, 17 en tout, pour qu’une synchronisation ultérieure ne renvoie rien', () => {
+      const { emailLogs } = espaceOf(espaceAfterFirst);
+      assert.equal(emailLogs.length, 17);
+      assert.deepEqual(emailLogs.map((log) => log.email), emails);
+      assert.ok(emailLogs.every((log) => log.template === 'welcome' && log.status === 'sent'));
+    });
+
+    it('ne stocke ni téléphone ni code postal (NF-11)', () => {
+      const text = JSON.stringify(espaceOf(espaceAfterFirst).attendees);
+      assert.ok(!/06 39 98|Code Postal|N° de téléphone/.test(text));
+    });
+
+    it('second passage : 17 Attendee et 17 EmailLog, état identique au premier (idempotence)', () => {
+      const second = espaceOf(espaceAfterSecond);
+      assert.equal(second.attendees.length, 17);
+      assert.equal(second.emailLogs.length, 17);
+      assert.deepEqual(second.attendees, espaceOf(espaceAfterFirst).attendees);
+      assert.deepEqual(second.emailLogs, espaceOf(espaceAfterFirst).emailLogs);
     });
   });
 });
