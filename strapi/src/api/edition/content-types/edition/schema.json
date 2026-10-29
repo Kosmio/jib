@@ -104,6 +104,49 @@
     },
     "testimonials": {
       "type": "richtext"
+    },
+    "participantSpaceEnabled": {
+      "type": "boolean",
+      "default": false,
+      "private": true
+    },
+    "helloassoOrgSlug": {
+      "type": "string",
+      "private": true
+    },
+    "helloassoFormType": {
+      "type": "enumeration",
+      "enum": ["Event", "Membership", "CrowdFunding", "Donation", "PaymentForm", "Checkout", "Shop"],
+      "default": "Event",
+      "private": true
+    },
+    "helloassoFormSlug": {
+      "type": "string",
+      "private": true
+    },
+    "helloassoFieldMap": {
+      "type": "json",
+      "private": true
+    },
+    "slotDurationMinutes": {
+      "type": "integer",
+      "default": 15,
+      "min": 1,
+      "private": true
+    },
+    "tablesCount": {
+      "type": "integer",
+      "default": 20,
+      "min": 0,
+      "private": true
+    },
+    "meetingRequestsOpenAt": {
+      "type": "datetime",
+      "private": true
+    },
+    "meetingRequestsCloseAt": {
+      "type": "datetime",
+      "private": true
     }
   }
 }

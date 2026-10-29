@@ -1,0 +1,34 @@
+{
+  "kind": "collectionType",
+  "collectionName": "espace_conversations",
+  "info": {
+    "singularName": "conversation",
+    "pluralName": "conversations",
+    "displayName": "Conversation (espace participant)",
+    "description": "Fil de messages entre deux participants d’une édition."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "edition": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::edition.edition",
+      "required": true
+    },
+    "participants": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::espace.attendee"
+    },
+    "meeting": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::espace.meeting"
+    },
+    "lastMessageAt": {
+      "type": "datetime"
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "kind": "collectionType",
+  "collectionName": "espace_messages",
+  "info": {
+    "singularName": "message",
+    "pluralName": "messages",
+    "displayName": "Message (espace participant)",
+    "description": "Message d’une conversation. Contenu privé, réservé aux deux participants."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "conversation": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::espace.conversation",
+      "required": true
+    },
+    "author": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::espace.attendee",
+      "required": true
+    },
+    "body": {
+      "type": "text",
+      "required": true,
+      "maxLength": 2000
+    },
+    "readAt": {
+      "type": "datetime"
+    },
+    "emailNotifiedAt": {
+      "type": "datetime"
+    }
+  }
+}

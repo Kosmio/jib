@@ -26,6 +26,11 @@ export interface AdminApiToken extends Struct.CollectionTypeSchema {
       Schema.Attribute.SetMinMaxLength<{
         minLength: 1;
       }>;
+    adminPermissions: Schema.Attribute.Relation<
+      'oneToMany',
+      'admin::permission'
+    >;
+    adminUserOwner: Schema.Attribute.Relation<'manyToOne', 'admin::user'>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -39,6 +44,9 @@ export interface AdminApiToken extends Struct.CollectionTypeSchema {
         minLength: 1;
       }>;
     expiresAt: Schema.Attribute.DateTime;
+    kind: Schema.Attribute.Enumeration<['content-api', 'admin']> &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'content-api'>;
     lastUsedAt: Schema.Attribute.DateTime;
     lifespan: Schema.Attribute.BigInteger;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
@@ -56,7 +64,6 @@ export interface AdminApiToken extends Struct.CollectionTypeSchema {
     >;
     publishedAt: Schema.Attribute.DateTime;
     type: Schema.Attribute.Enumeration<['read-only', 'full-access', 'custom']> &
-      Schema.Attribute.Required &
       Schema.Attribute.DefaultTo<'read-only'>;
     updatedAt: Schema.Attribute.DateTime;
     updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -134,6 +141,7 @@ export interface AdminPermission extends Struct.CollectionTypeSchema {
         minLength: 1;
       }>;
     actionParameters: Schema.Attribute.JSON & Schema.Attribute.DefaultTo<{}>;
+    apiToken: Schema.Attribute.Relation<'manyToOne', 'admin::api-token'>;
     conditions: Schema.Attribute.JSON & Schema.Attribute.DefaultTo<[]>;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
@@ -241,6 +249,7 @@ export interface AdminSession extends Struct.CollectionTypeSchema {
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<'oneToMany', 'admin::session'> &
       Schema.Attribute.Private;
+    metadata: Schema.Attribute.JSON & Schema.Attribute.Private;
     origin: Schema.Attribute.String &
       Schema.Attribute.Required &
       Schema.Attribute.Private;
@@ -385,6 +394,8 @@ export interface AdminUser extends Struct.CollectionTypeSchema {
     };
   };
   attributes: {
+    apiTokens: Schema.Attribute.Relation<'oneToMany', 'admin::api-token'> &
+      Schema.Attribute.Private;
     blocked: Schema.Attribute.Boolean &
       Schema.Attribute.Private &
       Schema.Attribute.DefaultTo<false>;
@@ -421,6 +432,8 @@ export interface AdminUser extends Struct.CollectionTypeSchema {
     publishedAt: Schema.Attribute.DateTime;
     registrationToken: Schema.Attribute.String & Schema.Attribute.Private;
     resetPasswordToken: Schema.Attribute.String & Schema.Attribute.Private;
+    resetPasswordTokenExpiresAt: Schema.Attribute.DateTime &
+      Schema.Attribute.Private;
     roles: Schema.Attribute.Relation<'manyToMany', 'admin::role'> &
       Schema.Attribute.Private;
     updatedAt: Schema.Attribute.DateTime;
@@ -454,6 +467,22 @@ export interface ApiEditionEdition extends Struct.CollectionTypeSchema {
       Schema.Attribute.Required &
       Schema.Attribute.DefaultTo<'a-venir'>;
     gallery: Schema.Attribute.Media<'images', true>;
+    helloassoFieldMap: Schema.Attribute.JSON & Schema.Attribute.Private;
+    helloassoFormSlug: Schema.Attribute.String & Schema.Attribute.Private;
+    helloassoFormType: Schema.Attribute.Enumeration<
+      [
+        'Event',
+        'Membership',
+        'CrowdFunding',
+        'Donation',
+        'PaymentForm',
+        'Checkout',
+        'Shop',
+      ]
+    > &
+      Schema.Attribute.Private &
+      Schema.Attribute.DefaultTo<'Event'>;
+    helloassoOrgSlug: Schema.Attribute.String & Schema.Attribute.Private;
     hero_bg_color: Schema.Attribute.String &
       Schema.Attribute.CustomField<'plugin::color-picker.color'>;
     image: Schema.Attribute.Media<'images'>;
@@ -465,6 +494,9 @@ export interface ApiEditionEdition extends Struct.CollectionTypeSchema {
       'api::edition.edition'
     > &
       Schema.Attribute.Private;
+    meetingRequestsCloseAt: Schema.Attribute.DateTime &
+      Schema.Attribute.Private;
+    meetingRequestsOpenAt: Schema.Attribute.DateTime & Schema.Attribute.Private;
     partenaires: Schema.Attribute.Relation<
       'manyToMany',
       'api::partenaire.partenaire'
@@ -476,6 +508,9 @@ export interface ApiEditionEdition extends Struct.CollectionTypeSchema {
         },
         number
       >;
+    participantSpaceEnabled: Schema.Attribute.Boolean &
+      Schema.Attribute.Private &
+      Schema.Attribute.DefaultTo<false>;
     publishedAt: Schema.Attribute.DateTime;
     region: Schema.Attribute.Enumeration<
       [
@@ -496,8 +531,26 @@ export interface ApiEditionEdition extends Struct.CollectionTypeSchema {
     > &
       Schema.Attribute.Required;
     sequences: Schema.Attribute.Relation<'oneToMany', 'api::sequence.sequence'>;
+    slotDurationMinutes: Schema.Attribute.Integer &
+      Schema.Attribute.Private &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 1;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<15>;
     slug: Schema.Attribute.UID<'title'>;
     summary: Schema.Attribute.RichText;
+    tablesCount: Schema.Attribute.Integer &
+      Schema.Attribute.Private &
+      Schema.Attribute.SetMinMax<
+        {
+          min: 0;
+        },
+        number
+      > &
+      Schema.Attribute.DefaultTo<20>;
     testimonials: Schema.Attribute.RichText;
     title: Schema.Attribute.String & Schema.Attribute.Required;
     updatedAt: Schema.Attribute.DateTime;
@@ -505,6 +558,424 @@ export interface ApiEditionEdition extends Struct.CollectionTypeSchema {
       Schema.Attribute.Private;
     video_urls: Schema.Attribute.Text;
     year: Schema.Attribute.Integer & Schema.Attribute.Required;
+  };
+}
+
+export interface ApiEspaceAttendee extends Struct.CollectionTypeSchema {
+  collectionName: 'espace_attendees';
+  info: {
+    description: 'Personne inscrite \u00E0 une \u00E9dition, import\u00E9e de HelloAsso. Contient des donn\u00E9es personnelles.';
+    displayName: 'Participant (espace participant)';
+    pluralName: 'attendees';
+    singularName: 'attendee';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    activatedAt: Schema.Attribute.DateTime;
+    bio: Schema.Attribute.Text &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 280;
+      }>;
+    company: Schema.Attribute.String;
+    consentAt: Schema.Attribute.DateTime;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    directoryOptIn: Schema.Attribute.Boolean &
+      Schema.Attribute.DefaultTo<false>;
+    editedFields: Schema.Attribute.JSON & Schema.Attribute.DefaultTo<[]>;
+    edition: Schema.Attribute.Relation<'manyToOne', 'api::edition.edition'> &
+      Schema.Attribute.Required;
+    email: Schema.Attribute.String & Schema.Attribute.Required;
+    emailPrefs: Schema.Attribute.JSON &
+      Schema.Attribute.DefaultTo<{
+        meetingRequests: true;
+        messages: true;
+        reminders: true;
+      }>;
+    exhibitor: Schema.Attribute.Relation<'manyToOne', 'api::espace.exhibitor'>;
+    firstName: Schema.Attribute.String & Schema.Attribute.Required;
+    helloassoItemId: Schema.Attribute.String;
+    helloassoOrderId: Schema.Attribute.String;
+    jobTitle: Schema.Attribute.String;
+    lastName: Schema.Attribute.String & Schema.Attribute.Required;
+    lastSeenAt: Schema.Attribute.DateTime;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::espace.attendee'
+    > &
+      Schema.Attribute.Private;
+    meetingsOptIn: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
+    newsOptIn: Schema.Attribute.Boolean & Schema.Attribute.DefaultTo<false>;
+    photo: Schema.Attribute.Media<'images'>;
+    publishedAt: Schema.Attribute.DateTime;
+    role: Schema.Attribute.Enumeration<
+      ['participant', 'speaker', 'exhibitor_rep', 'organizer']
+    > &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'participant'>;
+    speaker: Schema.Attribute.Relation<
+      'manyToOne',
+      'api::intervenant.intervenant'
+    >;
+    status: Schema.Attribute.Enumeration<['active', 'cancelled']> &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'active'>;
+    topics: Schema.Attribute.Relation<'manyToMany', 'api::espace.topic'>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiEspaceConversation extends Struct.CollectionTypeSchema {
+  collectionName: 'espace_conversations';
+  info: {
+    description: 'Fil de messages entre deux participants d\u2019une \u00E9dition.';
+    displayName: 'Conversation (espace participant)';
+    pluralName: 'conversations';
+    singularName: 'conversation';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    edition: Schema.Attribute.Relation<'manyToOne', 'api::edition.edition'> &
+      Schema.Attribute.Required;
+    lastMessageAt: Schema.Attribute.DateTime;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::espace.conversation'
+    > &
+      Schema.Attribute.Private;
+    meeting: Schema.Attribute.Relation<'manyToOne', 'api::espace.meeting'>;
+    participants: Schema.Attribute.Relation<
+      'manyToMany',
+      'api::espace.attendee'
+    >;
+    publishedAt: Schema.Attribute.DateTime;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiEspaceEmailLog extends Struct.CollectionTypeSchema {
+  collectionName: 'espace_email_logs';
+  info: {
+    description: 'Trace de chaque e-mail envoy\u00E9 ou en \u00E9chec\u00A0; garantit qu\u2019une relance n\u2019est envoy\u00E9e qu\u2019une fois.';
+    displayName: 'Journal d\u2019e-mails (espace participant)';
+    pluralName: 'email-logs';
+    singularName: 'email-log';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    attendee: Schema.Attribute.Relation<'manyToOne', 'api::espace.attendee'> &
+      Schema.Attribute.Required;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::espace.email-log'
+    > &
+      Schema.Attribute.Private;
+    providerMessageId: Schema.Attribute.String;
+    publishedAt: Schema.Attribute.DateTime;
+    scenarioKey: Schema.Attribute.String;
+    sentAt: Schema.Attribute.DateTime;
+    status: Schema.Attribute.Enumeration<['sent', 'failed']> &
+      Schema.Attribute.Required;
+    template: Schema.Attribute.String & Schema.Attribute.Required;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiEspaceExhibitor extends Struct.CollectionTypeSchema {
+  collectionName: 'espace_exhibitors';
+  info: {
+    description: 'Exposant d\u2019une \u00E9dition. Le nom, le logo et la description viennent de l\u2019organisation li\u00E9e.';
+    displayName: 'Exposant (espace participant)';
+    pluralName: 'exhibitors';
+    singularName: 'exhibitor';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    edition: Schema.Attribute.Relation<'manyToOne', 'api::edition.edition'> &
+      Schema.Attribute.Required;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::espace.exhibitor'
+    > &
+      Schema.Attribute.Private;
+    organisation: Schema.Attribute.Relation<
+      'manyToOne',
+      'api::organisation.organisation'
+    > &
+      Schema.Attribute.Required;
+    publishedAt: Schema.Attribute.DateTime;
+    representatives: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::espace.attendee'
+    >;
+    standNumber: Schema.Attribute.String;
+    topics: Schema.Attribute.Relation<'manyToMany', 'api::espace.topic'>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiEspaceMagicToken extends Struct.CollectionTypeSchema {
+  collectionName: 'espace_magic_tokens';
+  info: {
+    description: 'Lien de connexion ou session. Seule l\u2019empreinte du jeton est conserv\u00E9e.';
+    displayName: 'Jeton de connexion (espace participant)';
+    pluralName: 'magic-tokens';
+    singularName: 'magic-token';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    attendee: Schema.Attribute.Relation<'manyToOne', 'api::espace.attendee'> &
+      Schema.Attribute.Required;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    expiresAt: Schema.Attribute.DateTime & Schema.Attribute.Required;
+    ip: Schema.Attribute.String;
+    kind: Schema.Attribute.Enumeration<['link', 'session']> &
+      Schema.Attribute.Required;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::espace.magic-token'
+    > &
+      Schema.Attribute.Private;
+    publishedAt: Schema.Attribute.DateTime;
+    tokenHash: Schema.Attribute.String &
+      Schema.Attribute.Required &
+      Schema.Attribute.Unique;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    usedAt: Schema.Attribute.DateTime;
+  };
+}
+
+export interface ApiEspaceMeeting extends Struct.CollectionTypeSchema {
+  collectionName: 'espace_meetings';
+  info: {
+    description: 'Demande de rendez-vous B2B entre deux participants, ou vers un exposant.';
+    displayName: 'Rendez-vous (espace participant)';
+    pluralName: 'meetings';
+    singularName: 'meeting';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    answeredAt: Schema.Attribute.DateTime;
+    answeredBy: Schema.Attribute.Relation<'manyToOne', 'api::espace.attendee'>;
+    cancelledAt: Schema.Attribute.DateTime;
+    cancelReason: Schema.Attribute.String;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    edition: Schema.Attribute.Relation<'manyToOne', 'api::edition.edition'> &
+      Schema.Attribute.Required;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::espace.meeting'
+    > &
+      Schema.Attribute.Private;
+    location: Schema.Attribute.String;
+    message: Schema.Attribute.Text &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 300;
+      }>;
+    publishedAt: Schema.Attribute.DateTime;
+    requester: Schema.Attribute.Relation<'manyToOne', 'api::espace.attendee'> &
+      Schema.Attribute.Required;
+    slot: Schema.Attribute.Relation<'manyToOne', 'api::espace.slot'> &
+      Schema.Attribute.Required;
+    status: Schema.Attribute.Enumeration<
+      ['pending', 'accepted', 'declined', 'cancelled', 'expired']
+    > &
+      Schema.Attribute.Required &
+      Schema.Attribute.DefaultTo<'pending'>;
+    tableKey: Schema.Attribute.String;
+    tableNumber: Schema.Attribute.Integer;
+    targetAttendee: Schema.Attribute.Relation<
+      'manyToOne',
+      'api::espace.attendee'
+    >;
+    targetExhibitor: Schema.Attribute.Relation<
+      'manyToOne',
+      'api::espace.exhibitor'
+    >;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiEspaceMessage extends Struct.CollectionTypeSchema {
+  collectionName: 'espace_messages';
+  info: {
+    description: 'Message d\u2019une conversation. Contenu priv\u00E9, r\u00E9serv\u00E9 aux deux participants.';
+    displayName: 'Message (espace participant)';
+    pluralName: 'messages';
+    singularName: 'message';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    author: Schema.Attribute.Relation<'manyToOne', 'api::espace.attendee'> &
+      Schema.Attribute.Required;
+    body: Schema.Attribute.Text &
+      Schema.Attribute.Required &
+      Schema.Attribute.SetMinMaxLength<{
+        maxLength: 2000;
+      }>;
+    conversation: Schema.Attribute.Relation<
+      'manyToOne',
+      'api::espace.conversation'
+    > &
+      Schema.Attribute.Required;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    emailNotifiedAt: Schema.Attribute.DateTime;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::espace.message'
+    > &
+      Schema.Attribute.Private;
+    publishedAt: Schema.Attribute.DateTime;
+    readAt: Schema.Attribute.DateTime;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiEspaceSlot extends Struct.CollectionTypeSchema {
+  collectionName: 'espace_slots';
+  info: {
+    description: 'Cr\u00E9neau de rendez-vous B2B, g\u00E9n\u00E9r\u00E9 \u00E0 partir des s\u00E9quences de type pause B2B. Ne pas modifier \u00E0 la main.';
+    displayName: 'Cr\u00E9neau (espace participant)';
+    pluralName: 'slots';
+    singularName: 'slot';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    edition: Schema.Attribute.Relation<'manyToOne', 'api::edition.edition'> &
+      Schema.Attribute.Required;
+    endsAt: Schema.Attribute.DateTime & Schema.Attribute.Required;
+    label: Schema.Attribute.String & Schema.Attribute.Required;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<'oneToMany', 'api::espace.slot'> &
+      Schema.Attribute.Private;
+    publishedAt: Schema.Attribute.DateTime;
+    session: Schema.Attribute.Relation<'manyToOne', 'api::sequence.sequence'> &
+      Schema.Attribute.Required;
+    startsAt: Schema.Attribute.DateTime & Schema.Attribute.Required;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiEspaceSyncRun extends Struct.CollectionTypeSchema {
+  collectionName: 'espace_sync_runs';
+  info: {
+    description: 'Historique des synchronisations des inscriptions HelloAsso.';
+    displayName: 'Synchronisation HelloAsso (espace participant)';
+    pluralName: 'sync-runs';
+    singularName: 'sync-run';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    cancelled: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
+    created: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    edition: Schema.Attribute.Relation<'manyToOne', 'api::edition.edition'> &
+      Schema.Attribute.Required;
+    endedAt: Schema.Attribute.DateTime;
+    errors: Schema.Attribute.JSON;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<
+      'oneToMany',
+      'api::espace.sync-run'
+    > &
+      Schema.Attribute.Private;
+    publishedAt: Schema.Attribute.DateTime;
+    startedAt: Schema.Attribute.DateTime & Schema.Attribute.Required;
+    updated: Schema.Attribute.Integer & Schema.Attribute.DefaultTo<0>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+  };
+}
+
+export interface ApiEspaceTopic extends Struct.CollectionTypeSchema {
+  collectionName: 'espace_topics';
+  info: {
+    description: 'Th\u00E8me d\u2019une \u00E9dition\u00A0: filtres de l\u2019annuaire, suggestions et programme. Les s\u00E9quences du th\u00E8me se rattachent depuis sa fiche.';
+    displayName: 'Th\u00E8me (espace participant)';
+    pluralName: 'topics';
+    singularName: 'topic';
+  };
+  options: {
+    draftAndPublish: false;
+  };
+  attributes: {
+    createdAt: Schema.Attribute.DateTime;
+    createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
+    edition: Schema.Attribute.Relation<'manyToOne', 'api::edition.edition'> &
+      Schema.Attribute.Required;
+    locale: Schema.Attribute.String & Schema.Attribute.Private;
+    localizations: Schema.Attribute.Relation<'oneToMany', 'api::espace.topic'> &
+      Schema.Attribute.Private;
+    name: Schema.Attribute.String & Schema.Attribute.Required;
+    publishedAt: Schema.Attribute.DateTime;
+    sessions: Schema.Attribute.Relation<'manyToMany', 'api::sequence.sequence'>;
+    updatedAt: Schema.Attribute.DateTime;
+    updatedBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
+      Schema.Attribute.Private;
   };
 }
 
@@ -739,6 +1210,8 @@ export interface ApiSequenceSequence extends Struct.CollectionTypeSchema {
       'oneToMany',
       'api::intervention.intervention'
     >;
+    kind: Schema.Attribute.Enumeration<['talk', 'b2b_break', 'other']> &
+      Schema.Attribute.DefaultTo<'talk'>;
     locale: Schema.Attribute.String & Schema.Attribute.Private;
     localizations: Schema.Attribute.Relation<
       'oneToMany',
@@ -1335,7 +1808,7 @@ export interface PluginUsersPermissionsUser
 }
 
 declare module '@strapi/strapi' {
-  export module Public {
+  export namespace Public {
     export interface ContentTypeSchemas {
       'admin::api-token': AdminApiToken;
       'admin::api-token-permission': AdminApiTokenPermission;
@@ -1346,6 +1819,16 @@ declare module '@strapi/strapi' {
       'admin::transfer-token-permission': AdminTransferTokenPermission;
       'admin::user': AdminUser;
       'api::edition.edition': ApiEditionEdition;
+      'api::espace.attendee': ApiEspaceAttendee;
+      'api::espace.conversation': ApiEspaceConversation;
+      'api::espace.email-log': ApiEspaceEmailLog;
+      'api::espace.exhibitor': ApiEspaceExhibitor;
+      'api::espace.magic-token': ApiEspaceMagicToken;
+      'api::espace.meeting': ApiEspaceMeeting;
+      'api::espace.message': ApiEspaceMessage;
+      'api::espace.slot': ApiEspaceSlot;
+      'api::espace.sync-run': ApiEspaceSyncRun;
+      'api::espace.topic': ApiEspaceTopic;
       'api::home-page.home-page': ApiHomePageHomePage;
       'api::intervenant.intervenant': ApiIntervenantIntervenant;
       'api::intervention.intervention': ApiInterventionIntervention;

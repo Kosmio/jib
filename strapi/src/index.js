@@ -876,6 +876,9 @@ module.exports = {
       strapi.log.error(`[migration] failed: ${err.message}`);
     }
 
+    // Participant space: indexes Strapi cannot declare (idempotent)
+    await strapi.service('api::espace.schema').ensureIndexes();
+
     // Seed demo data if no editions exist yet (DEMO_SEED=false turns it off)
     if (process.env.DEMO_SEED !== 'false') {
       await seedData(strapi);

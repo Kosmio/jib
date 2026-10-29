@@ -319,6 +319,11 @@
         "type": "integer",
         "description": "Ordre d'affichage dans le programme (les séquences sont triées par order croissant)"
       },
+      "kind": {
+        "type": "enumeration",
+        "enum": ["talk", "b2b_break", "other"],
+        "description": "Nature de la séquence. 'talk' (par défaut) = intervention ; 'b2b_break' = pause avec rendez-vous B2B, dont l’heure de fin est obligatoire et qui génère les créneaux de rendez-vous de l’espace participant ; 'other' = accueil, clôture, etc. À choisir à la main, jamais déduit du titre"
+      },
       "edition": {
         "type": "relation manyToOne",
         "target": "editions",

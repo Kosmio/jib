@@ -1,0 +1,111 @@
+{
+  "kind": "collectionType",
+  "collectionName": "espace_attendees",
+  "info": {
+    "singularName": "attendee",
+    "pluralName": "attendees",
+    "displayName": "Participant (espace participant)",
+    "description": "Personne inscrite à une édition, importée de HelloAsso. Contient des données personnelles."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "edition": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::edition.edition",
+      "required": true
+    },
+    "helloassoItemId": {
+      "type": "string"
+    },
+    "helloassoOrderId": {
+      "type": "string"
+    },
+    "email": {
+      "type": "string",
+      "required": true
+    },
+    "firstName": {
+      "type": "string",
+      "required": true
+    },
+    "lastName": {
+      "type": "string",
+      "required": true
+    },
+    "jobTitle": {
+      "type": "string"
+    },
+    "company": {
+      "type": "string"
+    },
+    "role": {
+      "type": "enumeration",
+      "enum": ["participant", "speaker", "exhibitor_rep", "organizer"],
+      "default": "participant",
+      "required": true
+    },
+    "speaker": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::intervenant.intervenant"
+    },
+    "exhibitor": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::espace.exhibitor",
+      "inversedBy": "representatives"
+    },
+    "photo": {
+      "type": "media",
+      "multiple": false,
+      "allowedTypes": ["images"]
+    },
+    "bio": {
+      "type": "text",
+      "maxLength": 280
+    },
+    "topics": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::espace.topic"
+    },
+    "directoryOptIn": {
+      "type": "boolean",
+      "default": false
+    },
+    "meetingsOptIn": {
+      "type": "boolean",
+      "default": false
+    },
+    "newsOptIn": {
+      "type": "boolean",
+      "default": false
+    },
+    "consentAt": {
+      "type": "datetime"
+    },
+    "activatedAt": {
+      "type": "datetime"
+    },
+    "lastSeenAt": {
+      "type": "datetime"
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": ["active", "cancelled"],
+      "default": "active",
+      "required": true
+    },
+    "emailPrefs": {
+      "type": "json",
+      "default": { "meetingRequests": true, "messages": true, "reminders": true }
+    },
+    "editedFields": {
+      "type": "json",
+      "default": []
+    }
+  }
+}

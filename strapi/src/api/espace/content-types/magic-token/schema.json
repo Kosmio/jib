@@ -1,0 +1,41 @@
+{
+  "kind": "collectionType",
+  "collectionName": "espace_magic_tokens",
+  "info": {
+    "singularName": "magic-token",
+    "pluralName": "magic-tokens",
+    "displayName": "Jeton de connexion (espace participant)",
+    "description": "Lien de connexion ou session. Seule l’empreinte du jeton est conservée."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "attendee": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::espace.attendee",
+      "required": true
+    },
+    "kind": {
+      "type": "enumeration",
+      "enum": ["link", "session"],
+      "required": true
+    },
+    "tokenHash": {
+      "type": "string",
+      "required": true,
+      "unique": true
+    },
+    "expiresAt": {
+      "type": "datetime",
+      "required": true
+    },
+    "usedAt": {
+      "type": "datetime"
+    },
+    "ip": {
+      "type": "string"
+    }
+  }
+}

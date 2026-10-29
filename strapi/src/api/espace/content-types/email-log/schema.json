@@ -1,0 +1,39 @@
+{
+  "kind": "collectionType",
+  "collectionName": "espace_email_logs",
+  "info": {
+    "singularName": "email-log",
+    "pluralName": "email-logs",
+    "displayName": "Journal d’e-mails (espace participant)",
+    "description": "Trace de chaque e-mail envoyé ou en échec ; garantit qu’une relance n’est envoyée qu’une fois."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "attendee": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::espace.attendee",
+      "required": true
+    },
+    "template": {
+      "type": "string",
+      "required": true
+    },
+    "scenarioKey": {
+      "type": "string"
+    },
+    "sentAt": {
+      "type": "datetime"
+    },
+    "providerMessageId": {
+      "type": "string"
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": ["sent", "failed"],
+      "required": true
+    }
+  }
+}

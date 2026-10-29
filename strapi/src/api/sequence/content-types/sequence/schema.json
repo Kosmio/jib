@@ -28,6 +28,11 @@
     "order": {
       "type": "integer"
     },
+    "kind": {
+      "type": "enumeration",
+      "enum": ["talk", "b2b_break", "other"],
+      "default": "talk"
+    },
     "edition": {
       "type": "relation",
       "relation": "manyToOne",
