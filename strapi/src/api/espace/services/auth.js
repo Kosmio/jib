@@ -1,6 +1,7 @@
 'use strict';
 
 const { EspaceError } = require('../lib/errors');
+const { normalizeEmail } = require('../lib/import');
 const { createRateLimiter } = require('../lib/rate-limit');
 const { COOKIE_NAME, sessionCookieOptions } = require('../lib/session');
 const { generateToken, hashToken, linkUrl } = require('../lib/tokens');
@@ -10,16 +11,9 @@ const ATTENDEE = 'api::espace.attendee';
 const LINK_MINUTES = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const SESSION_MS = 30 * DAY_MS;
-const EMAIL_PATTERN = /^[^\s@<>,;"]+@[^\s@<>,;"]+\.[^\s@<>,;"]+$/;
 
 // Identity given to an organizer created from ORGANIZER_EMAILS (I-23): the required fields of Attendee, so that E2 passes as it is.
 const ORGANIZER_PROFILE = { firstName: 'Organisateur', lastName: 'JIB', company: 'Xylofutur' };
-
-/** Lower-case address, or null when it is not an address. */
-function normalizeEmail(value) {
-  const email = typeof value === 'string' ? value.trim().toLowerCase() : '';
-  return email.length <= 254 && EMAIL_PATTERN.test(email) ? email : null;
-}
 
 module.exports = ({ strapi }) => {
   // One limiter per Strapi instance (NF-03): a Strapi restarted by the tests starts from zero.
@@ -33,6 +27,8 @@ module.exports = ({ strapi }) => {
   const cookieOptions = () => sessionCookieOptions({ publicUrl: settings().publicUrl, maxAgeMs: SESSION_MS });
   const setCookie = (ctx, token) => ctx.cookies.set(COOKIE_NAME, token, cookieOptions());
   const clearCookie = (ctx) => ctx.cookies.set(COOKIE_NAME, null, cookieOptions());
+  // A-25: Koa refuses a Secure cookie on a request it sees in http, such as the internal call of the server-side rendering.
+  const canSetCookie = (ctx) => ctx.request.secure || !cookieOptions().secure;
 
   /** Published edition of an edition document (the draft row may differ, NF-52), or null. */
   const publishedEdition = (documentId) => (documentId ? documents('api::edition.edition').findOne({ documentId, status: 'published' }) : null);
@@ -107,12 +103,14 @@ module.exports = ({ strapi }) => {
       );
     },
 
-    /** A-18: state of a link without consuming it. The address is returned only for a known link that cannot be used. */
+    /** A-18: state of a link without consuming it. The address is returned only for an expired or used link of an active attendee of an open edition. */
     async linkState(token, { now = new Date() } = {}) {
       const loaded = await loadLink(token);
       if (!loaded.link) return { valid: false };
-      const editionSlug = loaded.link.attendee.edition?.slug;
-      return isUsable(loaded, now) ? { valid: true, editionSlug } : { valid: false, editionSlug, email: loaded.link.attendee.email };
+      const { attendee } = loaded.link;
+      const editionSlug = attendee.edition?.slug;
+      if (isUsable(loaded, now)) return { valid: true, editionSlug };
+      return attendee.status === 'active' && loaded.edition?.participantSpaceEnabled ? { valid: false, editionSlug, email: attendee.email } : { valid: false, editionSlug };
     },
 
     /**
@@ -149,7 +147,7 @@ module.exports = ({ strapi }) => {
     /**
      * Called by the context middleware: the session of the signed cookie -> { attendee, edition, session, isOrganizer }, or null (401).
      * Valid: unexpired session token, active attendee, published edition with the space open (NF-52).
-     * The expiry slides by 30 days at most once a day, cookie included.
+     * The expiry slides by 30 days at most once a day, cookie included, and only on a request that can receive the cookie (A-25).
      */
     async loadSession(ctx, { now = new Date() } = {}) {
       const token = ctx.cookies.get(COOKIE_NAME, { signed: true });
@@ -163,18 +161,18 @@ module.exports = ({ strapi }) => {
       const edition = attendee?.status === 'active' ? await publishedEdition(attendee.edition?.documentId) : null;
       if (!edition?.participantSpaceEnabled) return null;
 
-      if (new Date(session.expiresAt).getTime() - now.getTime() < SESSION_MS - DAY_MS) {
+      if (new Date(session.expiresAt).getTime() - now.getTime() < SESSION_MS - DAY_MS && canSetCookie(ctx)) {
         await documents(TOKEN).update({ documentId: session.documentId, data: { expiresAt: new Date(now.getTime() + SESSION_MS) } });
         setCookie(ctx, token);
       }
       return { attendee, edition, session, isOrganizer: isOrganizer(attendee) };
     },
 
-    /** Revokes the session of the request, if any, and removes the cookie. Never fails for lack of a session. */
+    /** Revokes the session of the request, if any, and removes the cookie when the request can receive it (A-25). Never fails for lack of a session. */
     async logout(ctx) {
       const session = ctx.state.espace?.session;
       if (session) await documents(TOKEN).delete({ documentId: session.documentId });
-      clearCookie(ctx);
+      if (canSetCookie(ctx)) clearCookie(ctx);
     },
   };
 };
