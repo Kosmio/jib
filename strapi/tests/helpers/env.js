@@ -6,6 +6,9 @@
  * Il est hermétique : `strapi/.env` n'est jamais lu (ENV_PATH pointe sur un fichier vide), donc ni
  * la clé Brevo réelle, ni le nom de base de développement ne peuvent s'y infiltrer. Seules les bases
  * dont le nom finit par _test ou _e2e sont admises, et jamais `strapi` ni `strapi_espace`.
+ *
+ * Les noms des deux bases se règlent par TEST_DATABASE (défaut strapi_test) et E2E_DATABASE (défaut strapi_e2e),
+ * pour que plusieurs exécutions simultanées aient chacune les leurs.
  */
 
 const os = require('node:os');
@@ -16,22 +19,57 @@ const STRAPI_DIR = path.resolve(__dirname, '../..');
 // Le Postgres du conteneur jib-postgres en local, le service postgres du workflow en CI.
 const DB_SERVER = { host: 'localhost', port: 5432, user: 'strapi', password: 'strapi' };
 
-const TEST_DATABASE = /^[a-z0-9]+(_[a-z0-9]+)*_(test|e2e)$/;
+const TEST_DATABASE_PATTERN = /^[a-z0-9]+(_[a-z0-9]+)*_(test|e2e)$/;
 const FORBIDDEN_DATABASES = new Set(['strapi', 'strapi_espace']);
+// Postgres tronque au-delà de 63 octets : un nom plus long ne serait plus celui qui a été validé.
+const MAX_DATABASE_NAME_LENGTH = 63;
+
+// Bases par défaut ; deux agents ou plus qui testent en même temps donnent chacun les leurs (TEST_DATABASE, E2E_DATABASE).
+const DEFAULT_TEST_DATABASE = 'strapi_test';
+const DEFAULT_E2E_DATABASE = 'strapi_e2e';
 
 /** Lève une erreur si `name` n'est pas une base de test (_test ou _e2e). À appeler avant toute connexion. */
 function assertTestDatabase(name) {
-  if (typeof name !== 'string' || FORBIDDEN_DATABASES.has(name) || !TEST_DATABASE.test(name)) {
+  if (
+    typeof name !== 'string' ||
+    name.length > MAX_DATABASE_NAME_LENGTH ||
+    FORBIDDEN_DATABASES.has(name) ||
+    !TEST_DATABASE_PATTERN.test(name)
+  ) {
     throw new Error(`Base refusée par les tests : « ${name} ». Seules les bases en _test ou _e2e sont admises.`);
   }
   return name;
 }
 
 /**
+ * Base lue dans la variable `variable` (défaut `fallback` si elle est absente ou vide), validée avant tout usage :
+ * base de test (assertTestDatabase) dont le nom finit par `_${suffix}`, ce qui interdit aussi de donner la même base
+ * aux tests d'intégration et au e2e.
+ */
+function configuredDatabase(variable, suffix, fallback, env) {
+  const name = env[variable] || fallback;
+  try {
+    assertTestDatabase(name);
+  } catch (error) {
+    throw new Error(`${variable} : ${error.message}`);
+  }
+  if (!name.endsWith(`_${suffix}`)) {
+    throw new Error(`${variable} : Base refusée par les tests : « ${name} » doit finir par _${suffix}.`);
+  }
+  return name;
+}
+
+/** Base des tests d'intégration : TEST_DATABASE (défaut strapi_test), en `_test`. */
+const testDatabaseName = (env = process.env) => configuredDatabase('TEST_DATABASE', 'test', DEFAULT_TEST_DATABASE, env);
+
+/** Base des tests e2e et du seed de recette : E2E_DATABASE (défaut strapi_e2e), en `_e2e`. */
+const e2eDatabaseName = (env = process.env) => configuredDatabase('E2E_DATABASE', 'e2e', DEFAULT_E2E_DATABASE, env);
+
+/**
  * Variables d'un processus Strapi de test. `overrides` s'applique en dernier (par exemple pour
  * retirer DEMO_SEED), sans jamais pouvoir changer de base : DATABASE_NAME est contrôlée ici.
  */
-function buildTestEnv({ database = 'strapi_test', port = 0, outboxFile, overrides = {} } = {}) {
+function buildTestEnv({ database = testDatabaseName(), port = 0, outboxFile, overrides = {} } = {}) {
   assertTestDatabase(database);
   const outbox = outboxFile || path.join(os.tmpdir(), `jib-mail-outbox-${database}.jsonl`);
 
@@ -86,4 +124,13 @@ function buildTestEnv({ database = 'strapi_test', port = 0, outboxFile, override
   return env;
 }
 
-module.exports = { DB_SERVER, STRAPI_DIR, assertTestDatabase, buildTestEnv };
+module.exports = {
+  DB_SERVER,
+  DEFAULT_E2E_DATABASE,
+  DEFAULT_TEST_DATABASE,
+  STRAPI_DIR,
+  assertTestDatabase,
+  buildTestEnv,
+  e2eDatabaseName,
+  testDatabaseName,
+};

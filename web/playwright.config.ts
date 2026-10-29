@@ -9,20 +9,27 @@ import { defineConfig, devices } from '@playwright/test';
  * de la CI : pas de données de production en CI, et les références sont propres à macOS.
  * Les serveurs ne sont pas démarrés par Playwright : voir docs/espace/CLAUDE.md.
  *
- * Projet `e2e` (lot C de la phase 0, A-14) : tests de bout en bout sur la base `strapi_e2e`,
- * remplie par le seed de recette. `pnpm test:e2e` pose PLAYWRIGHT_E2E=1, ce qui fait démarrer par
+ * Projet `e2e` (lot C de la phase 0, A-14) : tests de bout en bout sur la base e2e (E2E_DATABASE, défaut
+ * `strapi_e2e`), remplie par le seed de recette. `pnpm test:e2e` pose PLAYWRIGHT_E2E=1, ce qui fait démarrer par
  * Playwright, et lui seul, les deux serveurs ci-dessous (le projet `visual` n'en a pas besoin) :
- *   - Strapi des tests (strapi/tests/e2e-server.js) : vide strapi_e2e, y lance le seed, puis écoute
- *     sur 127.0.0.1:E2E_STRAPI_PORT (défaut 1338). L'admin n'est pas construit.
- *   - le front construit dans dist-e2e (le `dist` du projet `visual` reste intact) et servi sur
- *     127.0.0.1:E2E_WEB_PORT (défaut 4322), branché sur ce Strapi.
+ *   - Strapi des tests (strapi/tests/e2e-server.js) : vide la base e2e, y lance le seed, puis écoute
+ *     sur 127.0.0.1:E2E_STRAPI_PORT (défaut 1348). L'admin n'est pas construit.
+ *   - le front construit dans dist-e2e/<port> (le `dist` du projet `visual` reste intact) et servi sur
+ *     127.0.0.1:E2E_WEB_PORT (défaut 4332), branché sur ce Strapi.
  * Les ports sont distincts de ceux du développement (1337, 4321) pour laisser tourner les serveurs
  * de développement ; ils se changent par les deux variables si un autre projet les occupe.
  * Aucun serveur existant n'est réutilisé : les données doivent être celles du seed.
+ *
+ * Exécutions simultanées (plusieurs agents, un même poste) : chacune prend ses propres E2E_STRAPI_PORT,
+ * E2E_WEB_PORT et E2E_DATABASE, par exemple
+ *   E2E_DATABASE=strapi_dev_e2e E2E_STRAPI_PORT=1358 E2E_WEB_PORT=4342 pnpm test:e2e
+ * et ses dossiers de sortie, tous nommés d'après le port web (dist-e2e/<port>, test-results/e2e-<port>,
+ * playwright-report/e2e-<port>) : Playwright vide son dossier de sortie au départ, deux exécutions ne
+ * doivent donc jamais partager le leur.
  */
 
-const STRAPI_PORT = process.env.E2E_STRAPI_PORT ?? '1338';
-const WEB_PORT = process.env.E2E_WEB_PORT ?? '4322';
+const STRAPI_PORT = process.env.E2E_STRAPI_PORT ?? '1348';
+const WEB_PORT = process.env.E2E_WEB_PORT ?? '4332';
 const STRAPI_URL = `http://127.0.0.1:${STRAPI_PORT}`;
 const WEB_URL = `http://127.0.0.1:${WEB_PORT}`;
 
@@ -31,14 +38,18 @@ process.env.E2E_STRAPI_URL = STRAPI_URL;
 
 const startServers = process.env.PLAYWRIGHT_E2E === '1';
 
+// Dossiers de sortie propres à l'exécution : voir l'en-tête.
+const RUN = startServers ? `e2e-${WEB_PORT}` : 'visual';
+const WEB_BUILD_DIR = `dist-e2e/${WEB_PORT}`;
+
 export default defineConfig({
   testDir: './tests',
-  outputDir: './test-results',
+  outputDir: `./test-results/${RUN}`,
   fullyParallel: false,
   workers: 1,
   retries: 0,
   forbidOnly: !!process.env.CI,
-  reporter: [['list'], ['html', { open: 'never' }]],
+  reporter: [['list'], ['html', { open: 'never', outputFolder: `playwright-report/${RUN}` }]],
   projects: [
     {
       name: 'visual',
@@ -83,8 +94,7 @@ export default defineConfig({
         },
         {
           name: 'web-e2e',
-          command:
-            'node ./node_modules/astro/bin/astro.mjs build --outDir dist-e2e && node dist-e2e/server/entry.mjs',
+          command: `node ./node_modules/astro/bin/astro.mjs build --outDir ${WEB_BUILD_DIR} && node ${WEB_BUILD_DIR}/server/entry.mjs`,
           env: {
             HOST: '127.0.0.1',
             PORT: WEB_PORT,

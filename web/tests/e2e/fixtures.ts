@@ -11,7 +11,7 @@ import { expect, test as base } from '@playwright/test';
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
 const TOLERATED_HOSTS = new Set(['fonts.googleapis.com', 'fonts.gstatic.com']);
 
-export const STRAPI_URL = process.env.E2E_STRAPI_URL ?? 'http://127.0.0.1:1338';
+export const STRAPI_URL = process.env.E2E_STRAPI_URL ?? 'http://127.0.0.1:1348';
 
 export const test = base.extend<{ network: { blockedHosts: string[]; pageErrors: string[] } }>({
   network: [

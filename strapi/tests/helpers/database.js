@@ -20,13 +20,30 @@ async function withClient(database, fn) {
   }
 }
 
-/** Crée la base si elle manque. */
+const databaseExists = async (client, name) =>
+  (await client.query('select 1 from pg_database where datname = $1', [name])).rowCount > 0;
+
+/**
+ * Crée la base si elle manque. Deux exécutions qui la créent en même temps (le test passe de « absente » à
+ * « existe » entre la lecture et la création) ne s'opposent pas : Postgres refuse la seconde création (42P04 ou
+ * 23505 selon l'instant), et le perdant n'a qu'à constater que la base existe désormais.
+ */
 async function ensureDatabase(name) {
   assertTestDatabase(name);
   await withClient('postgres', async (client) => {
-    const { rowCount } = await client.query('select 1 from pg_database where datname = $1', [name]);
-    if (!rowCount) await client.query(`create database ${name}`);
+    if (await databaseExists(client, name)) return;
+    try {
+      await client.query(`create database "${name}"`);
+    } catch (error) {
+      if (!(await databaseExists(client, name))) throw error;
+    }
   });
+}
+
+/** Supprime une base de test, connexions comprises. Sert aux tests qui créent une base à eux ; le nom est contrôlé. */
+async function dropDatabase(name) {
+  assertTestDatabase(name);
+  await withClient('postgres', (client) => client.query(`drop database if exists "${name}" with (force)`));
 }
 
 /** Crée la base si elle manque, puis la vide entièrement (schéma public recréé). */
@@ -44,4 +61,4 @@ async function queryDatabase(name, sql, params = []) {
   return withClient(name, (client) => client.query(sql, params));
 }
 
-module.exports = { ensureDatabase, resetDatabase, queryDatabase };
+module.exports = { dropDatabase, ensureDatabase, resetDatabase, queryDatabase };

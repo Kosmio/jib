@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Seed de recette (A-13, B3, 10-recette.md) exécuté pour de bon sur strapi_test, dans un sous-processus,
+ * Seed de recette (A-13, B3, 10-recette.md) exécuté pour de bon sur la base de test (TEST_DATABASE, défaut strapi_test), dans un sous-processus,
  * comme `pnpm seed` : base vide, premier passage, données étrangères ajoutées, second passage.
  *
  * Preuves recherchées : le seed crée exactement les données de recette ; deux passages donnent le même
@@ -14,12 +14,12 @@ const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
 const path = require('node:path');
 
-const { buildTestEnv, STRAPI_DIR } = require('../helpers/env');
+const { buildTestEnv, STRAPI_DIR, testDatabaseName } = require('../helpers/env');
 const { queryDatabase, resetDatabase } = require('../helpers/database');
 const { startStrapi } = require('../helpers/strapi');
 const recette = require('../../scripts/espace/fixtures/recette.json');
 
-const DATABASE = 'strapi_test';
+const DATABASE = testDatabaseName();
 const SEED = path.join(STRAPI_DIR, 'scripts/espace/seed.js');
 const NO_NETWORK = path.join(STRAPI_DIR, 'tests/helpers/no-network.js');
 
@@ -63,7 +63,7 @@ async function readState(app) {
 const countDocuments = async (table, where = 'true') =>
   (await queryDatabase(DATABASE, `select count(distinct document_id)::int as n from ${table} where ${where}`)).rows[0].n;
 
-describe('seed de recette sur strapi_test', { timeout: 600_000 }, () => {
+describe('seed de recette sur la base de test', { timeout: 600_000 }, () => {
   let first;
   let second;
   let stateAfterFirst;
@@ -111,7 +111,7 @@ describe('seed de recette sur strapi_test', { timeout: 600_000 }, () => {
     });
 
     it('affiche le résumé des comptes', () => {
-      assert.match(first.stdout, /Seed de recette terminé sur la base strapi_test\./);
+      assert.ok(first.stdout.includes(`Seed de recette terminé sur la base ${DATABASE}.`), first.stdout);
       assert.match(first.stdout, /Édition\s+1 \(nouvelle-aquitaine-test\)/);
       assert.match(first.stdout, /Séquences\s+9 \(dont 3 pauses B2B\)/);
       assert.match(first.stdout, /Intervenants\s+2\b/);

@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Strapi démarré sur strapi_test (A-14) : squelette de l'API de l'espace (B4, A-02), absence de route CRUD,
+ * Strapi démarré sur la base de test, TEST_DATABASE ou strapi_test (A-14) : squelette de l'API de l'espace (B4, A-02), absence de route CRUD,
  * bootstrap sans données de démonstration (DEMO_SEED=false), câblage de la configuration e-mail (B1, NF-53).
  */
 
@@ -9,10 +9,13 @@ const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 
+const { testDatabaseName } = require('../helpers/env');
 const { startStrapi } = require('../helpers/strapi');
 const { createMailProvider } = require('../../src/api/espace/lib/mail');
 
-describe('Strapi sur strapi_test', { timeout: 180_000 }, () => {
+const DATABASE = testDatabaseName();
+
+describe('Strapi sur la base de test', { timeout: 180_000 }, () => {
   let strapi;
   const request = (path, init) => fetch(`${strapi.baseUrl}${path}`, init);
   const routes = () => strapi.app.server.listRoutes();
@@ -29,8 +32,8 @@ describe('Strapi sur strapi_test', { timeout: 180_000 }, () => {
   });
 
   describe('environnement du test', () => {
-    it('tourne sur la base strapi_test', () => {
-      assert.equal(strapi.app.config.get('database.connection.connection.database'), 'strapi_test');
+    it('tourne sur la base de test configurée (TEST_DATABASE, défaut strapi_test)', () => {
+      assert.equal(strapi.app.config.get('database.connection.connection.database'), DATABASE);
     });
 
     it('n’a lu aucun fichier .env : la clé Brevo est vide', () => {
@@ -184,14 +187,10 @@ describe('Strapi sur strapi_test', { timeout: 180_000 }, () => {
   });
 
   describe('réseau', () => {
-    // Défaut D2 : createStrapi() interroge le registre npm (notification de mise à jour) tant que
-    // server.logger.updates.enabled vaut true. Retirer `todo` quand config/server.js le désactive.
-    it(
-      'coupe la notification de mise à jour de Strapi (aucun appel au registre npm)',
-      { todo: 'défaut D2 : server.logger.updates.enabled vaut true' },
-      () => {
-        assert.equal(strapi.app.config.get('server.logger.updates.enabled'), false);
-      }
-    );
+    // NF-06 (ancien défaut D2, corrigé) : sans cela, createStrapi() interroge le registre npm une fois par jour
+    // et réécrit strapi/.strapi-updater.json, fichier suivi par git.
+    it('coupe la notification de mise à jour de Strapi (aucun appel au registre npm)', () => {
+      assert.equal(strapi.app.config.get('server.logger.updates.enabled'), false);
+    });
   });
 });

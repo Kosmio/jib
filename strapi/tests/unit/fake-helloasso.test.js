@@ -644,9 +644,8 @@ describe('buildEdgeCaseItems : cas limites de l’import (I-11, I-14, Q-15)', ()
     for (const state of ['Waiting', 'Refused', 'Deleted', 'Abandoned', 'Unknown', 'Canceled']) assert.ok(states.has(state), state);
   });
 
-  // Défaut D1 du lot B : buildEdgeCaseItems() passe `payments` à buildItem(), qui ignore ce paramètre
-  // (il attend `paymentState`) ; aucun paiement Refunded n'est produit. Retirer `todo` après correction.
-  it('contient un billet actif dont le paiement est Refunded', { todo: 'défaut D1 : paiement Refunded jamais produit' }, () => {
+  // Q-15 (ancien défaut D1, corrigé) : un billet traité dont un paiement est remboursé doit être annulé par la synchronisation.
+  it('contient un billet actif dont le paiement est Refunded', () => {
     const refunded = items.filter((i) => i.payments.some((p) => p.state === 'Refunded'));
     assert.equal(refunded.length, 1);
     assert.equal(refunded[0].state, 'Processed');

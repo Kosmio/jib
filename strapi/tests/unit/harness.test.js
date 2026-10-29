@@ -11,8 +11,9 @@ const assert = require('node:assert/strict');
 const net = require('node:net');
 const os = require('node:os');
 
-const { assertTestDatabase, buildTestEnv } = require('../helpers/env');
-const { ensureDatabase, queryDatabase, resetDatabase } = require('../helpers/database');
+const { assertTestDatabase, buildTestEnv, e2eDatabaseName, testDatabaseName } = require('../helpers/env');
+const { dropDatabase, ensureDatabase, queryDatabase, resetDatabase } = require('../helpers/database');
+const { startStrapi } = require('../helpers/strapi');
 
 describe('assertTestDatabase', () => {
   for (const name of ['strapi', 'strapi_espace']) {
@@ -27,18 +28,96 @@ describe('assertTestDatabase', () => {
     });
   }
 
-  for (const name of ['strapi_test', 'strapi_e2e', 'autre_test']) {
+  for (const name of ['strapi_test', 'strapi_e2e', 'autre_test', 'strapi_dev_test', 'strapi_dev_e2e', 'agent2_e2e']) {
     it(`admet « ${name} »`, () => {
       assert.equal(assertTestDatabase(name), name);
     });
   }
+
+  // Postgres tronque un identifiant au-delà de 63 octets : le nom créé ne serait plus celui qui a été validé.
+  it('refuse un nom de plus de 63 caractères, même terminé par _test', () => {
+    assert.throws(() => assertTestDatabase(`${'a'.repeat(59)}_test`), /Base refusée par les tests/);
+  });
+
+  it('admet un nom de exactement 63 caractères', () => {
+    const name = `${'a'.repeat(58)}_test`;
+    assert.equal(name.length, 63);
+    assert.equal(assertTestDatabase(name), name);
+  });
+});
+
+describe('TEST_DATABASE et E2E_DATABASE : noms des bases de test', () => {
+  it('donnent strapi_test et strapi_e2e par défaut, variable absente ou vide', () => {
+    assert.equal(testDatabaseName({}), 'strapi_test');
+    assert.equal(e2eDatabaseName({}), 'strapi_e2e');
+    assert.equal(testDatabaseName({ TEST_DATABASE: '' }), 'strapi_test');
+    assert.equal(e2eDatabaseName({ E2E_DATABASE: '' }), 'strapi_e2e');
+  });
+
+  it('suivent la variable quand elle est posée', () => {
+    assert.equal(testDatabaseName({ TEST_DATABASE: 'strapi_dev_test' }), 'strapi_dev_test');
+    assert.equal(e2eDatabaseName({ E2E_DATABASE: 'strapi_dev_e2e' }), 'strapi_dev_e2e');
+  });
+
+  it('lisent process.env quand aucun environnement n’est donné', () => {
+    const saved = { test: process.env.TEST_DATABASE, e2e: process.env.E2E_DATABASE };
+    try {
+      process.env.TEST_DATABASE = 'strapi_lu_test';
+      process.env.E2E_DATABASE = 'strapi_lu_e2e';
+      assert.equal(testDatabaseName(), 'strapi_lu_test');
+      assert.equal(e2eDatabaseName(), 'strapi_lu_e2e');
+    } finally {
+      for (const [key, value] of [['TEST_DATABASE', saved.test], ['E2E_DATABASE', saved.e2e]]) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
+  });
+
+  const refused = [
+    'strapi',
+    'strapi_espace',
+    'strapi_dev',
+    'strapi_test_old',
+    'postgres',
+    'Strapi_dev_test',
+    'strapi-dev-test',
+    'strapi_dev_test; drop database strapi',
+    '_test',
+    ' strapi_dev_test',
+    `${'a'.repeat(59)}_test`,
+  ];
+
+  for (const name of refused) {
+    it(`TEST_DATABASE refuse « ${name} »`, () => {
+      assert.throws(() => testDatabaseName({ TEST_DATABASE: name }), /TEST_DATABASE : Base refusée par les tests/);
+    });
+  }
+
+  for (const name of ['strapi', 'strapi_espace', 'strapi_dev', 'strapi_e2e_old', 'STRAPI_DEV_E2E', 'strapi_dev_e2e; drop database strapi', `${'a'.repeat(60)}_e2e`]) {
+    it(`E2E_DATABASE refuse « ${name} »`, () => {
+      assert.throws(() => e2eDatabaseName({ E2E_DATABASE: name }), /E2E_DATABASE : Base refusée par les tests/);
+    });
+  }
+
+  // Une base à elle par suite : la même base ne peut pas servir aux tests d'intégration et au e2e, qui la videraient tour à tour.
+  it('TEST_DATABASE refuse un nom en _e2e, E2E_DATABASE un nom en _test', () => {
+    assert.throws(() => testDatabaseName({ TEST_DATABASE: 'strapi_dev_e2e' }), /doit finir par _test/);
+    assert.throws(() => e2eDatabaseName({ E2E_DATABASE: 'strapi_dev_test' }), /doit finir par _e2e/);
+  });
+
+  it('startStrapi refuse une base interdite avant toute connexion', async () => {
+    for (const database of ['strapi', 'strapi_espace', 'strapi_dev']) {
+      await assert.rejects(startStrapi({ database }), /Base refusée par les tests/);
+    }
+  });
 });
 
 describe('base de données : aucune connexion avant la vérification du nom', () => {
   for (const name of ['strapi', 'strapi_espace']) {
-    it(`ensureDatabase, resetDatabase et queryDatabase refusent « ${name} » sans se connecter`, async () => {
+    it(`ensureDatabase, resetDatabase, dropDatabase et queryDatabase refusent « ${name} » sans se connecter`, async () => {
       // Une connexion tentée aurait échoué autrement (ou réussi) : on exige l'erreur du harnais, avant tout réseau.
-      for (const call of [() => ensureDatabase(name), () => resetDatabase(name), () => queryDatabase(name, 'select 1')]) {
+      for (const call of [() => ensureDatabase(name), () => resetDatabase(name), () => dropDatabase(name), () => queryDatabase(name, 'select 1')]) {
         await assert.rejects(call(), /Base refusée par les tests/);
       }
     });
@@ -81,8 +160,19 @@ describe('buildTestEnv : environnement hermétique', () => {
 
   it('impose la base demandée, même si l’environnement parent en nomme une autre', () => {
     process.env.DATABASE_NAME = 'strapi_espace';
+    delete process.env.TEST_DATABASE;
     assert.equal(buildTestEnv({ database: 'strapi_e2e' }).DATABASE_NAME, 'strapi_e2e');
     assert.equal(buildTestEnv().DATABASE_NAME, 'strapi_test');
+  });
+
+  it('prend par défaut la base de TEST_DATABASE', () => {
+    process.env.TEST_DATABASE = 'strapi_dev_test';
+    assert.equal(buildTestEnv().DATABASE_NAME, 'strapi_dev_test');
+  });
+
+  it('refuse un TEST_DATABASE invalide au lieu de retomber sur une autre base', () => {
+    process.env.TEST_DATABASE = 'strapi_espace';
+    assert.throws(() => buildTestEnv(), /TEST_DATABASE : Base refusée par les tests/);
   });
 
   it('refuse de construire un environnement pour une base interdite', () => {
@@ -122,6 +212,11 @@ describe('buildTestEnv : environnement hermétique', () => {
   it('range la boîte d’e-mails dans le dossier temporaire du système, un fichier par base', () => {
     assert.ok(buildTestEnv({ database: 'strapi_test' }).EMAIL_OUTBOX_FILE.startsWith(os.tmpdir()));
     assert.notEqual(buildTestEnv({ database: 'strapi_test' }).EMAIL_OUTBOX_FILE, buildTestEnv({ database: 'strapi_e2e' }).EMAIL_OUTBOX_FILE);
+  });
+
+  // Deux exécutions simultanées sur des bases différentes ne partagent pas la boîte d'e-mails (lue par les tests).
+  it('donne une boîte d’e-mails distincte à deux bases de même suite', () => {
+    assert.notEqual(buildTestEnv({ database: 'strapi_test' }).EMAIL_OUTBOX_FILE, buildTestEnv({ database: 'strapi_dev_test' }).EMAIL_OUTBOX_FILE);
   });
 });
 

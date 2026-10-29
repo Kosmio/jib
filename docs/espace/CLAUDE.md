@@ -93,6 +93,8 @@ Contournements en place, à connaître avant d'écrire ou de lancer un test :
 | 4010 | faux HelloAsso |
 | 1348, 4332 | Strapi et front des tests e2e (`strapi_e2e`) : défauts retenus, en place dès le lot 1 de la phase 1 |
 
+**Bases et ports par exécution.** `TEST_DATABASE` (défaut `strapi_test`, nom en `_test`) et `E2E_DATABASE` (défaut `strapi_e2e`, nom en `_e2e`) choisissent les bases de `strapi test` et de `test:e2e` ; toute autre terminaison est refusée, et la base est créée si elle manque. Avec `E2E_STRAPI_PORT` et `E2E_WEB_PORT`, deux agents lancent leurs suites en même temps sans interférer : `TEST_DATABASE=strapi_dev_test E2E_DATABASE=strapi_dev_e2e E2E_STRAPI_PORT=1358 E2E_WEB_PORT=4342`.
+
 Ce poste fait aussi tourner un autre projet : relevé `lsof -nP -iTCP -sTCP:LISTEN` du 29 octobre, 1338, 4322, 4330 et 5173 occupés, ainsi qu'un second Postgres sur 5433. D'ici le lot 1 de la phase 1, les défauts du code restent 1338 et 4322 (`web/playwright.config.ts`, `strapi/tests/e2e-server.js`, `web/tests/e2e/fixtures.ts`) : passer `E2E_STRAPI_PORT=1348 E2E_WEB_PORT=4332`. Les deux variables restent la surcharge si un port est pris. Le Postgres de l'espace est celui de Docker, sur 5432, jamais celui de 5433.
 
 ### Bases (même serveur Postgres)

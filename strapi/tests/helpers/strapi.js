@@ -8,14 +8,14 @@
  * l'import : le module n'est donc requis qu'ici, après `buildTestEnv`.
  */
 
-const { STRAPI_DIR, assertTestDatabase, buildTestEnv } = require('./env');
+const { STRAPI_DIR, assertTestDatabase, buildTestEnv, testDatabaseName } = require('./env');
 const { resetDatabase } = require('./database');
 
 const SETTLE_MS = 750;
 
 /**
  * @param {object} [options]
- * @param {string} [options.database] base de test (_test ou _e2e)
+ * @param {string} [options.database] base de test (_test ou _e2e) ; défaut : TEST_DATABASE, sinon strapi_test
  * @param {boolean} [options.reset] vider la base avant le démarrage (défaut : oui)
  * @param {number} [options.port] port d'écoute sur 127.0.0.1 (défaut : 0, un port libre)
  * @param {object} [options.overrides] variables d'environnement à surcharger (undefined = retirer)
@@ -23,7 +23,7 @@ const SETTLE_MS = 750;
  *   c'est-à-dire après le chargement des plugins et avant src/index.js (pour simuler un service)
  * @returns {Promise<{ app: object, baseUrl: string, env: object, stop: () => Promise<void> }>}
  */
-async function startStrapi({ database = 'strapi_test', reset = true, port = 0, overrides = {}, beforeBootstrap } = {}) {
+async function startStrapi({ database = testDatabaseName(), reset = true, port = 0, overrides = {}, beforeBootstrap } = {}) {
   assertTestDatabase(database);
   const env = buildTestEnv({ database, port, overrides });
 
