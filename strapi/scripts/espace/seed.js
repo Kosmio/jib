@@ -26,6 +26,14 @@ const UID = {
   organisation: 'api::organisation.organisation',
 };
 
+/**
+ * Guard (A-13): the seed may run only on a database whose effective name ends with _e2e or _test,
+ * and never under NODE_ENV=production. Pure (no exit, no connection) so that a unit test can call it.
+ */
+function isSeedAllowed({ database, nodeEnv }) {
+  return nodeEnv !== 'production' && /_(e2e|test)$/.test(database || '');
+}
+
 function refuse(reason) {
   console.error(`Seed refusé : ${reason}`);
   console.error('Seules les bases dont le nom finit par _e2e ou _test sont admises. Exemple :');
@@ -89,7 +97,7 @@ async function main() {
   const app = createStrapi(await compileStrapi());
   // Strapi has read strapi/.env without overriding the shell: check the effective database before any connection.
   const database = app.config.get('database.connection.connection.database');
-  if (!/_(e2e|test)$/.test(database || '')) {
+  if (!isSeedAllowed({ database, nodeEnv: process.env.NODE_ENV })) {
     refuse(`la base « ${database} » n’est pas une base de recette (DATABASE_NAME absent de l’environnement ou mal choisi).`);
   }
 
@@ -104,10 +112,14 @@ async function main() {
   }
 }
 
-main().then(
-  () => process.exit(0),
-  (error) => {
-    console.error(error);
-    process.exit(1);
-  }
-);
+module.exports = { isSeedAllowed };
+
+if (require.main === module) {
+  main().then(
+    () => process.exit(0),
+    (error) => {
+      console.error(error);
+      process.exit(1);
+    }
+  );
+}

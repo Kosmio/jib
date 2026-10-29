@@ -5,6 +5,8 @@ module.exports = ({ env }) => ({
   app: {
     keys: env.array('APP_KEYS'),
   },
+  // No npm registry lookup on startup (seed, develop, start), and strapi/.strapi-updater.json stays untouched.
+  logger: { updates: { enabled: false } },
   captcha: {
     hmacKey: env('ALTCHA_HMAC_KEY'),
   },

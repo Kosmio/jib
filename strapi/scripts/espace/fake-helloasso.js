@@ -128,7 +128,7 @@ function buildEdgeCaseItems({ padding = 20 } = {}) {
     region(910005, 'Zoe', 'Garnier', '  Zoe.Garnier@Example.ORG  '),
     ...otherStates,
     region(910012, 'Paiement', 'Rembourse', 'paiement.rembourse@example.org', {
-      payments: [{ id: 310012, shareAmount: 3000, state: 'Refunded' }],
+      paymentState: 'Refunded',
     }),
     ...padded,
   ];
