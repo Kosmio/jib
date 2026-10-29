@@ -10,6 +10,9 @@ module.exports = ({ env }) => ({
   },
   email: {
     apiKey: env('EMAIL_API_KEY'),
+    provider: env('EMAIL_PROVIDER'),
+    from: env('EMAIL_FROM'),
+    outboxFile: env('EMAIL_OUTBOX_FILE', '.tmp/mail-outbox.jsonl'),
     listId: env('EMAIL_LIST_ID'),
     contact: {
       to: env('EMAIL_CONTACT_TO'),
