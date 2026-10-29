@@ -16,11 +16,9 @@ module.exports = {
     task: safely('espaceSync', (strapi) => strapi.service('api::espace.sync').runAll()),
     options: { rule: '*/15 * * * *', tz: TIME_ZONE },
   },
-  // I-20: every night, the expired link and session tokens.
+  // I-20, A-21: every night, the link and session tokens expired for more than 7 days.
   espaceTokenPurge: {
-    task: safely('espaceTokenPurge', (strapi) =>
-      strapi.db.query('api::espace.magic-token').deleteMany({ where: { expiresAt: { $lt: new Date() } } })
-    ),
+    task: safely('espaceTokenPurge', (strapi) => strapi.service('api::espace.tokens').purgeExpired()),
     options: { rule: '0 4 * * *', tz: TIME_ZONE },
   },
 };

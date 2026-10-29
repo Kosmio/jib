@@ -15,6 +15,7 @@ module.exports = ({ strapi }) => ({
    * R-18, T-06: the pending and accepted meetings an attendee asked for or received personally become `cancelled` (table released:
    * `tableKey` back to null), and the other party is told by `meeting-cancelled` : the requester, the personal target, or the
    * active representatives of the targeted exhibitor. Meetings aimed at the exhibitor the attendee represents stay (R-14).
+   * NF-52: when the space of the edition is closed, the meetings are cancelled all the same, but no link is issued and nothing is sent.
    * Idempotent: a cancelled meeting is not found again. Phase 2 completes this service.
    */
   async cancelForAttendee(attendee, { reason = 'Inscription annulée', now = new Date() } = {}) {
@@ -41,6 +42,7 @@ module.exports = ({ strapi }) => ({
         documentId: meeting.documentId,
         data: { status: 'cancelled', cancelledAt: now, cancelReason: reason, tableKey: null },
       });
+      if (!edition?.participantSpaceEnabled) continue;
 
       const isRequester = meeting.requester.documentId === attendee.documentId;
       const others = isRequester ? (meeting.targetAttendee ? [meeting.targetAttendee] : meeting.targetExhibitor?.representatives ?? []) : [meeting.requester];

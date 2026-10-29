@@ -3,6 +3,7 @@
 const MAX_PAGES = 50;
 const PAGE_SIZE = 100;
 const TOKEN_MARGIN_MS = 60 * 1000;
+const TIMEOUT_MS = 20 * 1000;
 
 /** Failure of the HelloAsso API. The message never carries a secret, a token or a response body (NF-06); `status` is undefined when HelloAsso is unreachable. */
 class HelloAssoError extends Error {
@@ -16,8 +17,9 @@ class HelloAssoError extends Error {
 /**
  * Client of the HelloAsso API v5 (I-10, I-11): OAuth 2.0 client credentials, token kept until `expires_in` minus 60 s,
  * one renewal and one new try on a 401. `now` is a function returning milliseconds (default: the current time) ; `fetch` is injectable.
+ * Every request, token included, is aborted after `timeoutMs` (default 20 s) and then fails as an unreachable HelloAsso (no `status`).
  */
-function createHelloAssoClient({ apiBase, clientId, clientSecret, fetch = globalThis.fetch, now = Date.now }) {
+function createHelloAssoClient({ apiBase, clientId, clientSecret, fetch = globalThis.fetch, now = Date.now, timeoutMs = TIMEOUT_MS }) {
   const base = apiBase.replace(/\/+$/, '');
   const tokenUrl = `${new URL(base).origin}/oauth2/token`;
   const clock = () => Number(typeof now === 'function' ? now() : now);
@@ -25,7 +27,7 @@ function createHelloAssoClient({ apiBase, clientId, clientSecret, fetch = global
 
   const send = async (url, init, label) => {
     try {
-      return await fetch(url, init);
+      return await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
     } catch {
       throw new HelloAssoError(undefined, `HelloAsso unreachable (${label})`);
     }
