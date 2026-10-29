@@ -19,9 +19,11 @@ Ajouter au site existant des Journées de l'Innovation Filière Bois (journees-i
 
 ## Pile technique
 
-- Front : **Astro** existant (v6 constaté en production). L'espace participant vit dans le même dépôt, sous `/espace/*`. Interactivité par îlots, dans le framework d'îlots déjà présent dans le dépôt ; à défaut, **Preact** (léger).
-- Back : **Strapi** existant (servi sous `/strapi`). Version à détecter en phase 0 (v4 ou v5) ; toutes les specs sont écrites pour s'adapter aux deux.
-- E-mail transactionnel : service européen (Brevo par défaut) via une interface `MailProvider` pour pouvoir en changer.
+- Front : **Astro** existant (v6 constaté en production). L'espace participant vit dans le même dépôt, sous `/espace/*`. Interactivité par îlots en **React 19**, déjà présent dans le dépôt (`@astrojs/react`).
+- Back : **Strapi 5.59** sur **PostgreSQL 17** (constaté le 29 octobre 2026), servi sous `/strapi` sur le même domaine que le site.
+- E-mail transactionnel : le compte et le domaine d'envoi **Brevo** déjà utilisés par le site, via une interface `MailProvider` pour pouvoir en changer.
+- Multi-éditions : l'espace sert chaque édition sans développement ; tous les paramètres d'une édition (créneaux, tables, fenêtre de rendez-vous, formulaire HelloAsso) se règlent dans Strapi.
+- Recette : sur le serveur de **dev** (workflow Deploy, environnement `dev`) ; la prod reste inchangée jusqu'à la mise en production.
 - Pas de nouvelle base de données : tout est stocké dans la base de Strapi.
 - Pas de service tiers d'analytics, pas de traqueur.
 
