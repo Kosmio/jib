@@ -6,8 +6,9 @@ const { EspaceError } = require('../lib/errors');
 /**
  * Route middleware of every participant space route (A-02), declared as 'api::espace.context'.
  *  1. gives the request an id and turns errors into { error: { code, message } } (06-api.md), logging unexpected ones (NF-50) ;
- *  2. refuses a write (anything but GET and HEAD) whose Origin is not in CORS_ORIGINS (A-05, NF-04).
- * The session is loaded here too from the access lot on.
+ *  2. refuses a write (anything but GET and HEAD) whose Origin is not in CORS_ORIGINS (A-05, NF-04) ;
+ *  3. loads the session of the signed cookie into ctx.state.espace = { attendee, edition, session, isOrganizer }, or null.
+ *     The controllers decide with requireSession / requireOrganizer (guards.js).
  */
 module.exports = (config, { strapi }) => async (ctx, next) => {
   const requestId = randomUUID();
@@ -18,6 +19,7 @@ module.exports = (config, { strapi }) => async (ctx, next) => {
     if (!['GET', 'HEAD'].includes(ctx.method) && !strapi.config.get('server.espace.corsOrigins').includes(ctx.get('Origin'))) {
       throw new EspaceError(403, 'ORIGIN_REFUSED', 'Origine non autorisée.');
     }
+    ctx.state.espace = await strapi.service('api::espace.auth').loadSession(ctx);
     await next();
   } catch (error) {
     if (error instanceof EspaceError) {
