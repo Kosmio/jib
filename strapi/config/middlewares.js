@@ -1,8 +1,9 @@
-module.exports = [
+module.exports = ({ env }) => [
   'strapi::logger',
   'strapi::errors',
   'strapi::security',
-  'strapi::cors',
+  // Only the front origins may call the API with credentials (A-05).
+  { name: 'strapi::cors', config: { origin: env.array('CORS_ORIGINS', ['http://localhost:4321']), credentials: true } },
   'strapi::poweredBy',
   'strapi::query',
   'strapi::body',

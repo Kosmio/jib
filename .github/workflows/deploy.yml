@@ -81,6 +81,7 @@ jobs:
           EMAIL_CONTACT_TEMPLATE_ID=${{ secrets.SECRET_EMAIL_CONTACT_TEMPLATE_ID }}
           PUBLIC_MATOMO_URL=${{ secrets.SECRET_PUBLIC_MATOMO_URL }}
           PUBLIC_MATOMO_SITE_ID=${{ secrets.SECRET_PUBLIC_MATOMO_SITE_ID }}
+          HELLOASSO_CLIENT_SECRET=${{ secrets.SECRET_HELLOASSO_CLIENT_SECRET }}
           EOF
 
       - name: Copy infrastructure files to server
