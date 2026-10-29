@@ -1,0 +1,51 @@
+---
+// Vérification d'un lien de connexion (F-03, F-04, Q-13, A-18). Deux états, sans adresse dans l'URL :
+//  - lien valable : bouton « Ouvrir mon espace » (formulaire POST). Le jeton n'est consommé qu'au clic, jamais par un simple GET,
+//    car les analyseurs de liens des messageries ouvrent les URL avant le destinataire ;
+//  - lien inconnu, expiré ou déjà utilisé : message F-04 et formulaire de demande (prérempli si le lien est connu).
+// Un échec de POST /auth/verify revient ici par un 303 de Strapi, qui affiche alors l'état invalide.
+import EspaceLayout from "../../layouts/EspaceLayout.astro";
+import EditionBanner from "../../components/espace/EditionBanner.astro";
+import EspaceCard from "../../components/espace/EspaceCard.astro";
+import EspaceButton from "../../components/espace/EspaceButton.astro";
+import RequestLinkForm from "../../components/espace/RequestLinkForm.astro";
+import { getLinkState, getOpenEdition, publicStrapiUrl, type LinkState } from "../../lib/espace/api";
+import { editionSlugFromPath, meetingsSubtitle } from "../../lib/espace/format";
+
+const token = Astro.url.searchParams.get("token") ?? "";
+const next = Astro.url.searchParams.get("next") ?? "";
+
+const link: LinkState = token ? await getLinkState(token) : { valid: false };
+// L'édition vient du lien s'il est connu, sinon de `next` (A-18) ; absente ou fermée, il n'y a ni formulaire ni couleur d'édition.
+const slug = link.editionSlug ?? editionSlugFromPath(next);
+const edition = slug ? await getOpenEdition(slug) : null;
+const valid = link.valid && edition !== null;
+---
+
+<EspaceLayout title={valid ? "Ouvrir mon espace" : "Lien non valable"}>
+  <EditionBanner title="Bienvenue dans votre espace participant" subtitle={meetingsSubtitle(edition)} themeColor={edition?.themeColor} />
+  {
+    valid ? (
+      <EspaceCard heading="Votre lien est valable">
+        <form method="post" action={`${publicStrapiUrl}/api/espace/auth/verify`}>
+          <p class="mt-4">Appuyez sur le bouton pour entrer dans votre espace participant.</p>
+          <input type="hidden" name="token" value={token} />
+          {next && <input type="hidden" name="next" value={next} />}
+          <EspaceButton class="mt-6">Ouvrir mon espace</EspaceButton>
+          <p class="mt-4 text-sm text-muted">Ce lien ne fonctionne qu’une seule fois.</p>
+        </form>
+      </EspaceCard>
+    ) : (
+      <EspaceCard heading="Ce lien n’est plus valable">
+        <p class="mt-4">Il a expiré ou a déjà été utilisé. Recevez un nouveau lien à l’adresse de votre inscription.</p>
+        {edition ? (
+          <RequestLinkForm editionSlug={edition.slug} email={link.email} button="Recevoir un nouveau lien" />
+        ) : (
+          <EspaceButton variant="secondary" href="/" class="mt-6">
+            Retour au site des Journées
+          </EspaceButton>
+        )}
+      </EspaceCard>
+    )
+  }
+</EspaceLayout>

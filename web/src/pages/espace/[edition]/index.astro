@@ -1,0 +1,29 @@
+---
+// E1 provisoire : cible de la redirection après connexion, avec la déconnexion. La phase 2 le remplace par l'accueil complet.
+// Sans session valable pour l'édition de l'URL : E0. Sans consentement enregistré : E2.
+import EspaceLayout from "../../../layouts/EspaceLayout.astro";
+import EditionBanner from "../../../components/espace/EditionBanner.astro";
+import EspaceCard from "../../../components/espace/EspaceCard.astro";
+import EspaceButton from "../../../components/espace/EspaceButton.astro";
+import { getMe, getOpenEdition, publicStrapiUrl } from "../../../lib/espace/api";
+import { editionLine } from "../../../lib/espace/format";
+
+const slug = Astro.params.edition ?? "";
+const edition = await getOpenEdition(slug);
+if (!edition) return Astro.rewrite("/espace/introuvable");
+
+const me = await getMe(Astro.request.headers.get("cookie"));
+if (me?.edition.slug !== slug) return Astro.redirect(`/espace/${encodeURIComponent(slug)}/connexion`);
+if (!me.consent.consentAt) return Astro.redirect(`/espace/${encodeURIComponent(slug)}/bienvenue`);
+---
+
+<EspaceLayout title="Accueil">
+  <EditionBanner title={`Bonjour ${me.firstName}`} subtitle={editionLine(edition)} themeColor={edition.themeColor} />
+  <EspaceCard heading="Connexion réussie">
+    <p class="mt-4">L’annuaire, les rendez-vous et la messagerie arrivent bientôt.</p>
+    <form method="post" action={`${publicStrapiUrl}/api/espace/auth/logout`} class="mt-6">
+      <input type="hidden" name="editionSlug" value={slug} />
+      <EspaceButton variant="secondary">Me déconnecter</EspaceButton>
+    </form>
+  </EspaceCard>
+</EspaceLayout>

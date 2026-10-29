@@ -1,0 +1,51 @@
+---
+// Formulaire de demande de lien de connexion (F-01, F-04), en HTML pur : il fonctionne sans JavaScript (NF-31).
+// Il est envoyé à Strapi, qui répond par un 303 vers la page de connexion de l'édition (?envoye=1, ?erreur=trop, ?erreur=email).
+import { publicStrapiUrl } from "../../lib/espace/api";
+import EspaceButton from "./EspaceButton.astro";
+import Icon from "./Icon.astro";
+
+export interface Props {
+  editionSlug: string;
+  /** Adresse préremplie (valeur seulement) : celle d'un lien expiré ou déjà utilisé (A-18). */
+  email?: string;
+  /** Adresse refusée par l'API (?erreur=email). */
+  emailInvalid?: boolean;
+  button?: string;
+}
+
+const { editionSlug, email = "", emailInvalid = false, button = "Recevoir mon lien" } = Astro.props;
+---
+
+<form method="post" action={`${publicStrapiUrl}/api/espace/auth/request-link`} class="mt-6">
+  <input type="hidden" name="editionSlug" value={editionSlug} />
+  <label for="email" class="block font-semibold">Adresse e-mail utilisée pour l’inscription</label>
+  <input
+    id="email"
+    name="email"
+    type="email"
+    required
+    autocomplete="email"
+    inputmode="email"
+    autocapitalize="none"
+    spellcheck="false"
+    value={email}
+    aria-invalid={emailInvalid ? "true" : undefined}
+    aria-describedby={emailInvalid ? "email-erreur" : undefined}
+    class={`mt-2 min-h-12 w-full rounded-lg border-2 bg-white px-4 text-lg text-ink ${emailInvalid ? "border-danger" : "border-accent"}`}
+  />
+  {
+    emailInvalid && (
+      <p id="email-erreur" class="mt-2 flex items-start gap-2 text-sm font-semibold text-danger">
+        <Icon name="alert" />
+        Saisissez une adresse e-mail valide, par exemple prenom.nom@entreprise.fr.
+      </p>
+    )
+  }
+  <EspaceButton class="mt-6">{button}</EspaceButton>
+  <p class="mt-4 text-sm text-muted">
+    Pas de mot de passe&nbsp;: un lien valable 30&nbsp;minutes vous est envoyé par e-mail. Vos données servent uniquement à
+    l’organisation de la journée.
+    <a href="/confidentialite" class="text-title underline">Confidentialité</a>
+  </p>
+</form>

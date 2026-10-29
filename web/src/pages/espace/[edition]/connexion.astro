@@ -1,0 +1,61 @@
+---
+// E0 : connexion par lien magique (F-01, F-02). Page serveur sans îlot : le formulaire part vers Strapi, qui répond par un 303
+// vers cette page avec ?envoye=1, ?erreur=trop ou ?erreur=email ; ?deconnecte=1 vient de la déconnexion.
+import EspaceLayout from "../../../layouts/EspaceLayout.astro";
+import EditionBanner from "../../../components/espace/EditionBanner.astro";
+import EspaceCard from "../../../components/espace/EspaceCard.astro";
+import EspaceButton from "../../../components/espace/EspaceButton.astro";
+import Notice from "../../../components/espace/Notice.astro";
+import RequestLinkForm from "../../../components/espace/RequestLinkForm.astro";
+import { getOpenEdition } from "../../../lib/espace/api";
+import { meetingsSubtitle } from "../../../lib/espace/format";
+
+const slug = Astro.params.edition ?? "";
+const edition = await getOpenEdition(slug);
+if (!edition) return Astro.rewrite("/espace/introuvable");
+
+const query = Astro.url.searchParams;
+const state =
+  query.get("envoye") === "1"
+    ? "sent"
+    : query.get("erreur") === "trop"
+      ? "tooMany"
+      : query.get("erreur") === "email"
+        ? "invalidEmail"
+        : query.get("deconnecte") === "1"
+          ? "loggedOut"
+          : "initial";
+const titles = {
+  initial: "Connexion",
+  loggedOut: "Connexion",
+  sent: "Lien envoyé",
+  tooMany: "Trop de demandes",
+  invalidEmail: "Adresse non valide",
+};
+---
+
+<EspaceLayout title={titles[state]}>
+  <EditionBanner title="Bienvenue dans votre espace participant" subtitle={meetingsSubtitle(edition)} themeColor={edition.themeColor} />
+  {
+    state === "sent" ? (
+      <EspaceCard heading="Vérifiez votre messagerie">
+        <p role="status" class="mt-4 font-semibold">
+          Si cette adresse est inscrite, un lien vient de vous être envoyé.
+        </p>
+        <p class="mt-2 text-muted">
+          Le lien est valable 30&nbsp;minutes et ne fonctionne qu’une seule fois. Rien reçu&nbsp;? Regardez dans vos courriers
+          indésirables, puis demandez un nouveau lien.
+        </p>
+        <EspaceButton variant="secondary" href={`/espace/${encodeURIComponent(slug)}/connexion`} class="mt-6">
+          Demander un nouveau lien
+        </EspaceButton>
+      </EspaceCard>
+    ) : (
+      <EspaceCard heading="Recevoir mon lien de connexion">
+        {state === "tooMany" && <Notice kind="alert">Trop de demandes, réessayez dans quelques minutes.</Notice>}
+        {state === "loggedOut" && <Notice kind="status">Déconnexion effectuée.</Notice>}
+        <RequestLinkForm editionSlug={slug} emailInvalid={state === "invalidEmail"} />
+      </EspaceCard>
+    )
+  }
+</EspaceLayout>

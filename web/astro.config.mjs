@@ -7,7 +7,8 @@ import sitemap from "@astrojs/sitemap";
 // https://astro.build/config
 export default defineConfig({
   site: "https://journees-innovation-bois.xylofutur.fr",
-  integrations: [react(), sitemap()],
+  // L'espace participant reste hors du sitemap : pages privées, noindex.
+  integrations: [react(), sitemap({ filter: (page) => !new URL(page).pathname.startsWith("/espace/") })],
   output: "server",
   adapter: node({ mode: "standalone" }),
   vite: {

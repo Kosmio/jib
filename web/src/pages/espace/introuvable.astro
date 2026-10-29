@@ -1,0 +1,17 @@
+---
+// Réponse 404 des pages de l'espace (édition absente, non publiée ou fermée, NF-52) : les pages font
+// `return Astro.rewrite("/espace/introuvable")`. La page 404 du site public charge Google Fonts : elle n'a pas sa place ici.
+import EspaceLayout from "../../layouts/EspaceLayout.astro";
+import EditionBanner from "../../components/espace/EditionBanner.astro";
+import EspaceCard from "../../components/espace/EspaceCard.astro";
+import EspaceButton from "../../components/espace/EspaceButton.astro";
+
+Astro.response.status = 404;
+---
+
+<EspaceLayout title="Page introuvable">
+  <EditionBanner title="Page introuvable" subtitle="Cette page n’existe pas, ou l’espace participant n’est pas ouvert." />
+  <EspaceCard>
+    <EspaceButton variant="secondary" href="/">Retour au site des Journées</EspaceButton>
+  </EspaceCard>
+</EspaceLayout>

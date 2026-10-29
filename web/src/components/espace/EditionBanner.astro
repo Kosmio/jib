@@ -1,0 +1,62 @@
+---
+// Bandeau d'édition : couleur d'édition (Strapi), logos, halo doré et constellation, titre et sous-titre.
+// Une couleur qui ne passe pas 4,5:1 sous le blanc, ou qui n'est pas un hexadécimal à six chiffres, donne le fond `bg-title`.
+// La phase 2 y ajoutera le compte à rebours J-n (F-20).
+import { bannerColor } from "../../lib/espace/format";
+
+export interface Props {
+  title: string;
+  subtitle: string;
+  themeColor?: string | null;
+}
+
+const { title, subtitle, themeColor } = Astro.props;
+const color = bannerColor(themeColor);
+---
+
+<header class={`relative overflow-hidden pb-16 ${color ? "" : "bg-title"}`} style={color ? `background-color: ${color}` : undefined}>
+  <div
+    aria-hidden="true"
+    class="absolute inset-0 bg-[radial-gradient(circle_at_75%_25%,color-mix(in_srgb,var(--color-gold)_15%,transparent),transparent_60%)]"
+  >
+  </div>
+  <svg
+    aria-hidden="true"
+    class="absolute top-0 right-0 h-64 w-auto"
+    viewBox="0 0 240 220"
+    fill="none"
+    preserveAspectRatio="xMaxYMin meet"
+  >
+    <g class="stroke-gold/25" stroke-width="1.5">
+      <line x1="206" y1="14" x2="142" y2="96"></line>
+      <line x1="142" y1="96" x2="98" y2="152"></line>
+      <line x1="142" y1="96" x2="224" y2="132"></line>
+      <line x1="224" y1="132" x2="186" y2="204"></line>
+      <line x1="64" y1="8" x2="142" y2="96"></line>
+    </g>
+    <g class="fill-gold/50">
+      <circle cx="206" cy="14" r="3"></circle>
+      <circle cx="142" cy="96" r="5"></circle>
+      <circle cx="98" cy="152" r="3"></circle>
+      <circle cx="224" cy="132" r="4"></circle>
+      <circle cx="186" cy="204" r="3"></circle>
+      <circle cx="64" cy="8" r="3"></circle>
+    </g>
+  </svg>
+  <div class="relative mx-auto max-w-180 px-4 pt-8">
+    <div class="flex items-center gap-4">
+      <span class="rounded-lg bg-white px-2 py-1.5">
+        <img src="/assets/logo-xylofutur.png" alt="Xylofutur" width="1199" height="676" class="block h-8 w-auto" />
+      </span>
+      <img
+        src="/assets/logo-jib-blanc.svg"
+        alt="La Journée de l’Innovation de la Filière Bois"
+        width="649"
+        height="160"
+        class="h-9 w-auto"
+      />
+    </div>
+    <h1 class="mt-8 text-2xl leading-tight text-white md:text-3xl">{title}</h1>
+    <p class="mt-4 text-lg text-white">{subtitle}</p>
+  </div>
+</header>

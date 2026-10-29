@@ -1,0 +1,35 @@
+---
+// Gabarit de l'espace participant : ni Header, ni Footer, ni Matomo, ni bandeau de cookies, ni Google Fonts (NF-07, NF-23).
+// Les en-têtes de sécurité viennent de src/middleware.ts.
+import "../styles/espace.css";
+
+export interface Props {
+  /** État de la page : « Connexion », « Lien envoyé »… Le gabarit y ajoute le nom de l'espace. */
+  title: string;
+}
+
+const { title } = Astro.props;
+---
+
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/source-sans-3-latin-wght-normal.woff2" crossorigin />
+    <title>{title} | Espace participant, Journées de l’Innovation Filière Bois</title>
+  </head>
+  <body class="bg-surface font-sans text-ink antialiased">
+    <a
+      href="#main-content"
+      class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:font-semibold focus:text-title"
+    >
+      Aller au contenu
+    </a>
+    <main id="main-content" class="min-h-screen pb-12">
+      <slot />
+    </main>
+  </body>
+</html>

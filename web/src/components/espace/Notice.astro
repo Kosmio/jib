@@ -1,0 +1,20 @@
+---
+// Message annoncé aux lecteurs d'écran (NF-30) : `alert` pour une erreur (contour et icône d'alerte, jamais la couleur seule),
+// `status` pour une confirmation. La page se recharge après chaque envoi de formulaire, donc l'annonce live y est peu fiable :
+// le titre de chaque état reprend le message (EspaceLayout).
+import Icon from "./Icon.astro";
+
+export interface Props {
+  kind: "alert" | "status";
+}
+
+const { kind } = Astro.props;
+const classes = kind === "alert" ? "border-2 border-danger bg-white" : "bg-surface";
+---
+
+<div role={kind} class={`mt-4 flex items-start gap-3 rounded-lg p-3 font-semibold text-ink ${classes}`}>
+  <span class={kind === "alert" ? "text-danger" : "text-primary-ink"}>
+    <Icon name={kind === "alert" ? "alert" : "check"} />
+  </span>
+  <p><slot /></p>
+</div>

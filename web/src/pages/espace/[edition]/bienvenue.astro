@@ -1,0 +1,41 @@
+---
+// E2 : premier profil et consentement (F-10 à F-12). Seul îlot de la phase : WelcomeForm, qui envoie PATCH /me puis PUT /me/consent.
+// Sans session valable pour l'édition de l'URL, retour à E0.
+import EspaceLayout from "../../../layouts/EspaceLayout.astro";
+import EditionBanner from "../../../components/espace/EditionBanner.astro";
+import EspaceCard from "../../../components/espace/EspaceCard.astro";
+import WelcomeForm from "../../../react-components/espace/WelcomeForm";
+import { getMe, getOpenEdition, publicStrapiUrl } from "../../../lib/espace/api";
+
+const slug = Astro.params.edition ?? "";
+const edition = await getOpenEdition(slug);
+if (!edition) return Astro.rewrite("/espace/introuvable");
+
+const me = await getMe(Astro.request.headers.get("cookie"));
+if (me?.edition.slug !== slug) return Astro.redirect(`/espace/${encodeURIComponent(slug)}/connexion`);
+
+// Valeurs actuelles : les cases sont décochées à la première visite, le profil est celui de l'import (F-10).
+const initial = {
+  firstName: me.firstName,
+  lastName: me.lastName,
+  jobTitle: me.jobTitle ?? "",
+  company: me.company ?? "",
+  directoryOptIn: me.consent.directoryOptIn,
+  meetingsOptIn: me.consent.meetingsOptIn,
+  newsOptIn: me.consent.newsOptIn,
+};
+---
+
+<EspaceLayout title="Vos informations">
+  <EditionBanner
+    title={`Bienvenue, ${me.firstName}`}
+    subtitle="Vérifiez vos informations, puis choisissez ce que les autres participants voient de vous."
+    themeColor={edition.themeColor}
+  />
+  <EspaceCard>
+    <noscript>
+      <p class="font-semibold">Cette étape demande JavaScript. Activez-le ou utilisez un autre navigateur.</p>
+    </noscript>
+    <WelcomeForm client:load strapiUrl={publicStrapiUrl} editionSlug={slug} initial={initial} />
+  </EspaceCard>
+</EspaceLayout>

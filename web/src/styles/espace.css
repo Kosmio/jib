@@ -1,0 +1,45 @@
+/* Feuille de l'espace participant : une seule racine Tailwind (celle d'app.css), importée sans y toucher.
+   Les pages publiques n'importent pas ce fichier et restent inchangées. */
+@import "./app.css";
+
+/* Q-14 : Sora et Source Sans 3 servies par le site (fontes variables, sous-ensemble latin), sans Google Fonts.
+   Provenance et licences : public/fonts/README.md. */
+@font-face {
+  font-family: "Sora";
+  src: url("/fonts/sora-latin-wght-normal.woff2") format("woff2");
+  font-weight: 100 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Source Sans 3";
+  src: url("/fonts/source-sans-3-latin-wght-normal.woff2") format("woff2");
+  font-weight: 200 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Tokens ajoutés par le designer (phase-1-design.md, section 0), contrastes calculés sur blanc :
+   ink 11,7:1 (corps), gold-ink 7,3:1 (texte du bouton or), primary-ink 5,3:1 (cases, liens d'action),
+   danger 8,2:1 (erreurs, toujours avec icône et texte). */
+@theme {
+  --color-ink: #2a3a44;
+  --color-gold-ink: #3a2410;
+  --color-primary-ink: #007a5e;
+  --color-danger: #9b1c1c;
+}
+
+@layer base {
+  /* NF-30 : focus visible partout, sans jamais retirer le contour (8,5:1 sur blanc, 7,5:1 sur surface). */
+  :where(a, button, input, textarea, select, summary):focus-visible {
+    outline: 2px solid var(--color-title);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
