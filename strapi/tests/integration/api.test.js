@@ -64,9 +64,10 @@ describe('Strapi sur la base de test', { timeout: 180_000 }, () => {
 
     for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
       it(`répond 405 à ${method}`, async () => {
+        // Avec un Origin admis : le contrôle Origin des écritures (lot 2, NF-04) ne change pas ce verdict.
         const response = await request('/api/espace/health', {
           method,
-          headers: { 'content-type': 'application/json' },
+          headers: { 'content-type': 'application/json', origin: 'http://localhost:4321' },
           body: '{}',
         });
         assert.equal(response.status, 405);
@@ -81,9 +82,45 @@ describe('Strapi sur la base de test', { timeout: 180_000 }, () => {
   });
 
   describe('aucune route CRUD sous /api/espace (A-02)', () => {
-    it('ne déclare que GET /api/espace/health sous /api/espace', () => {
-      const declared = espaceRoutes().map((route) => ({ methods: route.methods.filter((m) => m !== 'HEAD'), path: route.path }));
-      assert.deepEqual(declared, [{ methods: ['GET'], path: '/api/espace/health' }]);
+    // Table de la section 4.2 du plan de la phase 1 (06-api.md). Les noms de paramètres sont sans importance (`:x`).
+    // Le test reste vrai à chaque lot : une route de plus doit figurer ici, ce qui oblige à la déclarer au plan.
+    const ALLOWED = new Set([
+      'GET /api/espace/health',
+      'GET /api/espace/editions/:x',
+      'POST /api/espace/admin/:x/slots/regenerate',
+      'POST /api/espace/admin/:x/sync',
+      'GET /api/espace/admin/:x/sync-runs',
+      'POST /api/espace/auth/request-link',
+      'GET /api/espace/auth/link',
+      'POST /api/espace/auth/verify',
+      'POST /api/espace/auth/logout',
+      'GET /api/espace/me',
+      'PATCH /api/espace/me',
+      'PUT /api/espace/me/consent',
+    ]);
+    const declared = () =>
+      espaceRoutes().flatMap((route) =>
+        route.methods.filter((method) => method !== 'HEAD').map((method) => `${method} ${route.path.replace(/:[A-Za-z]+/g, ':x')}`)
+      );
+
+    it('ne déclare sous /api/espace que des routes de la section 4.2 du plan de la phase 1', () => {
+      const unexpected = declared().filter((route) => !ALLOWED.has(route));
+      assert.deepEqual(unexpected, [], 'routes hors du plan');
+    });
+
+    it('déclare toujours GET /api/espace/health et aucune route en double', () => {
+      assert.ok(declared().includes('GET /api/espace/health'));
+      assert.equal(new Set(declared()).size, declared().length);
+    });
+
+    it('ne déclare aucune route d’écriture sur une ressource (attendees, meetings, slots…) : pas de CRUD', () => {
+      const crud = declared().filter((route) => /\/api\/espace\/(attendees|exhibitors|topics|slots|meetings|conversations|messages|magic-tokens|email-logs|sync-runs)(\/|$)/.test(route));
+      assert.deepEqual(crud, []);
+    });
+
+    it('ne sert aucune route de l’API espace hors du préfixe /api/espace', () => {
+      const strays = routes().filter((route) => String(route.handler ?? '').startsWith('api::espace.') && !route.path.startsWith('/api/espace'));
+      assert.deepEqual(strays.map((route) => route.path), []);
     });
 
     it('ne rattache aucune route à un contrôleur d’un type api::espace.*', () => {
@@ -114,7 +151,11 @@ describe('Strapi sur la base de test', { timeout: 180_000 }, () => {
       ['POST', '/api/espace/meetings'],
     ]) {
       it(`ne sert pas ${method} ${path} (404 ou 405)`, async () => {
-        const response = await request(path, { method, headers: { 'content-type': 'application/json' }, body: method === 'DELETE' ? undefined : '{}' });
+        const response = await request(path, {
+          method,
+          headers: { 'content-type': 'application/json', origin: 'http://localhost:4321' },
+          body: method === 'DELETE' ? undefined : '{}',
+        });
         assert.ok([404, 405].includes(response.status), `statut ${response.status}`);
       });
     }
@@ -125,6 +166,21 @@ describe('Strapi sur la base de test', { timeout: 180_000 }, () => {
       const paths = routes().map((route) => `${route.methods.filter((m) => m !== 'HEAD').join(',')} ${route.path}`);
       for (const expected of ['POST /api/contact/send', 'POST /api/newsletter/subscribe', 'GET /api/captcha/challenge']) {
         assert.ok(paths.includes(expected), `${expected} absente`);
+      }
+    });
+
+    // NF-04 ne vaut que sous /api/espace : le formulaire de contact et la newsletter du site public n'envoient pas d'Origin admis.
+    it('ne soumet pas contact ni newsletter au contrôle Origin de l’espace', async () => {
+      for (const path of ['/api/contact/send', '/api/newsletter/subscribe']) {
+        for (const origin of [undefined, 'https://autre-site.example.org']) {
+          const response = await request(path, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', ...(origin ? { origin } : {}) },
+            body: '{}',
+          });
+          const body = await response.json().catch(() => ({}));
+          assert.notEqual(body?.error?.code, 'ORIGIN_REFUSED', `${path} avec Origin ${origin}`);
+        }
       }
     });
 

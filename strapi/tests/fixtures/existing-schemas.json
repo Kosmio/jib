@@ -1,0 +1,309 @@
+{
+  "edition": {
+    "uid": "api::edition.edition",
+    "collectionName": "editions",
+    "attributes": {
+      "title": "string",
+      "slug": "uid",
+      "year": "integer",
+      "region": "enumeration",
+      "date": "date",
+      "city": "string",
+      "edition_status": "enumeration",
+      "participants_count": "integer",
+      "description": "richtext",
+      "inscription_url": "string",
+      "image": "media",
+      "hero_bg_color": "customField",
+      "lieux": "component",
+      "sequences": "relation",
+      "partenaires": "relation",
+      "gallery": "media",
+      "video_urls": "text",
+      "summary": "richtext",
+      "testimonials": "richtext"
+    },
+    "structural": {
+      "image": {
+        "type": "media",
+        "multiple": false,
+        "allowedTypes": [
+          "images"
+        ]
+      },
+      "lieux": {
+        "type": "component",
+        "component": "edition.lieu",
+        "repeatable": true
+      },
+      "sequences": {
+        "type": "relation",
+        "relation": "oneToMany",
+        "target": "api::sequence.sequence",
+        "mappedBy": "edition"
+      },
+      "partenaires": {
+        "type": "relation",
+        "relation": "manyToMany",
+        "target": "api::partenaire.partenaire",
+        "inversedBy": "editions"
+      },
+      "gallery": {
+        "type": "media",
+        "multiple": true,
+        "allowedTypes": [
+          "images"
+        ]
+      }
+    }
+  },
+  "home-page": {
+    "uid": "api::home-page.home-page",
+    "collectionName": "home_pages",
+    "attributes": {
+      "hero_subtitle": "text",
+      "hero_bg_color": "customField",
+      "pourquoi_title": "string",
+      "pourquoi_intro": "text",
+      "pourquoi_cards": "component",
+      "pourquoi_link_label": "string",
+      "editions_title": "string",
+      "editions_intro": "text",
+      "dynamique_title": "string",
+      "dynamique_body": "richtext",
+      "partenaires_label": "string",
+      "suite_title": "string",
+      "suite_body": "text",
+      "suite_cta_label": "string",
+      "suite_cta_url": "string"
+    },
+    "structural": {
+      "pourquoi_cards": {
+        "type": "component",
+        "component": "home.feature-card",
+        "repeatable": true
+      }
+    }
+  },
+  "intervenant": {
+    "uid": "api::intervenant.intervenant",
+    "collectionName": "intervenants",
+    "attributes": {
+      "name": "string",
+      "slug": "uid",
+      "title": "string",
+      "bio": "richtext",
+      "photo": "media",
+      "topic": "string",
+      "linkedin_url": "string",
+      "video_url": "string",
+      "long_description": "richtext",
+      "organisation": "relation",
+      "tags": "relation",
+      "interventions": "relation"
+    },
+    "structural": {
+      "photo": {
+        "type": "media",
+        "multiple": false,
+        "allowedTypes": [
+          "images"
+        ]
+      },
+      "organisation": {
+        "type": "relation",
+        "relation": "manyToOne",
+        "target": "api::organisation.organisation",
+        "inversedBy": "intervenants"
+      },
+      "tags": {
+        "type": "relation",
+        "relation": "manyToMany",
+        "target": "api::tag.tag",
+        "inversedBy": "intervenants"
+      },
+      "interventions": {
+        "type": "relation",
+        "relation": "manyToMany",
+        "target": "api::intervention.intervention",
+        "mappedBy": "intervenants"
+      }
+    }
+  },
+  "intervention": {
+    "uid": "api::intervention.intervention",
+    "collectionName": "interventions",
+    "attributes": {
+      "intervenants": "relation",
+      "sequence": "relation",
+      "description": "richtext",
+      "presentation": "media",
+      "order": "integer"
+    },
+    "structural": {
+      "intervenants": {
+        "type": "relation",
+        "relation": "manyToMany",
+        "target": "api::intervenant.intervenant",
+        "inversedBy": "interventions"
+      },
+      "sequence": {
+        "type": "relation",
+        "relation": "manyToOne",
+        "target": "api::sequence.sequence",
+        "inversedBy": "interventions"
+      },
+      "presentation": {
+        "type": "media",
+        "multiple": false,
+        "allowedTypes": [
+          "files",
+          "images"
+        ]
+      }
+    }
+  },
+  "organisation": {
+    "uid": "api::organisation.organisation",
+    "collectionName": "organisations",
+    "attributes": {
+      "name": "string",
+      "slug": "uid",
+      "logo": "media",
+      "description": "text",
+      "long_description": "richtext",
+      "website": "string",
+      "linkedin_url": "string",
+      "tags": "relation",
+      "intervenants": "relation",
+      "partenariats": "relation"
+    },
+    "structural": {
+      "logo": {
+        "type": "media",
+        "multiple": false,
+        "allowedTypes": [
+          "images"
+        ]
+      },
+      "tags": {
+        "type": "relation",
+        "relation": "manyToMany",
+        "target": "api::tag.tag",
+        "inversedBy": "organisations"
+      },
+      "intervenants": {
+        "type": "relation",
+        "relation": "oneToMany",
+        "target": "api::intervenant.intervenant",
+        "mappedBy": "organisation"
+      },
+      "partenariats": {
+        "type": "relation",
+        "relation": "oneToMany",
+        "target": "api::partenaire.partenaire",
+        "mappedBy": "organisation"
+      }
+    }
+  },
+  "partenaire": {
+    "uid": "api::partenaire.partenaire",
+    "collectionName": "partenaires",
+    "attributes": {
+      "display_name": "string",
+      "role": "enumeration",
+      "organisation": "relation",
+      "editions": "relation"
+    },
+    "structural": {
+      "organisation": {
+        "type": "relation",
+        "relation": "manyToOne",
+        "target": "api::organisation.organisation",
+        "inversedBy": "partenariats"
+      },
+      "editions": {
+        "type": "relation",
+        "relation": "manyToMany",
+        "target": "api::edition.edition",
+        "mappedBy": "partenaires"
+      }
+    }
+  },
+  "sequence": {
+    "uid": "api::sequence.sequence",
+    "collectionName": "sequences",
+    "attributes": {
+      "title": "string",
+      "start_time": "string",
+      "end_time": "string",
+      "description": "richtext",
+      "order": "integer",
+      "edition": "relation",
+      "interventions": "relation",
+      "tags": "relation",
+      "organisations": "relation"
+    },
+    "structural": {
+      "edition": {
+        "type": "relation",
+        "relation": "manyToOne",
+        "target": "api::edition.edition",
+        "inversedBy": "sequences"
+      },
+      "interventions": {
+        "type": "relation",
+        "relation": "oneToMany",
+        "target": "api::intervention.intervention",
+        "mappedBy": "sequence"
+      },
+      "tags": {
+        "type": "relation",
+        "relation": "manyToMany",
+        "target": "api::tag.tag"
+      },
+      "organisations": {
+        "type": "relation",
+        "relation": "manyToMany",
+        "target": "api::organisation.organisation"
+      }
+    }
+  },
+  "static-page": {
+    "uid": "api::static-page.static-page",
+    "collectionName": "static_pages",
+    "attributes": {
+      "slug": "uid",
+      "title": "string",
+      "hero_subtitle": "string",
+      "body": "richtext",
+      "meta_description": "text"
+    },
+    "structural": {}
+  },
+  "tag": {
+    "uid": "api::tag.tag",
+    "collectionName": "tags",
+    "attributes": {
+      "name": "string",
+      "slug": "uid",
+      "color": "string",
+      "organisations": "relation",
+      "intervenants": "relation"
+    },
+    "structural": {
+      "organisations": {
+        "type": "relation",
+        "relation": "manyToMany",
+        "target": "api::organisation.organisation",
+        "mappedBy": "tags"
+      },
+      "intervenants": {
+        "type": "relation",
+        "relation": "manyToMany",
+        "target": "api::intervenant.intervenant",
+        "mappedBy": "tags"
+      }
+    }
+  }
+}

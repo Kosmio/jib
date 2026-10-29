@@ -198,6 +198,31 @@ describe('buildTestEnv : environnement hermétique', () => {
     assert.equal(env.STRAPI_TELEMETRY_DISABLED, 'true');
   });
 
+  // Phase 1 (lot 3) : variables que lisent les lots 2 à 5. Chaque test choisit son IP par X-Forwarded-For (NF-03).
+  it('pose les variables de l’espace : PUBLIC_URL, CORS_ORIGINS, ORGANIZER_EMAILS, IS_PROXIED', () => {
+    const env = buildTestEnv();
+    assert.equal(env.PUBLIC_URL, 'http://localhost:4321');
+    assert.equal(env.CORS_ORIGINS, 'http://localhost:4321');
+    assert.equal(env.ORGANIZER_EMAILS, 'organisation@example.org');
+    assert.equal(env.IS_PROXIED, 'true');
+  });
+
+  it('vide les identifiants HelloAsso, même si l’environnement parent en porte (aucun appel réel)', () => {
+    process.env.HELLOASSO_CLIENT_ID = 'id-reel';
+    process.env.HELLOASSO_CLIENT_SECRET = 'secret-reel';
+    process.env.HELLOASSO_API_BASE = 'https://api.helloasso.com/v5';
+    const env = buildTestEnv();
+    assert.equal(env.HELLOASSO_CLIENT_ID, '');
+    assert.equal(env.HELLOASSO_CLIENT_SECRET, '');
+    assert.equal(env.HELLOASSO_API_BASE, '');
+  });
+
+  it('laisse une surcharge viser le faux HelloAsso du test', () => {
+    const env = buildTestEnv({ overrides: { HELLOASSO_API_BASE: 'http://localhost:4999/v5', CORS_ORIGINS: 'http://localhost:4321,http://localhost:4332' } });
+    assert.equal(env.HELLOASSO_API_BASE, 'http://localhost:4999/v5');
+    assert.equal(env.CORS_ORIGINS, 'http://localhost:4321,http://localhost:4332');
+  });
+
   it('n’emploie que des valeurs factices pour les clés et sels de Strapi', () => {
     const env = buildTestEnv();
     for (const key of ['APP_KEYS', 'API_TOKEN_SALT', 'ADMIN_JWT_SECRET', 'TRANSFER_TOKEN_SALT', 'JWT_SECRET', 'ALTCHA_HMAC_KEY']) {

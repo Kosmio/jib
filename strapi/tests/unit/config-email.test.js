@@ -13,14 +13,8 @@ const path = require('node:path');
 
 const serverConfig = require('../../config/server');
 const { createMailProvider } = require('../../src/api/espace/lib/mail');
-
-/** Reproduit l'aide `env` de Strapi pour un jeu de variables donné (valeur par défaut si absente). */
-const makeEnv = (vars) => {
-  const env = (key, fallback) => (vars[key] !== undefined ? vars[key] : fallback);
-  env.int = (key, fallback) => (vars[key] !== undefined ? Number.parseInt(vars[key], 10) : fallback);
-  env.array = (key, fallback) => (vars[key] !== undefined ? vars[key].split(',') : fallback);
-  return env;
-};
+// Aide `env` complète (int, bool, array…) : config/server.js lit aussi les variables de la phase 1 (env.bool, env.array).
+const { makeEnv } = require('../helpers/config-env');
 
 describe('config/server.js : section email', () => {
   it('ne fixe ni fournisseur ni expéditeur sans variables, et range la boîte dans .tmp/', () => {

@@ -111,6 +111,19 @@ function buildTestEnv({ database = testDatabaseName(), port = 0, outboxFile, ove
     CRON_ENABLED: 'false',
     RESTORE_MISSING_MEDIA: 'false',
 
+    // Phase 1 : adresse publique des liens et des redirections, origines admises (CORS et contrôle Origin, NF-04),
+    // organisateur par e-mail (I-23). IS_PROXIED : Strapi lit l'IP dans X-Forwarded-For, ce qui permet à chaque
+    // requête de test de choisir la sienne (limitation de débit, NF-03).
+    PUBLIC_URL: 'http://localhost:4321',
+    CORS_ORIGINS: 'http://localhost:4321',
+    ORGANIZER_EMAILS: 'organisation@example.org',
+    IS_PROXIED: 'true',
+    // HelloAsso : jamais celui de l'environnement du poste. Un test qui synchronise démarre le faux HelloAsso en module
+    // et passe son `apiBase` en surcharge (tests/helpers/espace.js).
+    HELLOASSO_API_BASE: '',
+    HELLOASSO_CLIENT_ID: '',
+    HELLOASSO_CLIENT_SECRET: '',
+
     // Aucun appel réseau : télémétrie de Strapi coupée (la notification de mise à jour n'a pas de variable : voir no-network.js).
     STRAPI_TELEMETRY_DISABLED: 'true',
     STRAPI_HIDE_STARTUP_MESSAGE: 'true',
