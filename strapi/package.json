@@ -7,7 +7,8 @@
     "develop": "strapi develop",
     "start": "strapi start",
     "build": "strapi build",
-    "strapi": "strapi"
+    "strapi": "strapi",
+    "helloasso:fake": "node scripts/espace/fake-helloasso.js"
   },
   "dependencies": {
     "@getbrevo/brevo": "^5.0.1",
