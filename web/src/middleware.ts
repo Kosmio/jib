@@ -24,13 +24,19 @@ function contentSecurityPolicy(siteUrl: URL): string {
 
 const isEspace = (pathname: string) => pathname === "/espace" || pathname.startsWith("/espace/");
 
+// A-24 : le jeton du lien d'accès est dans l'URL de /espace/verifier. Sur la même origine (dev serveur et prod, Strapi sous /strapi),
+// `strict-origin-when-cross-origin` enverrait l'URL complète en Referer, que Traefik journalise : `strict-origin` n'envoie que l'origine.
+// Jamais `no-referrer` : le navigateur enverrait `Origin: null` avec le POST du formulaire, et Strapi le refuserait (ORIGIN_REFUSED).
+const referrerPolicy = (pathname: string) =>
+  /^\/espace\/verifier\/?$/.test(pathname) ? "strict-origin" : "strict-origin-when-cross-origin";
+
 export const onRequest = defineMiddleware(async (context, next) => {
   if (!isEspace(context.url.pathname)) return next();
 
   const response = await next();
   response.headers.set("Content-Security-Policy", contentSecurityPolicy(context.url));
   response.headers.set("X-Content-Type-Options", "nosniff");
-  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  response.headers.set("Referrer-Policy", referrerPolicy(context.url.pathname));
   // Pages propres à la session de la personne : jamais mises en cache, ni par le navigateur ni par un relais.
   response.headers.set("Cache-Control", "private, no-store");
   return response;
