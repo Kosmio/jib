@@ -39,6 +39,10 @@ spec/mail-html/
 # macOS-specific files
 .DS_Store
 
+# Playwright (web)
+web/test-results/
+web/playwright-report/
+
 # Accessibility audit artifacts
 .claude/skills/accessibility/a11y-audit/last-audit.json
 .claude/skills/accessibility/a11y-audit/node_modules/
