@@ -9,7 +9,10 @@
     "build": "strapi build",
     "strapi": "strapi",
     "seed": "node scripts/espace/seed.js",
-    "helloasso:fake": "node scripts/espace/fake-helloasso.js"
+    "helloasso:fake": "node scripts/espace/fake-helloasso.js",
+    "test": "TZ=UTC node --require ./tests/helpers/no-network.js --test --test-concurrency=1 \"tests/unit/**/*.test.js\" \"tests/integration/**/*.test.js\"",
+    "test:unit": "TZ=UTC node --require ./tests/helpers/no-network.js --test --test-concurrency=1 \"tests/unit/**/*.test.js\"",
+    "test:integration": "TZ=UTC node --require ./tests/helpers/no-network.js --test --test-concurrency=1 \"tests/integration/**/*.test.js\""
   },
   "dependencies": {
     "@getbrevo/brevo": "^5.0.1",
