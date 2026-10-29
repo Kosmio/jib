@@ -19,7 +19,7 @@ Ajouter au site existant des Journées de l'Innovation Filière Bois (journees-i
 
 ## Pile technique
 
-- Front : **Astro** existant (v6 constaté en production). L'espace participant vit dans le même dépôt, sous `/espace/*`. Interactivité par îlots en **React 19**, déjà présent dans le dépôt (`@astrojs/react`).
+- Front : **Astro 6.0.7** existant (SSR, adaptateur Node `standalone`). L'espace participant vit dans le même dépôt, sous `/espace/*`. Interactivité par îlots en **React 19**, déjà présent dans le dépôt (`@astrojs/react`).
 - Back : **Strapi 5.59** sur **PostgreSQL 17** (constaté le 29 octobre 2026), servi sous `/strapi` sur le même domaine que le site.
 - E-mail transactionnel : le compte et le domaine d'envoi **Brevo** déjà utilisés par le site, via une interface `MailProvider` pour pouvoir en changer.
 - Multi-éditions : l'espace sert chaque édition sans développement ; tous les paramètres d'une édition (créneaux, tables, fenêtre de rendez-vous, formulaire HelloAsso) se règlent dans Strapi.
@@ -29,7 +29,91 @@ Ajouter au site existant des Journées de l'Innovation Filière Bois (journees-i
 
 ## Commandes
 
-À compléter par l'architecte en phase 0 après analyse du dépôt (installation, lancement local du front et de Strapi, tests, lint, build). Ne jamais inventer une commande : la lire dans `package.json`.
+Relevées le 29 octobre 2026 dans `strapi/package.json`, `web/package.json` et le `Makefile`. Ne jamais inventer une commande : la lire dans `package.json`. `<dépôt>` = `/Users/mathieu/Operations/Kosmio/20-Axe2-Plateformes-IA/Projets/Site-web-wylofutur/dev-form-cdc/skeleton-astro-strapi/skeleton-astro-strapi`.
+
+**pnpm.** Il n'est pas dans le PATH : toujours passer par corepack. Corepack choisit la version de pnpm d'après le `package.json` du répertoire courant. Lancé depuis la racine du dépôt, qui n'en a pas, il prend une autre version et pnpm refuse (`ERR_PNPM_BAD_PM_VERSION`), même avec `--dir`. Forme à une seule commande, valable depuis n'importe quel répertoire : `corepack pnpm@12.15.0 --dir <dépôt>/strapi <script>` (ou `<dépôt>/web`). La version doit rester celle du champ `packageManager` ; la vérifier si elle change.
+
+| Besoin | Commande | Vérifiée le 29/10 |
+|---|---|---|
+| Postgres local (conteneur `jib-postgres`) | `make -C <dépôt> infra-up` | conteneur déjà actif |
+| Valider la configuration Docker locale | `make -C <dépôt> infra-validate` | oui |
+| Installer les dépendances | `corepack pnpm@12.15.0 --dir <dépôt>/strapi install`, idem pour `web` | non relancée, `node_modules` présents |
+| Strapi en dev, admin compris (port 1337) | `corepack pnpm@12.15.0 --dir <dépôt>/strapi develop` | |
+| Vérifier que Strapi démarre et lister ses routes | `corepack pnpm@12.15.0 --dir <dépôt>/strapi strapi routes:list` | oui, environ 10 s |
+| Version de Strapi | `corepack pnpm@12.15.0 --dir <dépôt>/strapi strapi version` | oui, 5.59.0 |
+| Construire l'admin Strapi | `corepack pnpm@12.15.0 --dir <dépôt>/strapi build` | non (lente) |
+| Front en dev (port 4321) | `corepack pnpm@12.15.0 --dir <dépôt>/web dev` | |
+| Construire le front | `corepack pnpm@12.15.0 --dir <dépôt>/web build` | oui, environ 3 s |
+| Servir le front construit | `corepack pnpm@12.15.0 --dir <dépôt>/web preview` | |
+| Requête SQL (sans terminal interactif) | `docker exec jib-postgres psql -U strapi -d strapi_espace -Atc "select slug from editions"` | oui |
+| Créer une base | `docker exec jib-postgres createdb -U strapi strapi_e2e` | |
+| Lint des Dockerfiles (hadolint par Docker) | `make -C <dépôt> lint` | |
+| Seed de recette (lot B) | `DATABASE_NAME=strapi_e2e corepack pnpm@12.15.0 --dir <dépôt>/strapi seed` | à venir |
+| Faux HelloAsso, port 4010 (lot B) | `corepack pnpm@12.15.0 --dir <dépôt>/strapi helloasso:fake` | à venir |
+| Tests (lots A et C) | à compléter d'après le compte rendu du tester | à venir |
+
+Les configurations `strapi` et `web` de `.claude/launch.json` lancent `develop` et `dev` par corepack, depuis le bon répertoire. Ne pas utiliser `make strapi`, `make web` ni `make mcp` : ils appellent `pnpm` sans corepack. `make test` n'affiche que « No Test ». `make build` et `make stage` construisent et poussent des images : jamais sans demande de Mathieu.
+
+### Ports
+
+| Port | Service |
+|---|---|
+| 1337 | Strapi de dev (`strapi_espace`) |
+| 4321 | front Astro (dev ou build servi) |
+| 5432 | Postgres (`jib-postgres`, utilisateur `strapi`) |
+| 4010 | faux HelloAsso |
+| 1338, 4322 | Strapi et front des tests e2e (`strapi_e2e`) |
+
+### Bases (même serveur Postgres)
+
+| Base | Rôle | Règle |
+|---|---|---|
+| `strapi` | copie de référence | n'y toucher sous aucun prétexte, pas même en démarrant Strapi dessus |
+| `strapi_espace` | dev par défaut (`strapi/.env`) ; copie de prod avec des données personnelles réelles | jamais de seed, d'export ni de commit ; sert aux captures visuelles |
+| `strapi_test` | tests d'intégration Strapi | vidée par la suite ; créée par le tester |
+| `strapi_e2e` | seed de recette, Playwright, essais manuels de l'espace | remplie par `seed` |
+
+### Variables d'environnement
+
+Existantes. Strapi (`strapi/.env`, lu par `strapi/config/*.js`) : `HOST`, `PORT`, `BASE_URL`, `ADMIN_URL`, `APP_KEYS`, `API_TOKEN_SALT`, `ADMIN_JWT_SECRET`, `TRANSFER_TOKEN_SALT`, `JWT_SECRET`, `DATABASE_CLIENT`, `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_NAME`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `EMAIL_API_KEY` (clé Brevo réelle), `EMAIL_LIST_ID`, `EMAIL_CONTACT_TO`, `EMAIL_CONTACT_TEMPLATE_ID`, `ALTCHA_HMAC_KEY`, `RESTORE_MISSING_MEDIA`. Front (`web/.env`) : `STRAPI_URL` (serveur), `REACT_STRAPI_URL` (navigateur), `PUBLIC_COOKIE_CONSENT`, `PUBLIC_MATOMO_URL`, `PUBLIC_MATOMO_SITE_ID`.
+
+Ajoutées par l'espace (Strapi) :
+
+| Variable | Rôle | Depuis |
+|---|---|---|
+| `EMAIL_PROVIDER` | `console` ou `brevo` ; défaut `brevo` si `NODE_ENV=production`, sinon `console` ; `brevo` refusé sous `NODE_ENV=test` | phase 0 |
+| `EMAIL_FROM` | expéditeur des e-mails de l'espace, « Nom <adresse> » (Q-16) | phase 0 |
+| `EMAIL_OUTBOX_FILE` | fichier JSONL du `ConsoleMailProvider`, défaut `.tmp/mail-outbox.jsonl` | phase 0 |
+| `DEMO_SEED` | `false` empêche le bootstrap de créer les éditions de démonstration sur une base vide | phase 0 |
+| `HELLOASSO_CLIENT_ID`, `HELLOASSO_CLIENT_SECRET`, `HELLOASSO_API_BASE` | I-10 ; en local `HELLOASSO_API_BASE=http://localhost:4010/v5` (faux) ; jeton demandé à `{origine}/oauth2/token` | phase 1 |
+| `PUBLIC_URL` | URL publique du site : liens des e-mails, redirections 303 | phase 1 |
+| `ORGANIZER_EMAILS` | e-mails des organisateurs, séparés par des virgules (I-23) | phase 1 |
+| `CORS_ORIGINS` | origines admises par CORS et par le contrôle `Origin`, défaut `http://localhost:4321` | phase 1 |
+| `IS_PROXIED` | `proxy.koa` de Strapi : `true` derrière Traefik (dev, prod) | phase 1 |
+| `CRON_ENABLED` | tâches planifiées : `false` en local et en test, `true` en dev et prod | phase 1 |
+
+Déploiement : chaque variable de Strapi est listée une à une dans `infra/deploy/base/docker-compose.base.yml` (`strapi.environment`). Une variable nouvelle s'ajoute là, dans `infra/deploy/overlays/{dev,prod}/.env.*` et, si elle est secrète, dans les secrets GitHub fusionnés par `deploy.yml`.
+
+### Pièges connus
+
+- Strapi charge `strapi/.env` de lui-même : un script ou un test qui ne fixe pas `DATABASE_NAME` dans son environnement tourne sur `strapi_espace`. Le seed et la suite d'intégration refusent toute base dont le nom ne finit pas par `_test` ou `_e2e`.
+- Sur une base vide, le bootstrap (`strapi/src/index.js`) crée des éditions de démonstration et téléverse les images de `strapi/seed-assets/` : poser `DEMO_SEED=false`.
+- `web/.astro/` est versionné et réécrit par `astro build` et `astro dev` : ne jamais committer ces modifications. `.claude/launch.json` et `strapi/.strapi-updater.json` ont aussi des modifications locales hors périmètre.
+- `web/package-lock.json` est un reste de npm : seul `pnpm-lock.yaml` fait foi.
+- Le plugin e-mail de Strapi est resté sur sendmail : ne jamais appeler `strapi.plugin('email')`, toujours passer par le fournisseur de l'espace.
+- Types en brouillon et publication (`edition`, `sequence`, `intervention`, `intervenant`, `organisation`) : deux lignes par document. Filtrer par `documentId`, lire avec `status: 'published'`.
+- Ne jamais changer le type d'une relation existante : la table de liaison est recréée vide au déploiement, et la prod est éditée directement.
+- Les images Docker sont étiquetées par `VERSION` (0.1.0, la version de prod) : changer `VERSION` avant de construire une image depuis la branche.
+- Données fictives uniquement, adresses en `@example.org`.
+
+## Architecture de l'espace
+
+Décisions A-01 à A-14 : `docs/espace/journal/phase-0-plan.md`. L'essentiel :
+
+- Back : une API Strapi `espace` (`strapi/src/api/espace/`), routes personnalisées sous `/api/espace`, sans route CRUD générée ; logique pure dans `lib/`, testable sans Strapi.
+- Session (I-22) : cookie `jib_espace` signé, posé et lu par Strapi seul. Même domaine en prod et en dev serveur (Traefik : site sur `/`, Strapi sur `/strapi`) ; en local, les cookies de `localhost` sont partagés entre les ports 4321 et 1337. Pas de proxy Astro.
+- Front : pages sous `web/src/pages/espace/[edition]/…`, layout `EspaceLayout.astro` sans Matomo ; rendu serveur par `STRAPI_URL` en relayant le cookie, îlots par `REACT_STRAPI_URL` avec `credentials: 'include'`.
+- Dates en UTC en base, affichées avec `timeZone: 'Europe/Paris'` explicite ; tests sous `TZ=UTC`.
 
 ## Conventions
 

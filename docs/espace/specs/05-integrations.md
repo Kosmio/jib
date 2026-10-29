@@ -30,7 +30,7 @@ API v5, base `https://api.helloasso.com/v5`, bac à sable `https://api.helloasso
 
 ## E-mails (I-3x)
 
-- **I-30 (P0)** Interface `MailProvider.send({ to, template, data, attachments })`. Implémentation par défaut Brevo (API transactionnelle, hébergement UE), clé `MAIL_API_KEY`, expéditeur `MAIL_FROM`. Implémentation `ConsoleMailProvider` pour le développement et les tests (écrit dans un fichier ou la console).
+- **I-30 (P0)** Interface `MailProvider.send({ to, template, data, attachments })`. Implémentation par défaut Brevo (API transactionnelle, hébergement UE), clé `EMAIL_API_KEY` (celle du site, Q-09), expéditeur `EMAIL_FROM`, choix du fournisseur par `EMAIL_PROVIDER` (`console` ou `brevo`). Implémentation `ConsoleMailProvider` pour le développement et les tests (écrit dans un fichier ou la console). Découpage retenu en phase 0 : le fournisseur envoie un message déjà rendu (`{ to, subject, html, text, attachments, headers }`) ; le service d'envoi de la phase 1 rend le gabarit, appelle le fournisseur et écrit EmailLog.
 - **I-31 à I-39 (P0)** Gabarits listés en E10, écrits en HTML simple avec styles en ligne, rendus côté serveur, version texte générée. Chaque envoi est journalisé dans EmailLog.
 - **I-39 (P0)** En-têtes `List-Unsubscribe` sur les relances ; lien « Gérer mes notifications » vers E3.
 

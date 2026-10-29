@@ -4,6 +4,16 @@ Routes personnalisées Strapi sous le préfixe `/api/espace`. JSON, dates ISO 86
 
 Le developer peut ajuster les chemins aux conventions Strapi découvertes en phase 0, à condition de mettre à jour ce fichier dans le même commit.
 
+## Conventions transverses (décidées en phase 0)
+
+Détail et justification : `docs/espace/journal/phase-0-plan.md`.
+
+- Les routes sont déclarées dans `strapi/src/api/espace/routes/espace.js` avec le chemin `/espace/…`, ce qui donne `/api/espace/…` sur Strapi. Le navigateur les appelle sur `{REACT_STRAPI_URL}/api/espace/…` : `/strapi/api/espace/…` derrière Traefik, `http://localhost:1337/api/espace/…` en local.
+- Session : cookie `jib_espace`, posé et lu par Strapi seul (I-22). Le rendu serveur d'Astro relaie l'en-tête `Cookie` reçu ; il ne lit pas le cookie.
+- CSRF (NF-04) : toute requête autre que GET et HEAD doit porter un en-tête `Origin` figurant dans `CORS_ORIGINS`, sinon 403 `ORIGIN_REFUSED`. Ce contrôle couvre aussi les formulaires HTML, qui ne peuvent pas ajouter d'en-tête personnalisé.
+- Formulaires sans JavaScript (NF-31) : `POST /auth/request-link`, `POST /auth/verify` et `POST /auth/logout` acceptent aussi `application/x-www-form-urlencoded` ; ils répondent alors par une redirection 303 vers la page Astro adaptée au lieu du JSON.
+- `GET /health` (public) → 200 `{ "status": "ok" }` : sonde d'exploitation et test de fumée.
+
 ## Authentification
 
 | Méthode | Chemin | Accès | Corps / réponse |
