@@ -8,6 +8,7 @@
     "start": "strapi start",
     "build": "strapi build",
     "strapi": "strapi",
+    "seed": "node scripts/espace/seed.js",
     "helloasso:fake": "node scripts/espace/fake-helloasso.js"
   },
   "dependencies": {

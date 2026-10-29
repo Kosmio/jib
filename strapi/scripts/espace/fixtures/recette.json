@@ -1,0 +1,127 @@
+{
+  "edition": {
+    "title": "Nouvelle-Aquitaine (test)",
+    "slug": "nouvelle-aquitaine-test",
+    "year": 2026,
+    "region": "nouvelle-aquitaine",
+    "date": "2026-12-03",
+    "city": "Bordeaux",
+    "edition_status": "inscriptions-ouvertes",
+    "hero_bg_color": "#600e24",
+    "description": "Édition fictive pour la recette de l’espace participant. Toutes les données sont inventées.",
+    "lieux": [
+      {
+        "name": "Salle de recette (lieu fictif)",
+        "address": "1 rue de l’Exemple\n33000 Bordeaux",
+        "time_slot": "Journée (9h00 - 17h00)"
+      }
+    ]
+  },
+
+  "editionSettings": {
+    "participantSpaceEnabled": true,
+    "helloassoOrgSlug": "xylofutur-test",
+    "helloassoFormType": "Event",
+    "helloassoFormSlug": "jib-nouvelle-aquitaine-test",
+    "helloassoFieldMap": { "email": "Email", "company": "Organisation", "jobTitle": "Poste" },
+    "slotDurationMinutes": 15,
+    "tablesCount": 3,
+    "meetingRequestsOpenAt": "2026-10-01T08:00:00.000Z",
+    "meetingRequestsCloseAt": "2026-12-02T17:00:00.000Z"
+  },
+
+  "topics": [
+    "Forêt et adaptation",
+    "Process, data et IA",
+    "Économie circulaire",
+    "Territoires résilients",
+    "Construction bois"
+  ],
+
+  "sequences": [
+    { "title": "Accueil et ouverture", "start_time": "9h15", "end_time": "9h45", "kind": "other" },
+    { "title": "Forêt et adaptation", "start_time": "9h45", "end_time": "10h45", "kind": "talk", "topic": "Forêt et adaptation" },
+    { "title": "Pause et B2B", "start_time": "10h45", "end_time": "11h15", "kind": "b2b_break" },
+    { "title": "Process, data et IA", "start_time": "11h15", "end_time": "12h30", "kind": "talk", "topic": "Process, data et IA" },
+    { "title": "Cocktail déjeunatoire & B2B", "start_time": "12h30", "end_time": "14h00", "kind": "b2b_break" },
+    { "title": "Économie circulaire", "start_time": "14h00", "end_time": "14h45", "kind": "talk", "topic": "Économie circulaire" },
+    { "title": "Territoires résilients", "start_time": "14h45", "end_time": "15h30", "kind": "talk", "topic": "Territoires résilients" },
+    { "title": "Pause et B2B", "start_time": "15h30", "end_time": "16h00", "kind": "b2b_break" },
+    { "title": "Construction bois", "start_time": "16h00", "end_time": "17h00", "kind": "talk", "topic": "Construction bois" }
+  ],
+
+  "organisations": [
+    {
+      "name": "Sylvadour",
+      "slug": "test-sylvadour",
+      "description": "Scierie fictive du Sud-Ouest, exposante de la recette (stand 4).",
+      "website": "https://example.org/sylvadour"
+    },
+    {
+      "name": "Résinéo",
+      "slug": "test-resineo",
+      "description": "Fabricant fictif de produits biosourcés, exposant de la recette (stand 12).",
+      "website": "https://example.org/resineo"
+    },
+    {
+      "name": "Institut Lignéa",
+      "slug": "test-institut-lignea",
+      "description": "Institut de recherche fictif, structure d’un intervenant de la recette.",
+      "website": "https://example.org/lignea"
+    },
+    {
+      "name": "Cabinet Verdelis",
+      "slug": "test-cabinet-verdelis",
+      "description": "Cabinet de conseil fictif, structure d’un intervenant de la recette.",
+      "website": "https://example.org/verdelis"
+    }
+  ],
+
+  "intervenants": [
+    {
+      "name": "Hélène Marquès",
+      "slug": "test-helene-marques",
+      "title": "Directrice scientifique",
+      "bio": "Intervenante fictive de la recette.",
+      "topic": "Forêt et adaptation",
+      "organisation": "test-institut-lignea",
+      "sequence": "Forêt et adaptation"
+    },
+    {
+      "name": "Antoine Vergnes",
+      "slug": "test-antoine-vergnes",
+      "title": "Associé",
+      "bio": "Intervenant fictif de la recette.",
+      "topic": "Économie circulaire",
+      "organisation": "test-cabinet-verdelis",
+      "sequence": "Économie circulaire"
+    }
+  ],
+
+  "exhibitors": [
+    { "organisation": "test-sylvadour", "standNumber": "4", "topics": ["Construction bois", "Économie circulaire"] },
+    { "organisation": "test-resineo", "standNumber": "12", "topics": ["Process, data et IA"] }
+  ],
+
+  "organizerEmails": ["organisation@example.org"],
+
+  "attendees": {
+    "lea.ducasse@example.org": { "role": "participant", "status": "active", "activated": true, "directoryOptIn": true, "meetingsOptIn": true, "newsOptIn": true, "topics": ["Construction bois", "Process, data et IA"] },
+    "mathis.lagrange@example.org": { "role": "participant", "status": "active", "activated": true, "directoryOptIn": true, "meetingsOptIn": true, "newsOptIn": false, "topics": ["Économie circulaire"] },
+    "ines.castaing@example.org": { "role": "participant", "status": "active", "activated": true, "directoryOptIn": true, "meetingsOptIn": true, "newsOptIn": false, "topics": ["Construction bois", "Territoires résilients"] },
+    "hugo.peyrat@example.org": { "role": "participant", "status": "active", "activated": true, "directoryOptIn": true, "meetingsOptIn": true, "newsOptIn": false, "topics": ["Forêt et adaptation", "Territoires résilients"] },
+    "manon.bordenave@example.org": { "role": "participant", "status": "active", "activated": true, "directoryOptIn": true, "meetingsOptIn": false, "newsOptIn": false, "topics": ["Forêt et adaptation"] },
+    "nathan.lasserre@example.org": { "role": "participant", "status": "active", "activated": true, "directoryOptIn": true, "meetingsOptIn": true, "newsOptIn": true, "topics": ["Process, data et IA"] },
+    "clara.dubourdieu@example.org": { "role": "participant", "status": "active", "activated": true, "directoryOptIn": false, "meetingsOptIn": false, "newsOptIn": false, "topics": [] },
+    "jules.mazeres@example.org": { "role": "participant", "status": "active", "activated": true, "directoryOptIn": true, "meetingsOptIn": true, "newsOptIn": false, "topics": ["Process, data et IA", "Économie circulaire"] },
+    "alice.fourcade@example.org": { "role": "participant", "status": "active", "activated": true, "directoryOptIn": true, "meetingsOptIn": true, "newsOptIn": false, "topics": ["Territoires résilients"] },
+    "tom.laffitte@example.org": { "role": "participant", "status": "active", "activated": false, "directoryOptIn": false, "meetingsOptIn": false, "newsOptIn": false, "topics": [] },
+    "eva.cazaux@example.org": { "role": "participant", "status": "active", "activated": true, "directoryOptIn": true, "meetingsOptIn": true, "newsOptIn": false, "topics": ["Forêt et adaptation", "Économie circulaire"] },
+    "lucas.darrigade@example.org": { "role": "participant", "status": "cancelled", "activated": true, "directoryOptIn": true, "meetingsOptIn": true, "newsOptIn": false, "topics": ["Construction bois"] },
+    "helene.marques@example.org": { "role": "speaker", "speaker": "test-helene-marques", "status": "active", "activated": true, "directoryOptIn": true, "meetingsOptIn": true, "newsOptIn": false, "topics": ["Forêt et adaptation"] },
+    "antoine.vergnes@example.org": { "role": "speaker", "speaker": "test-antoine-vergnes", "status": "active", "activated": true, "directoryOptIn": true, "meetingsOptIn": true, "newsOptIn": false, "topics": ["Économie circulaire"] },
+    "benoit.tastet@example.org": { "role": "exhibitor_rep", "exhibitor": "test-sylvadour", "status": "active", "activated": true, "directoryOptIn": true, "meetingsOptIn": true, "newsOptIn": false, "topics": ["Construction bois"] },
+    "marion.lacoste@example.org": { "role": "exhibitor_rep", "exhibitor": "test-sylvadour", "status": "active", "activated": true, "directoryOptIn": true, "meetingsOptIn": true, "newsOptIn": false, "topics": ["Économie circulaire"] },
+    "pierre.haurie@example.org": { "role": "exhibitor_rep", "exhibitor": "test-resineo", "status": "active", "activated": true, "directoryOptIn": true, "meetingsOptIn": true, "newsOptIn": false, "topics": ["Process, data et IA"] }
+  }
+}

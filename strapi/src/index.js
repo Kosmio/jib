@@ -876,8 +876,10 @@ module.exports = {
       strapi.log.error(`[migration] failed: ${err.message}`);
     }
 
-    // Seed demo data if no editions exist yet
-    await seedData(strapi);
+    // Seed demo data if no editions exist yet (DEMO_SEED=false turns it off)
+    if (process.env.DEMO_SEED !== 'false') {
+      await seedData(strapi);
+    }
 
     // Re-upload missing media on existing entities (recovery from lost uploads volume)
     try {
