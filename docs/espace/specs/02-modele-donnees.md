@@ -7,7 +7,7 @@ Principe : **étendre les types existants plutôt que dupliquer.** Les noms tech
 | Entité de la spec | Type existant | UID Strapi | Action |
 |---|---|---|---|
 | Edition | `edition` (« Édition ») | `api::edition.edition` | étendre : champs scalaires ajoutés, aucune relation modifiée |
-| Session | `sequence` (« Séquence ») | `api::sequence.sequence` | étendre : `kind` et `topic` |
+| Session | `sequence` (« Séquence ») | `api::sequence.sequence` | étendre : `kind` seulement ; le thème est porté par Topic (A-15) |
 | Speaker | `intervenant` | `api::intervenant.intervenant` | aucun changement de schéma : le lien au compte est porté par `Attendee.speaker` |
 | Exhibitor | aucun. `partenaire` (« Partenariat ») relie une `organisation` à des éditions avec un rôle de soutien : ce n'est pas un exposant | `api::espace.exhibitor` (nouveau) | créer, en s'appuyant sur `organisation` pour le nom, le logo et la description |
 | Topic | aucun. `tag` mêle thèmes et rôles et n'est pas rattaché à une édition | `api::espace.topic` (nouveau) | créer |
@@ -22,7 +22,8 @@ Types existants hors périmètre : `home-page`, `static-page`, `contact`, `newsl
 
 - **Emplacement.** Les types nouveaux vivent dans `strapi/src/api/espace/content-types/<nom>/schema.json` (UID `api::espace.<nom>`), avec `draftAndPublish: false`.
 - **Brouillon et publication.** `edition`, `sequence`, `intervention`, `intervenant` et `organisation` sont en brouillon et publication : chaque document a deux lignes en base (brouillon et publiée, `id` différents, même `documentId`). Les relations d'un type nouveau vers un type existant sont **unidirectionnelles et portées par le type nouveau** ; Strapi 5 les relie aux deux versions (constaté dans `@strapi/core`, `document-service/transform/relations/utils/dp.js`). Le code de l'espace filtre toujours par `documentId`, jamais par `id`, et lit les contenus publics avec `status: 'published'`.
-- **Relations existantes.** Ne jamais changer le type d'une relation existante : la table de liaison est recréée vide au démarrage, et la prod est éditée directement.
+- **Relations existantes.** Ne jamais changer le type d'une relation existante : la table de liaison est recréée vide au démarrage, et la prod est éditée directement. Sur un type existant, seuls des champs scalaires sont ajoutés ; toute nouvelle relation est déclarée sur un type nouveau (A-15, `docs/espace/journal/phase-1-plan.md`).
+- **Tables.** Les types nouveaux déclarent `collectionName: "espace_<pluriel>"` (`espace_attendees`, `espace_meetings`, `espace_magic_tokens`…), pour grouper leurs tables et éviter toute collision avec l'existant.
 - **Unicités composites** (« unique par édition ») : Strapi ne sait pas les déclarer. Elles sont garanties par les services, sous verrou consultatif Postgres. Seule exception : R-13 (voir Meeting).
 - **Dates.** Les champs `datetime` sont stockés en UTC. Les horaires du programme restent du texte (« 9h15 », « 10h45 ») ; ils sont convertis en UTC avec `Edition.date` en Europe/Paris.
 
@@ -30,7 +31,7 @@ Types existants hors périmètre : `home-page`, `static-page`, `contact`, `newsl
 
 ```
 Edition (edition) 1──n Session (sequence)
-Edition 1──n Topic ; Session n──0..1 Topic
+Edition 1──n Topic ; Topic n──n Session (relation portée par Topic)
 Edition 1──n Slot ; Slot n──1 Session (kind = b2b_break)
 Edition 1──n Attendee (participant importé de HelloAsso)
 Edition 1──n Exhibitor ; Exhibitor n──1 Organisation (organisation)
@@ -87,16 +88,17 @@ Champs existants utilisés :
 | (intervenants) | `interventions` → `intervenants` | relations | |
 | (édition) | `edition` | relation manyToOne | |
 
-Champs ajoutés (publics, à reporter dans `strapi/mcp/content-types.json`) :
+Champ ajouté (public, à reporter dans `strapi/mcp/content-types.json`) :
 
 | Champ | Type | Règle |
 |---|---|---|
 | kind | enumeration `talk`, `b2b_break`, `other` | défaut `talk`, valeur nulle traitée comme `talk` ; `b2b_break` génère des créneaux. Posé à la main par l'organisateur, jamais déduit du titre |
-| topic | relation manyToOne → Topic, unidirectionnelle | thématique de la séquence |
+
+Le thème d'une séquence n'est pas un champ de `sequence` : il est porté par `Topic.sessions` (A-15).
 
 ### Topic (nouveau, `api::espace.topic`)
 
-`name` (string, unique par édition, garanti par le service), `edition` (relation manyToOne → edition, requis). Sert aux filtres et aux suggestions.
+`name` (string, unique par édition, garanti par le service), `edition` (relation manyToOne → edition, requis), `sessions` (relation manyToMany → sequence, unidirectionnelle : les séquences de ce thème ; posée par l'organisateur sur la fiche du thème). Sert aux filtres, aux suggestions et au programme.
 
 ### Slot (nouveau, `api::espace.slot`, généré)
 

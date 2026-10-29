@@ -11,7 +11,7 @@ Détail et justification : `docs/espace/journal/phase-0-plan.md`.
 - Les routes sont déclarées dans `strapi/src/api/espace/routes/espace.js` avec le chemin `/espace/…`, ce qui donne `/api/espace/…` sur Strapi. Le navigateur les appelle sur `{REACT_STRAPI_URL}/api/espace/…` : `/strapi/api/espace/…` derrière Traefik, `http://localhost:1337/api/espace/…` en local.
 - Session : cookie `jib_espace`, posé et lu par Strapi seul (I-22). Le rendu serveur d'Astro relaie l'en-tête `Cookie` reçu ; il ne lit pas le cookie.
 - CSRF (NF-04) : toute requête autre que GET et HEAD doit porter un en-tête `Origin` figurant dans `CORS_ORIGINS`, sinon 403 `ORIGIN_REFUSED`. Ce contrôle couvre aussi les formulaires HTML, qui ne peuvent pas ajouter d'en-tête personnalisé.
-- Formulaires sans JavaScript (NF-31) : `POST /auth/request-link`, `POST /auth/verify` et `POST /auth/logout` acceptent aussi `application/x-www-form-urlencoded` ; ils répondent alors par une redirection 303 vers la page Astro adaptée au lieu du JSON.
+- Formulaires sans JavaScript (NF-31) : `POST /auth/request-link`, `POST /auth/verify` et `POST /auth/logout` acceptent aussi `application/x-www-form-urlencoded` ; ils répondent alors par une redirection 303 vers la page Astro adaptée au lieu du JSON. L'en-tête `Location` est absolu, construit sur `PUBLIC_URL` : le formulaire a été envoyé à l'origine de Strapi, un chemin relatif y resterait. Cibles retenues en phase 1 : `phase-1-plan.md`, section API.
 - `GET /health` (public) → 200 `{ "status": "ok" }` : sonde d'exploitation et test de fumée.
 
 ## Authentification
@@ -19,6 +19,7 @@ Détail et justification : `docs/espace/journal/phase-0-plan.md`.
 | Méthode | Chemin | Accès | Corps / réponse |
 |---|---|---|---|
 | POST | `/auth/request-link` | public | `{ editionSlug, email }` → 202 toujours (F-02) ; 429 au-delà de 5 demandes en 15 min (E0) |
+| GET | `/auth/link?token=…` | public | état d'un lien sans le consommer (A-18) : `{ valid: true, editionSlug }`, `{ valid: false, editionSlug, email }` pour un lien connu expiré ou utilisé (F-04, prérempli), `{ valid: false }` sinon ; toujours 200 |
 | POST | `/auth/verify` | public | `{ token }` → 200 `{ me }` + cookie ; 400 `TOKEN_INVALID` |
 | POST | `/auth/logout` | session | 204 |
 | GET | `/me` | session | profil complet, `profileCompletion`, consentements, préférences, compteurs (demandes reçues en attente, messages non lus) |
