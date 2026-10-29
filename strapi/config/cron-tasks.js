@@ -1,3 +1,26 @@
-// Scheduled tasks of the participant space (A-08). Each one only calls an idempotent service.
-// Filled in as the services are delivered ; registered only with CRON_ENABLED=true (config/server.js).
-module.exports = {};
+// Scheduled tasks of the participant space (A-08). Strapi registers them only with CRON_ENABLED=true (config/server.js).
+// An error is logged and never brings Strapi down.
+const TIME_ZONE = 'Europe/Paris';
+
+const safely = (name, work) => async ({ strapi }) => {
+  try {
+    await work(strapi);
+  } catch (error) {
+    strapi.log.error(`[cron] ${name}: ${String(error.message).split('\n')[0]}`);
+  }
+};
+
+module.exports = {
+  // I-12, A-17: every 15 minutes, the published editions that have a HelloAsso form.
+  espaceSync: {
+    task: safely('espaceSync', (strapi) => strapi.service('api::espace.sync').runAll()),
+    options: { rule: '*/15 * * * *', tz: TIME_ZONE },
+  },
+  // I-20: every night, the expired link and session tokens.
+  espaceTokenPurge: {
+    task: safely('espaceTokenPurge', (strapi) =>
+      strapi.db.query('api::espace.magic-token').deleteMany({ where: { expiresAt: { $lt: new Date() } } })
+    ),
+    options: { rule: '0 4 * * *', tz: TIME_ZONE },
+  },
+};
