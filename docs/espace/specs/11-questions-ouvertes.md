@@ -26,7 +26,8 @@ Tant qu'une question n'est pas tranchée par Xylofutur, les agents appliquent l'
 | Q-04, Q-05, Q-06 | Réglables dans Strapi pour chaque édition (`tablesCount`, `slotDurationMinutes`, `meetingRequestsOpenAt`, `meetingRequestsCloseAt`). Les hypothèses par défaut servent de valeurs initiales. | Mathieu |
 | Q-09 | Même compte et même domaine d'envoi Brevo que le site actuel (formulaire de contact, newsletter). | Mathieu |
 | Q-11 | Même domaine confirmé : Traefik sert le site sur `/` et Strapi sur `/strapi`. Le cookie de session (I-22) est posé sur le domaine du site, sans proxy supplémentaire. | constat |
-| Q-03, Q-08 | Demandés à Xylofutur (Néthi), avec les identifiants API HelloAsso de production. En attendant, le développement se fait contre une organisation créée sur le bac à sable HelloAsso. | en attente |
+| Q-03 | Libellés relevés sur le formulaire Nouvelle-Aquitaine : « Email », « Organisation », « Poste », tous obligatoires. `helloassoFieldMap` de l'édition : `{ "email": "Email", "company": "Organisation", "jobTitle": "Poste" }`. Les autres questions (Type d'organisation, N° de téléphone, Code Postal, Accès PMR) ne sont pas importées (NF-11). | capture de Nétih, 29 octobre |
+| Q-08 | Demandé à Xylofutur (Nétih), avec les identifiants API HelloAsso de production. En attendant, le développement se fait contre une organisation créée sur le bac à sable HelloAsso. | en attente |
 
 | Id | Décision | Source |
 |---|---|---|
@@ -41,3 +42,6 @@ Tant qu'une question n'est pas tranchée par Xylofutur, les agents appliquent l'
 - `partenaire` porte un rôle de soutien (soutien, co-organisateur, institutionnel, privé) entre une `organisation` et des éditions : ce n'est pas un exposant. Le type Exhibitor est à créer, en s'appuyant sur `organisation` pour le nom, le logo et la description.
 - La couleur d'édition existe déjà : champ `hero_bg_color` (sélecteur de couleur), `#600e24` pour Nouvelle-Aquitaine.
 - Les étiquettes `tag` mêlent thèmes et rôles ; les Topic par édition de `02-modele-donnees.md` restent à créer.
+- Formulaire HelloAsso Nouvelle-Aquitaine (capture du 29 octobre) : Nom, Prénom et Accès PMR valent pour tous les montants, mais Email, Organisation et Poste ne sont rattachés qu'au tarif « Journée Innovation Filière Bois en Nouvelle-Auitaine » (coquille dans le nom, signalée). Le rattachement à tous les montants a été demandé à Xylofutur le 29 octobre. D'ici là, un billet d'un autre tarif arrive sans ces champs : l'import se replie sur `payer.email` (I-11) et une commande groupée produit des doublons d'e-mail (I-14).
+- HelloAsso saisit « Email » en texte court, sans contrôle de format : l'import valide l'adresse et se replie sur `payer.email` si elle est invalide.
+- L'information sur l'espace participant (I-15) prend la forme d'une phrase dans la description de la billetterie, demandée le 29 octobre. Pas de case à cocher côté HelloAsso : le consentement reste recueilli en E2 (R-40).

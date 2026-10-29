@@ -28,6 +28,7 @@ EmailLog, MagicToken, SyncRun : techniques
 | helloassoOrgSlug | string | ex. slug de l'organisation Xylofutur |
 | helloassoFormType | enum Event, Membership, CrowdFunding… | défaut Event |
 | helloassoFormSlug | string | formulaire de l'édition |
+| helloassoFieldMap | json | libellé du champ personnalisé HelloAsso pour chaque attribut importé, ex. `{ "email": "Email", "company": "Organisation", "jobTitle": "Poste" }` (I-11) |
 | slotDurationMinutes | integer | défaut 15 |
 | tablesCount | integer | défaut 20 |
 | meetingRequestsOpenAt | datetime | ouverture de la prise de RDV |
