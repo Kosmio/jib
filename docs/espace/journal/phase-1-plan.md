@@ -2,6 +2,8 @@
 
 Rédigé par l'architecte le 29 octobre 2026, pour la phase 1 prévue du 4 au 6 novembre (`09-phases.md`). La phase peut démarrer dès la porte locale de la phase 0, verte (`phase-0.md`). Les décisions A-15 à A-20 complètent celles de `phase-0-plan.md` et remplacent les points de A-03 et A-08 qu'elles citent. `02-modele-donnees.md` (A-15) et `06-api.md` (A-18, redirections) ont été mis à jour dans le même commit.
 
+Mis à jour le 29 octobre après la revue des lots 2, 4 et 5 (section 11) : décisions A-21 à A-26, contrats de la section 4 alignés sur le code livré, critères 2 du lot 4 et 4 du lot 5 corrigés, lot 6b de corrections, à lancer après le lot 6.
+
 Principe directeur : le code le plus court qui satisfait les critères. Aucune dépendance nouvelle, ni côté Strapi ni côté front.
 
 ## 1. Périmètre
@@ -62,6 +64,51 @@ Si `POST /auth/verify` échoue (lien consommé entre-temps), Strapi renvoie par 
 - Socle partagé, livré par le lot 2 : `lib/errors.js`, `lib/guards.js`, `lib/tokens.js`, `services/tokens.js`, `services/mailer.js`.
 - Les tables des types nouveaux s'appellent `espace_<pluriel>` (`collectionName`).
 
+### A-21. Purge des MagicToken avec un délai de grâce de 7 jours
+
+La purge nocturne supprime les MagicToken (liens et sessions) dont `expiresAt` est passé depuis plus de 7 jours. Sans ce délai, un lien expiré la veille passe de l'état « expiré, adresse préremplie » (A-18) à l'état « inconnu » dès 4h00. La règle vit dans `services/tokens.js` (`purgeExpired`) ; la tâche `espaceTokenPurge` de `cron-tasks.js` ne fait que l'appeler (section 4.3 : aucune logique dans le cron). Exécution : lot 6b.
+
+### A-22. Un Attendee annulé qui rachète un billet est réactivé
+
+Cas courant : billet annulé et remboursé, puis racheté avec la même adresse, par exemple pour changer de tarif. Tel que livré, le nouveau billet tombe en `DUPLICATE_EMAIL` à chaque synchronisation, et la personne ne peut plus se connecter puisque son Attendee reste `cancelled`.
+
+Règle, dans `planSync` : un billet actif inconnu dont l'adresse est celle d'un Attendee **déjà `cancelled` au début de la synchronisation** rattache cet Attendee au nouveau billet.
+
+- `update` avec `helloassoItemId`, `helloassoOrderId`, `status: 'active'` et les champs importés hors `editedFields` ; compté dans `updated`.
+- Profil, consentements, rôle et rattachements conservés. Les rendez-vous annulés le restent. Aucun nouveau `welcome` : l'EmailLog existe déjà.
+- Un Attendee n'est rattaché qu'une fois par synchronisation : un second billet actif à la même adresse reste en `DUPLICATE_EMAIL`.
+- Un Attendee annulé pendant la synchronisation en cours n'est rattaché qu'à la suivante.
+
+L'ancien billet, devenu inconnu, est ignoré sans erreur (billet annulé inconnu). Exécution : lot 6b.
+
+### A-23. Adresse e-mail et synchronisation
+
+- `normalizeEmail` est la seule règle d'adresse de l'espace : définie dans `lib/import.js` (minuscules, sans espaces autour, motif actuel, 254 caractères au plus), importée par `services/auth.js`, qui perd sa copie. Exécution : lot 6b.
+- La synchronisation ne modifie jamais l'e-mail d'un Attendee existant : c'est son identifiant de connexion. Une adresse corrigée côté HelloAsso se reporte à la main dans le back-office.
+- Une valeur vide côté HelloAsso ne vide jamais un champ (prénom, nom, fonction, entreprise).
+- Le rôle proposé par le tarif (Q-03 : `exhibitor_rep`, `speaker`) est posé à la création. L'organisateur le confirme en rattachant l'exposant ou l'intervenant dans le back-office, ou le corrige. Une synchronisation ne touche plus jamais au rôle.
+- Sans `helloassoFieldMap` (null ou `{}`), aucun libellé par défaut (D-03) : nom par `user`, e-mail du payeur, fonction et entreprise vides.
+- `INVALID_EMAIL` ne sort que si ni le champ e-mail ni `payer.email` ne donnent d'adresse valable. Un champ invalide avec un payeur valable crée l'Attendee sur l'adresse du payeur (I-11).
+- `DUPLICATE_EMAIL` vient de `planSync`, `EMAIL_TAKEN` du seul contrôle sous verrou (A-16). Liste des codes : `06-api.md`.
+
+### A-24. Jeton dans les journaux et dans le Referer
+
+Le jeton circule en clair dans l'URL de `/espace/verifier`, puisque l'e-mail l'y place (Q-13).
+
+- **Strapi** : `auth.link` retire la query de `ctx.url` avant la ligne de `strapi::logger`, et `verify` reçoit le jeton dans le corps. Rien à faire.
+- **Referer** : avec `strict-origin-when-cross-origin`, le formulaire de vérification et les ressources de la page partent sur la même origine en dev et en prod (`/strapi`), donc avec l'URL complète, jeton compris, en `Referer`, que Traefik journalise. Règle : `/espace/verifier` répond `Referrer-Policy: strict-origin`. Jamais `no-referrer` : le navigateur enverrait alors `Origin: null` avec le POST du formulaire, et Strapi le refuserait (`ORIGIN_REFUSED`). Exécution : lot 6b.
+- **Traefik** : `--accesslog=true` journalise le chemin avec sa query, donc `/espace/verifier?token=…`. La documentation de Traefik v3 décrit `--accesslog.fields.queryparameters.defaultmode=drop`, qui retire les paramètres de requête du journal sans toucher aux chemins. Décision : ajouter cette option à `infra/deploy/base/docker-compose.base.yml`, après avoir vérifié sur le serveur de dev (Traefik v3.7.16) que la ligne du journal ne porte plus la query. Comme le fichier de base vaut aussi pour la prod, l'option n'entre qu'avec l'accord de Mathieu (section 9, point 7). D'ici là, le risque est accepté : le journal reste sur l'hôte, où la base, `APP_KEYS` et les secrets sont déjà lisibles, et le jeton est à usage unique, valable 30 minutes (72 heures pour un lien d'action).
+
+### A-25. Cookie `Secure` et rendu serveur
+
+Koa refuse de poser un cookie `Secure` sur une requête qu'il voit en http (« Cannot send secure cookie over unencrypted connection »). Or le rendu serveur d'Astro appelle Strapi par `STRAPI_INTERNAL_URL` (`http://jib-strapi:1337`), sans `X-Forwarded-Proto`, en relayant le cookie. Sur dev et prod, où `PUBLIC_URL` est en https, le premier appel du jour d'une session, celui qui fait glisser l'échéance, répond donc 500. Les tests, en http, ne le voient pas.
+
+Règle : `loadSession` ne fait glisser l'échéance, en base et dans le cookie, que si la requête peut recevoir le cookie (`ctx.request.secure`, ou cookie sans `Secure`). L'effacement du cookie à la déconnexion suit la même garde ; la session est supprimée en base dans tous les cas. Les appels du navigateur (formulaires, îlots) passent par Traefik en https et font glisser la session ; ceux du rendu serveur, non. Exécution : lot 6b.
+
+### A-26. Organisateur créé par `ORGANIZER_EMAILS`
+
+Conservé tel que livré : rôle `organizer`, profil provisoire « Organisateur », « JIB », « Xylofutur », aucun consentement. À sa première connexion, il passe par E2 comme tout le monde, ce qui lui permet de corriger son nom. « Invisible » (critère 4 du lot 5) se lit par le rôle, quelles que soient ses cases : il ne reçoit ni `welcome` (A-17, livré) ni relances, et la phase 2 l'exclut de l'annuaire, des suggestions, des cibles de rendez-vous et des exports. Aucune correction de code.
+
 ## 3. Modèle
 
 **Piège (mémoire projet).** Changer le type d'une relation existante, par exemple de manyToOne en manyToMany, fait recréer par Strapi la table de liaison, vide, au démarrage qui suit le déploiement. La prod étant éditée directement dans le back-office, les liens saisis seraient perdus, et seule la sauvegarde permettrait de les retrouver. Règles :
@@ -104,20 +151,24 @@ Le lot de tests d'abord est écrit à partir de ces contrats. Un écart découve
 | `time.js` | 2 | `parseProgramTime(text)` → `{ hours, minutes }` ou `null`. Formes admises : `9h15`, `10h45`, `9h` ; tout le reste, `--` compris, donne `null`. `zonedToUtc(dateIso, { hours, minutes }, timeZone = 'Europe/Paris')` → `Date`. Heure inexistante : avancée de la durée du saut ; heure ambiguë : premier instant. `formatTimeLabel(date, timeZone = 'Europe/Paris')` → `9h45`, `13h00` |
 | `slots.js` | 2 | `computeSlots({ date, durationMinutes, sessions, timeZone })` → `{ slots: [{ sessionDocumentId, startsAt, endsAt, label }], warnings: [{ sessionDocumentId, title, code }] }`. Seules les séquences `kind = b2b_break` comptent ; le dernier créneau finit au plus tard à `end` (R-01). Codes : `MISSING_END`, `INVALID_TIME`, `TOO_SHORT`, `OVERLAP`. `planSlots({ wanted, existing })` → `{ create, keep, remove, orphans }`. Clé : `startsAt`, `endsAt`, `sessionDocumentId`. Un créneau existant hors clé qui a des rendez-vous `pending` ou `accepted` va dans `orphans`, jamais dans `remove` (R-02) |
 | `tokens.js` | 2 | `generateToken()` → 32 octets en base64url (43 caractères) ; `hashToken(token)` → SHA-256 en hexadécimal ; `linkUrl({ publicUrl, token, next })` → `{publicUrl}/espace/verifier?token=…&next=…` |
-| `import.js` | 4 | `normalizeEmail(value)` → adresse en minuscules, sans espaces autour, ou `null` si invalide. `mapItem(item, fieldMap)` → `{ helloassoItemId, helloassoOrderId, firstName, lastName, email, jobTitle, company, proposedRole, decision, reason }`. `decision` : `active`, `cancelled` ou `ignored` (Q-15). Nom et prénom : `user`. E-mail : champ `fieldMap.email` s'il est valide, sinon `payer.email`. Rôle proposé : `exhibitor_rep` si le tarif contient « Exposant », `speaker` s'il contient « Intervenant ». `planSync({ items, attendees, fieldMap })` → `{ create, update: [{ documentId, changes }], cancel: [documentId], errors: [{ itemId, code, email?, attendeeDocumentId? }] }`. Billets traités par `id` croissant. Champs de `editedFields` jamais écrasés (R-31). `role`, rattachements et consentements jamais touchés. Billet annulé inconnu : ignoré sans erreur. Billet redevenu actif : `status: 'active'`. Codes : `DUPLICATE_EMAIL` (I-14), `INVALID_EMAIL`, `WAITING`, `UNKNOWN`, `EMAIL_TAKEN` |
-| `helloasso.js` | 4 | `createHelloAssoClient({ apiBase, clientId, clientSecret, fetch, now })` → `{ listFormItems({ organizationSlug, formType, formSlug }), getOrder(orderId) }`. Jeton demandé sur `{origine de apiBase}/oauth2/token` (`client_credentials`), gardé jusqu'à `expires_in - 60` s (I-10). Une réponse 401 provoque un renouvellement et un seul nouvel essai. Requêtes `withDetails=true`, `pageSize=100`, `continuationToken` jusqu'à `data: []`, 50 pages au plus. Erreur : `HelloAssoError { status }`, sans secret ni jeton dans le message |
-| `session.js` | 5 | `safeNextPath(next, editionSlug)` → `next` s'il commence par `/espace/{editionSlug}/` et ne contient ni `//`, ni `\`, ni `..`, ni schéma ; sinon `/espace/{editionSlug}/`. `sessionCookieOptions({ publicUrl, maxAgeMs })` → `httpOnly`, `sameSite: 'lax'`, `path: '/'`, `signed`, `overwrite`, `secure` si `publicUrl` est en https |
-| `rate-limit.js` | 5 | `createRateLimiter({ max = 5, windowMs = 900000, now })` → `{ hit(key) → boolean, reset() }`, fenêtre glissante. L'instance est créée par le service d'authentification, jamais au niveau du module : un Strapi redémarré par les tests repart à zéro |
-| `mail/layout.js`, `mail/render.js` | 2 | `escapeHtml`. `renderEmail(name, data)` → `{ subject, html, text }` : le nom est contrôlé par `^[a-z-]+$`, `templates/<name>.js` est chargé, puis le HTML est enveloppé du gabarit commun : 600 px, en-tête couleur d'édition, `{publicUrl}/assets/logo-jib-blanc.png`, pied Xylofutur et lien « Gérer mes notifications » vers `/espace/{slug}/profil` |
+| `import.js` | 4 | `normalizeEmail(value)` → adresse en minuscules, sans espaces autour, ou `null` si invalide ou au-delà de 254 caractères ; seule règle d'adresse de l'espace, importée par `services/auth.js` (A-23). `mapItem(item, fieldMap)` → `{ helloassoItemId, helloassoOrderId, firstName, lastName, email, jobTitle, company, proposedRole, decision, reason }`. `decision` : `active`, `cancelled` ou `ignored` (Q-15). Nom et prénom : `user`. E-mail : champ `fieldMap.email` s'il est valide, sinon `payer.email`. Sans `fieldMap`, aucun libellé par défaut (A-23). Rôle proposé : `exhibitor_rep` si le tarif contient « Exposant », `speaker` s'il contient « Intervenant ». `planSync({ items, attendees, fieldMap })`, `attendees` portant `documentId, helloassoItemId, email, firstName, lastName, jobTitle, company, status, editedFields`, → `{ create, update: [{ documentId, changes }], cancel: [documentId], errors: [{ itemId, code, email? }] }`. Billets traités par `id` croissant. Champs de `editedFields` jamais écrasés (R-31) ; e-mail d'un Attendee existant jamais modifié ; une valeur vide ne vide rien. `role`, rattachements et consentements jamais touchés. Billet annulé inconnu : ignoré sans erreur. Billet redevenu actif : `status: 'active'`. Billet actif inconnu à l'adresse d'un Attendee annulé : rattachement (A-22). Codes : `DUPLICATE_EMAIL` (I-14), `INVALID_EMAIL` (aucune adresse valable, A-23), `WAITING`, `UNKNOWN` ; `EMAIL_TAKEN` vient du service (A-16) |
+| `helloasso.js` | 4 | `createHelloAssoClient({ apiBase, clientId, clientSecret, fetch, now, timeoutMs = 20000 })` → `{ listFormItems({ organizationSlug, formType, formSlug }) → tableau de billets, getOrder(orderId) }`. Jeton demandé sur `{origine de apiBase}/oauth2/token` (`client_credentials`), gardé jusqu'à `expires_in - 60` s (I-10). Une réponse 401 provoque un renouvellement et un seul nouvel essai. Requêtes `withDetails=true`, `pageSize=100`, `continuationToken` jusqu'à `data: []`, 50 pages au plus. Chaque requête abandonnée après `timeoutMs` (lot 6b). Erreur : `HelloAssoError { status }`, `status` absent si HelloAsso est injoignable, sans secret ni jeton dans le message |
+| `session.js` | 5 | `safeNextPath(next, editionSlug)` → `next` s'il commence par `/espace/{editionSlug}/` et ne contient ni `//`, ni `\`, ni `..`, ni caractère de contrôle, même encodés ; sinon `/espace/{editionSlug}/`. `sessionCookieOptions({ publicUrl, maxAgeMs })` → `httpOnly`, `sameSite: 'lax'`, `path: '/'`, `signed`, `overwrite`, `secure` si `publicUrl` est en https. `COOKIE_NAME` = `jib_espace` |
+| `rate-limit.js` | 5 | `createRateLimiter({ max = 5, windowMs = 900000, now })` → `{ hit(key) → boolean, reset() }`, fenêtre glissante. `hit` vaut `true` si la demande est admise ; une demande refusée n'est pas comptée. L'instance est créée par le service d'authentification, jamais au niveau du module : un Strapi redémarré par les tests repart à zéro |
+| `mail/layout.js`, `mail/render.js` | 2 | `escapeHtml`. `renderEmail(name, data)` → `{ subject, html, text }` : le nom est contrôlé par `^[a-z-]+$`, `templates/<name>.js` est chargé, puis le HTML est enveloppé du gabarit commun : 600 px, en-tête couleur d'édition, `{publicUrl}/assets/logo-jib-blanc.png`, pied Xylofutur et lien « Gérer mes notifications » vers `/espace/{slug}/profil`, sauf pour `access-link` (`manage: false`, design Q5). Un gabarit est une fonction `(data) => { subject, preheader, title, blocks, footer?, manage? }` ; un bloc est un paragraphe (texte), `{ ul: [...] }`, `{ button: { label, url } }` ou `{ url }` (lien de secours) |
 | `mail/templates/access-link.js` | 5 | données `{ edition: { slug, title, themeColor }, publicUrl, firstName, url, validityMinutes }` |
 | `mail/templates/welcome.js` | 4 | `{ edition, publicUrl, firstName, url, validityHours }` |
-| `mail/templates/meeting-cancelled.js` | 4 | `{ edition, publicUrl, firstName, slotLabel, counterpartName, reason, agendaUrl }` |
+| `mail/templates/meeting-cancelled.js` | 4 | `{ edition, publicUrl, firstName, slotLabel, counterpartName, reason, agendaUrl }`. `reason` n'est affiché que s'il est donné : R-18 ne le donne pas, « Inscription annulée » se lirait comme celle du destinataire. `slotLabel` est déjà rédigé (« jeudi 3 décembre à 10h45 ») |
 
 Services partagés du lot 2 :
 
-- `services/mailer.js` : `send({ attendee, template, data, scenarioKey })` → `{ status, messageId }`. Il rend le gabarit, appelle le fournisseur de la phase 0 (créé une fois, d'après `server.email`), écrit l'EmailLog et ne lève jamais d'erreur sur un échec d'envoi (statut `failed`, journal).
-- `services/tokens.js` : `issueLink(attendeeDocumentId, { ttlMinutes, ip, now })` → jeton en clair. Seule l'empreinte est stockée.
+- `services/mailer.js` : `send({ attendee, template, data, scenarioKey, now })` → `{ status, messageId }`. Il rend le gabarit, appelle le fournisseur de la phase 0 (créé une fois, d'après `server.email`), écrit l'EmailLog et ne lève jamais d'erreur sur un échec d'envoi (statut `failed`, journal). Il n'interroge pas `participantSpaceEnabled` : chaque appelant le fait (NF-52).
+- `services/tokens.js` : `issueLink(attendeeDocumentId, { ttlMinutes, ip, now })` → jeton en clair. Seule l'empreinte est stockée. Lot 6b : `purgeExpired({ now, graceDays = 7 })` → nombre de MagicToken supprimés (A-21).
 - `services/editions.js` : `findPublished(slug)`, champs privés compris.
+- `services/locks.js` (écart du lot 2, entériné) : `withLock(key, fn)` exécute `fn` dans une transaction qui tient `pg_advisory_xact_lock(hashtext(key))` ; les appels au Document Service faits par `fn` rejoignent la transaction. Seul accès aux verrous de A-16.
+- `services/slots.js` : `regenerate(editionDocumentId)` → rapport de la route de régénération, sous le verrou `slots:` ; 409 `EDITION_DATE_MISSING` si l'édition publiée n'a pas de date. Appelé par la route et par le seed. `planSlots` reçoit `existing: [{ documentId, startsAt, endsAt, label, sessionDocumentId, activeMeetings }]`.
+
+Services des lots 4 et 5 : `services/sync.js` (`run`, `runAll`), `services/meetings.js` (`cancelForAttendee`, qui n'envoie rien si l'édition est fermée, lot 6b), `services/auth.js` (`requestLink`, `linkState`, `verify`, `loadSession`, `logout`, `setCookie`), `services/me.js` (`toMe`, `update`, `setConsent`).
 
 ### 4.2 API de la phase 1
 
@@ -132,7 +183,7 @@ Base `/api/espace`. Formats et codes d'erreur : `06-api.md`. Toute écriture exi
 | GET | `/admin/:edition/sync-runs` | organisateur | 4 | les 10 derniers SyncRun, du plus récent au plus ancien |
 | POST | `/auth/request-link` | public | 5 | JSON : 202 `{ "status": "accepted" }`, 400 `EMAIL_INVALID` (format), 429 `RATE_LIMITED` (« Trop de demandes, réessayez dans quelques minutes. »). Formulaire : 303 vers `/espace/{slug}/connexion?envoye=1`, `?erreur=trop` ou `?erreur=email` |
 | GET | `/auth/link?token=` | public | 5 | A-18 ; toujours 200 |
-| POST | `/auth/verify` | public | 5 | JSON `{ token, next? }` : 200 `{ me, redirect }` avec le cookie, ou 400 `TOKEN_INVALID`. Formulaire : 303 vers `/espace/{slug}/bienvenue` si `consentAt` est vide, sinon vers `safeNextPath(next)` ; en cas d'échec, 303 vers `/espace/verifier?token=…&next=…` |
+| POST | `/auth/verify` | public | 5 | JSON `{ token, next? }` : 200 `{ me, redirect }` avec le cookie, `redirect` étant un chemin relatif, ou 400 `TOKEN_INVALID`. Formulaire : 303 vers `/espace/{slug}/bienvenue` si `consentAt` est vide, sinon vers `safeNextPath(next)` ; en cas d'échec, 303 vers `/espace/verifier?token=…&next=…` |
 | POST | `/auth/logout` | session | 5 | 204 ; formulaire (champ caché `editionSlug`) : 303 vers `/espace/{slug}/connexion?deconnecte=1` ; même réponse sans session |
 | GET | `/me` | session | 5 | `Me` ; 401 `UNAUTHENTICATED` |
 | PATCH | `/me` | session | 5 | `{ firstName?, lastName?, jobTitle?, company? }` → `Me`. Tout autre champ est ignoré. 400 `VALIDATION`, avec `error.fields` ({ champ: message }), si le profil qui en résulte n'a pas de prénom, de nom ou d'entreprise (F-30 ; l'entreprise peut manquer à l'import) ou si un champ dépasse 100 caractères. Un champ importé modifié s'ajoute à `editedFields` (R-31) |
@@ -142,7 +193,8 @@ Base `/api/espace`. Formats et codes d'erreur : `06-api.md`. Toute écriture exi
 
 Règles d'accès communes :
 
-- **Session valable** : MagicToken `session` trouvé par empreinte et non expiré, Attendee `active`, édition publiée avec `participantSpaceEnabled = true`. Sinon, 401. `ctx.state.espace = { attendee, edition, session, isOrganizer }`. `isOrganizer` vaut `role = organizer` ou e-mail présent dans `ORGANIZER_EMAILS`. L'échéance est prolongée de 30 jours au plus une fois par jour, cookie compris.
+- **Session valable** : MagicToken `session` trouvé par empreinte et non expiré, Attendee `active`, édition publiée avec `participantSpaceEnabled = true`. Sinon, 401. `ctx.state.espace = { attendee, edition, session, isOrganizer }`. `isOrganizer` vaut `role = organizer` ou e-mail présent dans `ORGANIZER_EMAILS`. L'échéance est prolongée de 30 jours au plus une fois par jour, cookie compris, seulement sur une requête qui peut recevoir le cookie `Secure` (A-25).
+- **État d'un lien** (A-18) : l'adresse n'est renvoyée que pour un lien expiré ou utilisé d'un Attendee actif dans une édition ouverte. Lien d'un inscrit annulé ou d'une édition fermée : `{ valid: false, editionSlug }` (lot 6b).
 - **Vérification** : la consommation est atomique (`strapi.db.query(…).updateMany` conditionné par `usedAt: null` et `expiresAt > now` ; on poursuit seulement si une ligne a changé), seule exception admise au Document Service. Effets : création du MagicToken `session` (30 jours, IP) ; `activatedAt` s'il est vide ; `lastSeenAt`. Cookie `jib_espace` signé (A-04).
 - **Demande de lien** : le compteur par e-mail normalisé et par IP s'incrémente avant toute recherche, que l'adresse soit connue ou non. Cas :
   - édition fermée ou inconnue : 202, aucun envoi ;
@@ -160,8 +212,8 @@ Règles d'accès communes :
   - la section `email` et le correctif D2 sont conservés.
 - `strapi/config/middlewares.js` : devient une fonction de `{ env }`. `strapi::cors` y reçoit `origin: env.array('CORS_ORIGINS', ['http://localhost:4321'])` et `credentials: true` (A-05).
 - `strapi/config/cron-tasks.js` (tz `Europe/Paris`) :
-  - synchronisation `*/15 * * * *` des éditions d'A-17 ;
-  - purge `0 4 * * *` des MagicToken expirés.
+  - synchronisation `*/15 * * * *` des éditions d'A-17 (`sync.runAll`) ;
+  - purge `0 4 * * *` des MagicToken expirés depuis plus de 7 jours (`tokens.purgeExpired`, A-21).
 
   Aucune logique dans le cron. Une erreur est journalisée et ne fait jamais tomber Strapi.
 - `strapi/.env.example` : `PUBLIC_URL`, `ORGANIZER_EMAILS`, `CORS_ORIGINS`, `IS_PROXIED`, `CRON_ENABLED`, `HELLOASSO_API_BASE=http://localhost:4010/v5`, `HELLOASSO_CLIENT_ID`, `HELLOASSO_CLIENT_SECRET`, avec des valeurs fictives.
@@ -200,7 +252,8 @@ Conséquence vérifiable : sur une base fraîchement seedée, une synchronisatio
 | 4 | HelloAsso, synchronisation, annulation, `welcome` | developer | 2 | lot 3 ; lot 5 s'il y a une seconde instance developer |
 | 5 | accès | developer | 2, ou 4 avec une seule instance developer | lot 3 ; lot 4 s'il y a une seconde instance |
 | 6 | écrans E0, vérification, E2, E1 provisoire | developer | 5, et réponses du designer validées par Mathieu | lot 3 |
-| 7 | vérification et porte | tester | 6 | |
+| 6b | corrections de la revue des lots 2, 4 et 5 (section 11) | developer | 6, pour ne croiser aucun de ses fichiers | lot 3 |
+| 7 | vérification et porte | tester | 6 et 6b | |
 
 - Les lots 4 et 5 ne partagent aucun fichier (A-20). Avec une seule instance developer, ils s'enchaînent : 4, puis 5.
 - Chaque lot developer est relu par l'architecte, puis vérifié par le tester, qui active les tests d'abord correspondants. Un échec repart au developer, et la vérification est relancée.
@@ -226,9 +279,10 @@ Fournisseur `console` par défaut, sans `NODE_ENV=production` : les e-mails arri
 | `strapi/mcp/content-types.json` | lot 2 | `sequence.kind` seulement |
 | `docs/espace/specs/06-api.md` | developer du lot concerné | s'il ajuste un chemin, dans le même commit |
 | `web/astro.config.mjs` | lot 6 | filtre du sitemap seulement |
+| `strapi/src/api/espace/services/{auth,tokens,meetings}.js`, `lib/{import,helloasso}.js`, `strapi/config/cron-tasks.js`, `web/src/middleware.ts` | lot 6b | après le lot 6 ; corrections de la section 11 seulement |
 | `strapi/tests/**`, `web/tests/**`, `web/playwright.config.ts`, `.github/workflows/tests.yml`, `strapi/tests/SPEC.md` | tester | |
 
-Personne ne committe `web/.astro/`, `.claude/launch.json`, `strapi/.strapi-updater.json` ni `.vscode/`. Les commits nomment leurs fichiers (`git commit -m "…" -- <fichiers>`).
+Personne ne committe `web/.astro/`, `.claude/launch.json`, `strapi/.strapi-updater.json` ni `.vscode/`. Les commits nomment leurs fichiers : `git add <fichiers>`, puis, dans un second appel, `git commit -m "…" -- <fichiers>` (`docs/espace/CLAUDE.md`, Pièges connus).
 
 ### Lot 1 (tester) : clôture de la phase 0
 
@@ -289,7 +343,7 @@ Critères d'acceptation :
 6. **Erreurs** : une écriture sous `/api/espace` sans `Origin` admis reçoit 403 `ORIGIN_REFUSED`. Une erreur inattendue donne 500 `{ error: { code: 'INTERNAL', message, requestId } }` et une ligne de journal structurée.
 7. **CORS** : préflight accepté pour `http://localhost:4321` avec `credentials`, refusé pour toute autre origine. Le formulaire de contact du site fonctionne toujours en local.
 8. **Index** : `espace_meetings_table_key_uq` existe après un démarrage et après un redémarrage.
-9. **Socle e-mail** : `mailer.send` avec un gabarit d'essai écrit une ligne dans la boîte de sortie et un EmailLog.
+9. **Socle e-mail** : `mailer.send` avec un gabarit d'essai écrit une ligne dans la boîte de sortie et un EmailLog. Le lot 2 ne livrant aucun gabarit, le critère se vérifie avec `welcome`, au lot 4.
 10. **Règles communes** : aucune dépendance, `web/` intact, aucun tiret cadratin, textes en français, identifiants en anglais, `.env.example` sans secret, commandes et résultats dans le compte rendu.
 
 ### Lot 3 (tester) : tests d'abord
@@ -344,7 +398,7 @@ Fichiers : `lib/{import,helloasso}.js`, `services/{sync,meetings}.js`, `controll
 Critères d'acceptation :
 
 1. Sur `strapi_e2e` fraîchement seedée, faux HelloAsso lancé par `helloasso:fake`, une synchronisation donne 0, 0, 0 et aucune erreur (section 4.4).
-2. Sur une édition sans Attendee, avec le jeu par défaut et `buildEdgeCaseItems()` chargés par `/__fake/items`, la première synchronisation crée les billets attendus et consigne `DUPLICATE_EMAIL`, `INVALID_EMAIL`, `WAITING` et `UNKNOWN`. La seconde donne 0, 0, 0, les mêmes erreurs et aucun doublon d'e-mail ni de `helloassoItemId`.
+2. Sur une édition sans Attendee, avec le jeu par défaut et `buildEdgeCaseItems()` chargés par `/__fake/items`, la première synchronisation crée les billets attendus et consigne `DUPLICATE_EMAIL` (commande groupée), `WAITING` et `UNKNOWN`. Le billet 910004, dont le champ Email est invalide, crée son Attendee sur l'adresse du payeur (I-11, A-23). `INVALID_EMAIL` ne sort que pour un billet sans aucune adresse valable, ni dans le champ ni chez le payeur : le jeu du faux n'en contient pas, les tests unitaires de `planSync` le couvrent. La seconde synchronisation donne 0, 0, 0, les mêmes erreurs et aucun doublon d'e-mail ni de `helloassoItemId`. (Critère corrigé à la revue : il exigeait `INVALID_EMAIL` sur ce jeu.)
 3. Un billet passé à `Canceled`, ou dont un paiement passe à `Refunded`, par `PATCH /__fake/items/{id}`, donne un Attendee `cancelled`, ses rendez-vous annulés et un `meeting-cancelled` par autre partie dans la boîte de sortie.
 4. `welcome` part une fois par Attendee, avec un lien de 72 heures, seulement si l'espace est ouvert.
 5. Deux synchronisations simultanées : la seconde reçoit 409 `SYNC_RUNNING`.
@@ -364,7 +418,7 @@ Critères d'acceptation, vérifiés par `curl` sur `strapi_e2e` seedée, command
 1. **Demande de lien** : une adresse inscrite produit un `access-link` dans la boîte de sortie, avec un lien de 30 minutes. Une adresse inconnue reçoit la même réponse, sans envoi. À la 6e demande en 15 minutes pour une même adresse ou une même IP, la réponse est 429.
 2. **Lien** : `GET /auth/link` renvoie les trois états de A-18. Un lien vérifié deux fois échoue la seconde fois. Un lien expiré échoue.
 3. **Cookie** : `HttpOnly`, `SameSite=Lax`, `Path=/`, signé, 30 jours, sans `Secure` en http local. Après la déconnexion, le même cookie reçoit 401.
-4. **Organisateur** : `organisation@example.org` reçoit un lien et devient `organizer`, invisible et sans consentement ; il accède aux routes `admin`, ce qu'un participant ne peut pas faire (403).
+4. **Organisateur** : `organisation@example.org` reçoit un lien ; l'Attendee créé a le rôle `organizer`, le profil provisoire de A-26 et aucun consentement. À sa première connexion, la vérification le renvoie vers E2. Il accède aux routes `admin`, ce qu'un participant ne peut pas faire (403). « Invisible » se lit par le rôle (A-26) : aucun `welcome` en phase 1, exclusions de la phase 2.
 5. **Profil** : `PATCH /me` et `PUT /me/consent` respectent la section 4.2. Un participant ne peut ni lire ni modifier un autre Attendee, quel que soit le corps envoyé.
 6. **Redirections** : toutes absolues sur `PUBLIC_URL` ; `next` hors de l'édition retombe sur l'accueil de l'édition.
 7. Règles communes du lot 2, point 10.
@@ -499,12 +553,13 @@ Porte de `09-phases.md` : T-01 à T-06 verts ; import du formulaire bac à sable
 
 ## 9. Points qui demandent une action de Mathieu
 
-1. Autoriser un push de `feat/espace-participant`. Le workflow de tests tournera alors pour la première fois : porte de la phase 0 « en intégration continue », puis celle de la phase 1.
+1. Autoriser un push de `feat/espace-participant`. Le workflow de tests tournera alors pour la première fois : porte de la phase 0 « en intégration continue », puis celle de la phase 1. Pousser seulement après l'activation des tests du lot 2 par le tester, sinon le garde-fou des routes met la CI au rouge.
 2. Créer le compte bac à sable HelloAsso et un formulaire reproduisant Q-03 (champs par tarif). Obtenir de Xylofutur les identifiants API de production (Q-08).
 3. Fournir `EMAIL_FROM` (Q-16) et décider si le serveur de dev envoie de vrais e-mails à la recette : il tourne en `NODE_ENV=production`, donc sur Brevo par défaut.
 4. Valider Q-13 (bouton « Ouvrir mon espace ») et Q-14 (polices servies par le site) avant le lot 6, qui les met en œuvre par défaut.
 5. Trancher avant la phase 3 le chemin des données de recette sur le serveur de dev. Le seed refuse toute base autre que `_e2e` et `_test`. Proposition : édition de test créée dans le back-office, puis import depuis le bac à sable.
 6. Avant le premier déploiement de la branche : créer le secret GitHub `SECRET_HELLOASSO_CLIENT_SECRET` et changer `VERSION`, puisque la prod tourne sur les images `0.1.0`.
+7. Valider A-24 pour le journal d'accès de Traefik, qui garde le jeton des liens (`/espace/verifier?token=…`). Proposition : ajouter `--accesslog.fields.queryparameters.defaultmode=drop` aux options de Traefik dans `infra/deploy/base/docker-compose.base.yml`. Les chemins restent journalisés, les query strings du site entier disparaissent. Le changement s'essaie d'abord sur le serveur de dev, puis s'applique au Traefik de prod au déploiement suivant. Sans accord, le risque reste accepté en v1 et rien ne change en prod.
 
 ## 10. À reprendre ensuite
 
@@ -513,9 +568,10 @@ Porte de `09-phases.md` : T-01 à T-06 verts ; import du formulaire bac à sable
   - E1 complet, qui remplace l'E1 provisoire ;
   - service des rendez-vous, qui étend `services/meetings.js`, et gabarits `meeting-*` sur le gabarit commun ;
   - fermeture par défaut de la fenêtre (veille 18h00, dans `lib/time.js`) ;
+  - exclusion des Attendee `organizer` de l'annuaire, des suggestions, des cibles de rendez-vous et des exports, quelles que soient leurs cases (A-26) ;
   - mesure de la couverture des branches.
 - **Phase 3** :
-  - E9 (bouton de synchronisation, historique, régénération des créneaux), qui appelle les routes de la phase 1 ;
+  - E9 (bouton de synchronisation, historique, régénération des créneaux), qui appelle les routes de la phase 1. À trancher alors : tant que l'espace est fermé (NF-52), aucun organisateur ne peut se connecter, donc E9 est inaccessible avant l'ouverture ; la tâche planifiée synchronise quand même (A-17) ;
   - I-13 par `getOrder` (P1) ;
   - autres tâches planifiées ;
   - E8, qui lit `Topic.sessions` ;
@@ -526,3 +582,72 @@ Porte de `09-phases.md` : T-01 à T-06 verts ; import du formulaire bac à sable
   - réglages HelloAsso de l'édition ;
   - liste réelle de `ORGANIZER_EMAILS` (Q-12).
 - **Après le 3 décembre** : fenêtre du seed périmée (`phase-0.md`), sans effet sur les tests (A-19).
+
+## 11. Revue des lots 2, 4 et 5 (architecte, 29 octobre)
+
+Relus : `4bd6ab8`, `47ac556` et `f6184b6` (lot 2), `1f23963` (lot 5), `4236ea2` (lot 4), contre les sections 2 à 4 et les specs.
+
+Conforme, sans réserve :
+
+- jetons hachés en base (NF-02) et absents des journaux de Strapi ;
+- `Me` sans e-mail ni identifiant HelloAsso, profil toujours tiré de la session, jamais du corps (NF-01, R-42) ;
+- `planSync` idempotent, `welcome` une seule fois sous la réservation du SyncRun ;
+- verrous `pg_advisory_xact_lock` dans `strapi.db.transaction`, qui propage la transaction au Document Service par contexte asynchrone (constaté dans `@strapi/database` 5.59) ;
+- aucune relation d'un type existant modifiée ; aucun champ ajouté visible par `/api/editions` ; aucune route CRUD, pas de GraphQL, aucune permission publique nouvelle ;
+- `server.proxy.maxIpsCount` est bien lu par Strapi 5.59 : l'IP de la limitation de débit est la dernière adresse de `X-Forwarded-For`, celle que Traefik ajoute.
+
+### Défauts
+
+| # | Gravité | Où | Défaut | Décision |
+|---|---|---|---|---|
+| 1 | haute | `services/auth.js:166-168` (glissement), `:35` (effacement) | cookie `Secure` posé sur l'appel http interne du rendu serveur : 500 sur dev et prod, une fois par jour et par session | A-25 |
+| 2 | moyenne | `config/cron-tasks.js:20-23` | purge sans délai de grâce, qui fait perdre l'état « expiré » de A-18 ; logique dans le cron (4.3) | A-21 |
+| 3 | moyenne | `lib/import.js:59`, `:79` | Attendee annulé qui rachète un billet : `DUPLICATE_EMAIL` sans fin, connexion impossible | A-22 |
+| 4 | moyenne | `web/src/middleware.ts` (lot 6, en cours) | `Referer` complet, jeton compris, envoyé par `/espace/verifier` sur la même origine, puis journalisé par Traefik | A-24 |
+| 5 | basse | `services/auth.js:19`, `lib/import.js:15` | `normalizeEmail` en double, avec des règles divergentes (254 caractères d'un seul côté) | A-23 |
+| 6 | basse | `services/meetings.js:47` | `meeting-cancelled` envoyé pour une édition fermée, alors que NF-52 coupe les envois | lot 6b |
+| 7 | basse | `services/auth.js:115` | `GET /auth/link` renvoie l'adresse pour un inscrit annulé ou une édition fermée ; A-18 la réserve au lien expiré ou utilisé | lot 6b |
+| 8 | basse | `lib/helloasso.js:28` | `fetch` sans délai : une synchronisation bloquée plus de 15 minutes laisse partir la suivante (SyncRun réputé périmé), d'où un `welcome` en double possible | lot 6b |
+
+Écarts entérinés, contrats mis à jour : `services/locks.js` ; `EMAIL_PROVIDER` et `EMAIL_FROM` dans `docker-compose.base.yml` ; contrat de gabarit ; `access-link` sans « Gérer mes notifications » ; `cancelReason` stocké mais non affiché ; `/auth/verify` en `{ token, next? }` → `{ me, redirect }` ; 409 `EDITION_DATE_MISSING`. Rôle proposé posé à la création, e-mail jamais resynchronisé, champs jamais vidés : A-23. Organisateur par défaut : A-26.
+
+### Ambiguïtés relevées par le tester (`strapi/tests/SPEC.md`, « Écarts et ambiguïtés »)
+
+1. **`mapItem` sans `helloassoFieldMap`** : repli sur le payeur seul, aucun libellé par défaut (D-03, A-23). Le code livré s'y conforme déjà (`lib/import.js:35`). C'est le test qui se trompe : l'aide `map(item, fieldMap = FIELD_MAP)` de `unit/import.test.js:63` remplace `undefined` par la correspondance de Q-03. Correction côté tester.
+2. **Champ Email invalide, payeur valable (910004)** : repli sur le payeur (I-11). `INVALID_EMAIL` seulement sans aucune adresse valable. Critère 2 du lot 4 corrigé.
+3. **`DUPLICATE_EMAIL` ou `EMAIL_TAKEN`** : `planSync` donne `DUPLICATE_EMAIL` pour toute adresse déjà en base ou déjà prise par un billet de plus petit `id`. `EMAIL_TAKEN` ne sort que du contrôle sous verrou, quand un Attendee est créé entre le calcul du plan et l'écriture ; la synchronisation suivante le redonne en `DUPLICATE_EMAIL`. Sur deux synchronisations successives sans écriture concurrente, les erreurs sont identiques.
+4. **`hit(key)`** : `true` si la demande est admise ; une demande refusée n'est pas comptée.
+5. **« Gérer mes notifications »** : présent dans l'enveloppe commune, sauf pour `access-link` (`manage: false`, design Q5). Le test doit l'exiger de `welcome` et `meeting-cancelled`, et vérifier son absence dans `access-link`.
+6. **`reason` dans `meeting-cancelled`** : affiché seulement s'il est donné. R-18 ne le donne pas : pas de motif dans l'e-mail d'annulation par la synchronisation.
+7. **NF-52 et `meeting-cancelled`** : oui, une édition fermée n'envoie rien ; les rendez-vous sont annulés quand même. Défaut 6, corrigé au lot 6b : le test s'active avec le lot 6b.
+8. **Synchronisation manuelle sans formulaire HelloAsso renseigné** : SyncRun clos avec `[{ code: 'HELLOASSO_NOT_CONFIGURED' }]`, réponse 200 ; même résultat si `HELLOASSO_*` manque. Comportement livré, désormais spécifié (`06-api.md`).
+9. **Méthode de `services/slots.js`** : `regenerate(editionDocumentId)` (section 4.1). Les tests peuvent l'appeler directement.
+10. **Gabarit d'essai du lot 2 (critère 9)** : vérifié avec `welcome`, dès le lot 4.
+11. **Forme des entrées de `planSync`, de `planSlots` et de `listFormItems`** : écrite en section 4.1.
+
+### Lot 6b (developer) : corrections de la revue
+
+Démarre après le lot 6, dont il touche un fichier (`web/src/middleware.ts`). Exigences : A-18, A-21 à A-25, NF-52.
+
+Fichiers : `strapi/src/api/espace/services/{auth,tokens,meetings}.js`, `strapi/src/api/espace/lib/{import,helloasso}.js`, `strapi/config/cron-tasks.js`, `web/src/middleware.ts`. Interdits : tests, `package.json` et lockfiles, schémas, fichiers des autres lots.
+
+1. **`services/auth.js`, `loadSession` (A-25)** : le bloc de glissement (lignes 166 à 169) ne s'exécute que si `ctx.request.secure || !cookieOptions().secure` ; sinon, ni mise à jour en base ni cookie. `logout` supprime la session dans tous les cas, mais n'efface le cookie que sous la même condition. `verify` inchangé.
+2. **`services/tokens.js` et `config/cron-tasks.js` (A-21)** : `purgeExpired({ now = new Date(), graceDays = 7 } = {})` supprime les MagicToken dont `expiresAt` est antérieur à `now - graceDays` jours et renvoie le nombre supprimé. La tâche `espaceTokenPurge` n'appelle plus que `strapi.service('api::espace.tokens').purgeExpired()`.
+3. **`lib/import.js`, `planSync` (A-22)** : rattachement d'un Attendee `cancelled` à un billet actif inconnu de même adresse, selon les règles de A-22. Le commentaire de tête et celui de `planSync` le décrivent.
+4. **`lib/import.js` et `services/auth.js` (A-23)** : `normalizeEmail` de `lib/import.js` refuse au-delà de 254 caractères ; `services/auth.js` l'importe et supprime sa copie et son `EMAIL_PATTERN`.
+5. **`services/meetings.js`, `cancelForAttendee` (NF-52)** : si l'édition publiée n'a pas `participantSpaceEnabled`, les rendez-vous sont annulés comme aujourd'hui, mais aucun lien n'est émis et aucun `meeting-cancelled` n'est envoyé.
+6. **`services/auth.js`, `linkState` (A-18)** : l'adresse n'est renvoyée que si le lien est expiré ou utilisé, l'Attendee actif et l'édition ouverte. Sinon `{ valid: false, editionSlug }`.
+7. **`lib/helloasso.js`** : option `timeoutMs` (défaut 20000) ; chaque `fetch`, jeton compris, reçoit `signal: AbortSignal.timeout(timeoutMs)`. Un dépassement donne `HelloAssoError` sans `status`, donc `FETCH_FAILED`.
+8. **`web/src/middleware.ts` (A-24)** : `Referrer-Policy: strict-origin` sur `/espace/verifier`, `strict-origin-when-cross-origin` ailleurs sous `/espace`. Un commentaire interdit `no-referrer`, qui ferait envoyer `Origin: null` au POST du formulaire.
+
+Critères d'acceptation, vérifiés par le tester, qui écrit les tests :
+
+1. **Cookie (A-25)** : avec `PUBLIC_URL` en https et `IS_PROXIED=true`, `GET /me` sur une session prolongée il y a plus d'un jour, sans `X-Forwarded-Proto`, répond 200, sans `Set-Cookie`, échéance inchangée en base ; avec `X-Forwarded-Proto: https`, 200, `Set-Cookie` `Secure`, échéance repoussée. `POST /auth/logout` sans `X-Forwarded-Proto` : 204 et session supprimée.
+2. **Purge (A-21)** : un jeton expiré depuis 6 jours est gardé, un jeton expiré depuis 8 jours est supprimé ; après la purge, un lien expiré la veille donne toujours `{ valid: false, editionSlug, email }`. `cron-tasks.js` ne contient plus de requête.
+3. **Rachat (A-22)** : Attendee annulé (billet A `Canceled`) et nouveau billet B `Processed` à la même adresse : 0 création, 1 mise à jour, aucune erreur ; Attendee actif sur B, consentements et `editedFields` intacts, aucun `welcome` de plus. La synchronisation suivante donne 0, 0, 0. Avec deux billets actifs B et C à cette adresse : B rattaché, C en `DUPLICATE_EMAIL`.
+4. **Adresse (A-23)** : une seule définition de `normalizeEmail` dans `strapi/src` ; une adresse de 255 caractères donne 400 `EMAIL_INVALID` à `request-link` et n'est pas retenue par `mapItem`.
+5. **Édition fermée (NF-52)** : l'annulation d'un inscrit annule ses rendez-vous (`tableKey` à `null`), sans ligne dans la boîte de sortie ni MagicToken créé.
+6. **Lien (A-18)** : lien d'un inscrit annulé, ou d'une édition fermée, sans `email` dans la réponse.
+7. **HelloAsso** : un client dont le `fetch` ne répond jamais, avec un `timeoutMs` court, échoue en `HelloAssoError` sans `status` ; la synchronisation clôt son SyncRun en `FETCH_FAILED`.
+8. **Referer (A-24)** : `/espace/verifier` répond `Referrer-Policy: strict-origin`, les autres pages de `/espace` gardent `strict-origin-when-cross-origin`, et le parcours de vérification passe toujours dans le navigateur (POST accepté).
+9. Règles communes du lot 2, point 10.
