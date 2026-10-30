@@ -161,13 +161,16 @@ const hasStarted = (snap, slot) => time(slot.startsAt) <= time(snap.now);
 const acceptedAt = (snap, slotId, ignoreMeetingId) =>
   snap.meetings.filter((meeting) => isActive(meeting, 'accepted') && meeting.slotId === slotId && meeting.id !== ignoreMeetingId);
 
-/** R-11.5: the requester has an accepted meeting on the slot, or a pending request of his own. */
-const requesterBusy = (snap, requesterId, slotId, ignoreMeetingId) =>
+/**
+ * R-11.5: the requester has an accepted meeting on the slot, or a pending request of his own (`withPending`: false at the
+ * acceptance, where only an accepted meeting takes the slot and A-30 closes the other requests).
+ */
+const requesterBusy = (snap, requesterId, slotId, ignoreMeetingId, { withPending = true } = {}) =>
   snap.meetings.some(
     (meeting) =>
       meeting.slotId === slotId &&
       meeting.id !== ignoreMeetingId &&
-      ((isActive(meeting, 'accepted') && involves(meeting, requesterId)) || (isActive(meeting, 'pending') && meeting.requesterId === requesterId))
+      ((isActive(meeting, 'accepted') && involves(meeting, requesterId)) || (withPending && isActive(meeting, 'pending') && meeting.requesterId === requesterId))
   );
 
 /** R-11.6, R-14, R-19: a person has an accepted meeting, a dedicated table has its table taken, an exhibitor is full (as many meetings as active representatives). */
@@ -284,7 +287,7 @@ function checkAccept(snap, meetingId, viewerId) {
   if (snap.window.state !== 'open') return fail('WINDOW_CLOSED');
   const slot = snap.slots.get(meeting.slotId);
   if (!slot || hasStarted(snap, slot)) return fail('SLOT_PAST');
-  if (requesterBusy(snap, meeting.requesterId, meeting.slotId, meeting.id)) return fail('SLOT_TAKEN');
+  if (requesterBusy(snap, meeting.requesterId, meeting.slotId, meeting.id, { withPending: false })) return fail('SLOT_TAKEN');
 
   const target = meeting.targetExhibitorId ? { kind: 'x', id: meeting.targetExhibitorId } : { kind: 'p', id: meeting.targetAttendeeId };
   if (targetBusy(snap, target, meeting.slotId, meeting.id)) return fail('TARGET_BUSY');
