@@ -1,8 +1,8 @@
 # SPEC des tests de l'espace participant
 
-Registre vivant de ce qui est testé et pourquoi. Tenu par le tester. Couvre les trois suites du dépôt : Strapi (`strapi/tests/`), Playwright `e2e` (`web/tests/e2e/`) et Playwright `visual` (`web/tests/visual/`). État : lot 7 de la phase 1 exécuté (30 octobre) : suite Strapi inchangée en nombre (1136), 31 tests e2e de l'espace ajoutés (41 au total, dont un échec attendu : défaut D3), test visuel relancé.
+Registre vivant de ce qui est testé et pourquoi. Tenu par le tester. Couvre les trois suites du dépôt : Strapi (`strapi/tests/`), Playwright `e2e` (`web/tests/e2e/`) et Playwright `visual` (`web/tests/visual/`). État : lot 7 de la phase 1 exécuté (30 octobre) : suite Strapi inchangée en nombre (1136), 31 tests e2e de l'espace ajoutés (41 au total, dont un échec attendu : défaut D3), test visuel relancé. Lot 13 des phases 2 et 3 (30 octobre) : tests d'abord des lots 8 (rendez-vous) et 9 (profil, annuaire, suggestions) ajoutés côté Strapi, voir « Tests des phases 2 et 3 ». Les groupes du lot 9 sont activés (le code est livré) ; ceux du lot 8 restent en `pending('lot 8')` jusqu'à la demande de l'architecte.
 
-Tous les tests de la suite Strapi sont **actifs** : ils passent et doivent passer à tout moment. Aucun n'est marqué `todo` ni en attente. Le marqueur `pending('lot N')` (`tests/helpers/pending.js`, option `todo` de `node:test`) reste disponible pour de futurs tests écrits avant leur code ; aucun fichier ne l'importe plus. Un défaut constaté mais non corrigé se consigne par un test `todo` accompagné de sa reproduction, à retirer dès la correction.
+Les tests de la suite Strapi sont **actifs** : ils passent et doivent passer à tout moment. Seuls font exception les groupes écrits avant leur code, marqués `pending('lot N')` (`tests/helpers/pending.js`, option `todo` de `node:test`) : ils s'exécutent et s'affichent sans faire échouer la suite. `TESTS_FIRST_STRICT=1` les rend tous stricts, `TESTS_FIRST_STRICT=8` les seuls groupes du lot 8 (`8,9` : deux lots), ce qui montre leurs vraies erreurs. Au 30 octobre, seuls les groupes `pending('lot 8')` subsistent (fichiers `unit/meetings-*.test.js`, `unit/ics.test.js`, `unit/meeting-templates.test.js`, `integration/meetings-*.test.js`) ; ils passent tous en mode strict contre le code livré. Un défaut constaté mais non corrigé se consigne par un test `todo` accompagné de sa reproduction, à retirer dès la correction.
 
 ## Lancer les tests
 
@@ -10,14 +10,14 @@ Tous les tests de la suite Strapi sont **actifs** : ils passent et doivent passe
 
 | Suite | Commande | Prérequis | Mesure du 29/10 (lot 6b) |
 |---|---|---|---|
-| Strapi, tout | `corepack pnpm@12.15.0 --dir <dépôt>/strapi test` | Postgres (`make -C <dépôt> infra-up`) | 178 s, 1136 tests : 1136 passés, 0 `todo`, 0 échec (30/10, lot 7) |
-| Strapi, unitaires | `… strapi test:unit` | aucun (sans Strapi) | 7,4 s, 770 tests |
-| Strapi, intégration | `… strapi test:integration` | Postgres | environ 162 s, 366 tests |
+| Strapi, tout | `corepack pnpm@12.15.0 --dir <dépôt>/strapi test` | Postgres (`make -C <dépôt> infra-up`) | 333 s, 2005 tests : 1424 passés, 581 `todo` (groupes `pending('lot 8')`), 0 échec ; avec `TESTS_FIRST_STRICT=1` : 2005 passés, 0 `todo`, 335 s (30/10, lot 13, sur `strapi_l13_test`) |
+| Strapi, unitaires | `… strapi test:unit` | aucun (sans Strapi) | 7,8 s, 1300 tests : 929 actifs, 371 `todo` (30/10, lot 13) |
+| Strapi, intégration | `… strapi test:integration` | Postgres | environ 325 s, 705 tests : 495 actifs, 210 `todo` (30/10, lot 13) |
 | e2e | `corepack pnpm@12.15.0 --dir <dépôt>/web test:e2e` | Postgres, Chromium, ports 1348 et 4332 libres | 26 s de tests (environ 40 s avec le démarrage et la construction du front), 41 tests : 41 passés dont 1 échec attendu, D3 (30/10, lot 7) |
 | e2e avec captures du designer | `E2E_CAPTURES_DIR=<dossier hors dépôt> … web test:e2e` | idem | mêmes tests ; `capture()` enregistre les écrans à 390 et 1280 px (voir « Tests e2e de l'espace ») |
 | visuel (local) | `… web test:visual` | Strapi sur `strapi_espace` (1337), `web build` puis `web preview --host 127.0.0.1 --port 4321` | 6 s, 4 tests : 4 passés (30/10, lot 7) |
 
-La durée de la suite Strapi vient des démarrages de Strapi (un par fichier d'intégration, trois pour `seed.test.js`, deux pour le test d'index, un pour `espace-seed-sync.test.js`). La suite est séquentielle (`--test-concurrency=1`) parce que tous les fichiers partagent la base de test. Deux exécutions complètes de suite sur l'arbre du lot 6b donnent le même résultat (1136 sur 1136), une troisième au lot 7 aussi.
+La durée de la suite Strapi vient des démarrages de Strapi (un par fichier d'intégration, trois pour `seed.test.js`, deux pour le test d'index, un pour `espace-seed-sync.test.js`, un pour chacun des sept fichiers du lot 13, deux pour `meetings-expiry-ics.test.js`). Un fichier se lance seul avec `node --require ./tests/helpers/no-network.js --test tests/integration/<fichier>` depuis `strapi/` ; plusieurs fichiers de suite exigent `--test-concurrency=1` (même base). La suite est séquentielle (`--test-concurrency=1`) parce que tous les fichiers partagent la base de test. Deux exécutions complètes de suite sur l'arbre du lot 6b donnent le même résultat (1136 sur 1136), une troisième au lot 7 aussi.
 
 Préparation des bases : rien à faire à la main. La base des tests d'intégration (`TEST_DATABASE`, défaut `strapi_test`) et celle du e2e (`E2E_DATABASE`, défaut `strapi_e2e`) sont créées si elles manquent, puis vidées au démarrage de chaque suite (`node tests/prepare-databases.js`, depuis `strapi/`, les crée seules sans les vider). Le workflow `.github/workflows/tests.yml` appelle ce script, sans variable : il garde les défauts.
 
@@ -82,7 +82,11 @@ Règles : un nom qui ne finit pas par `_test` (`TEST_DATABASE`) ou `_e2e` (`E2E_
 
 | Fichier | Rôle |
 |---|---|
-| `helpers/pending.js` | marqueur `pending('lot N')` et mode strict `TESTS_FIRST_STRICT=1`, disponible, inutilisé |
+| `helpers/pending.js` | marqueur `pending('lot N')` ; `TESTS_FIRST_STRICT=1` (tout), `=8` (le lot 8), `=8,9` (une liste de lots) rendent les groupes stricts ; testé par `unit/pending.test.js` |
+| `helpers/meetings-snapshot.js` | instantané de l'édition pour les règles pures de `lib/meetings.js` (A-28) : maintenant, tables, fenêtre, créneaux s1 à s4 et `past`, participants a à g, exposants, rendez-vous, tables dédiées ; `verdict(result)` |
+| `helpers/ics-validate.js` | lecteur et validateur minimal de RFC 5545 (CRLF, 75 octets, pliage, imbrication, propriétés obligatoires, échappements, TZID défini) ; ses propres cas sont actifs dans `unit/ics.test.js` |
+| `helpers/meetings-world.js` | monde de test des phases 2 et 3 : éditions aux dates relatives à l'horloge (`createMeetingEdition`, créneaux générés par le service réel), sujets, exposants, intervenants, personnes consentantes, sessions par le parcours réel (`useLogin`), appels d'API (`useApi`), rendez-vous écrits directement (`seedMeeting`), journal d'e-mails (`waitForEmailLogs`, `settledEmailLogs`), détection de fuites (`leaks`) |
+| `helpers/png.js` | PNG valable de taille choisie (`makePng`, `padTo`), requête multipart (`postFile`) pour la photo de profil |
 | `helpers/config-env.js` | aide `env` de Strapi simulée (`int`, `bool`, `array`, `json`) pour les tests de configuration |
 | `helpers/espace.js` | Strapi démarré avec faux HelloAsso en module, requêtes avec `Origin` et IP choisis, lecture de la boîte de sortie avec attente, connexion d'un Attendee (demande, lien, vérification, cookie), `useEspace` (une erreur de démarrage ne fait pas échouer le hook) |
 | `helpers/espace-data.js` | éditions, programme et Attendee de test par le Document Service |
@@ -91,6 +95,65 @@ Règles : un nom qui ne finit pas par `_test` (`TEST_DATABASE`) ou `_e2e` (`E2E_
 | `e2e-server.js` | serveur Strapi du e2e (vide la base, seed, démarre). Lot 7 : `PUBLIC_URL` et `CORS_ORIGINS` valent l'URL du front e2e (`http://127.0.0.1:E2E_WEB_PORT`) au lieu de `http://localhost:4321`, sans quoi les liens des e-mails, les 303 et le contrôle `Origin` visent un autre site ; la boîte de sortie (`EMAIL_OUTBOX_FILE` de `buildTestEnv` pour la base e2e) est supprimée au démarrage |
 | `web/tests/e2e/espace.ts` | `test` de l'espace : réseau strict (aucun hôte externe, polices Google comprises), IP propre à chaque test par `X-Forwarded-For` (la limite de 5 demandes par IP ne lie pas les tests), lecture de la boîte de sortie (`mailsTo`, `nextMail`, `linkOf`, `receiveLink`), `capture()` |
 | `fixtures/existing-schemas.json` | relations, médias et composants des types existants, relevés au commit a70a56e |
+
+## Tests des phases 2 et 3 (lot 13, 30 octobre)
+
+Écrits avant le code à partir de `docs/espace/journal/phase-2-plan.md` (sections 2 et 3, contrats) et des specs `04-regles-metier.md`, `10-recette.md`, `06-api.md`. Le code des lots 8 et 9 était livré pendant l'écriture : chaque fichier a été lancé en mode strict contre lui, les écarts triés (test qui se trompait ou défaut du code), puis les groupes du lot 9 activés. Commandes d'un fichier : `TESTS_FIRST_STRICT=8 TEST_DATABASE=strapi_l8_test corepack pnpm@12.15.0 --dir <dépôt>/strapi exec node --require ./tests/helpers/no-network.js --test tests/integration/<fichier>`.
+
+### Unitaires (sans Strapi)
+
+| Fichier | Ce qui est vérifié | Exigences | Lot | Tests |
+|---|---|---|---|---|
+| `unit/pending.test.js` | marqueur `pending`, `TESTS_FIRST_STRICT` (`1`, `8`, `8,9`, `14` ne se confond pas avec `1`) | lot 13 | actif | 7 |
+| `unit/meetings-basics.test.js` | `parseTarget` (formes valables, 18 refus, valeurs qui ne sont pas du texte), `requestWindow` (ouverture, fermeture à la milliseconde, bornes vides, veille 18h00 Paris en hiver, en été et à cheval sur le changement d'heure, fermeture explicite), `hostedTables` (numéro valable, invalides, conflit au plus petit `id`, rôles et statuts, lot commun), `assertTransition` (5 transitions permises, toutes les autres en 409) | R-10, R-17, R-19, A-29, A-32 | 8 | 85 |
+| `unit/meetings-request.test.js` | `checkRequest` : mode `request`, `stand`, `booking` ; un code par condition de R-11 (1 à 10), R-14 (exposant à 2 représentants, T-19), R-11.7 dans les deux sens et `ignoreMeetingId` (A-31), R-11.8 avec table dédiée (T-26), R-11.9 à 9 et 10 demandes ; ordre des contrôles par paires (1 avant 2 jusqu'à 8 avant 9) ; réservation R-19 (TARGET_BUSY, ALREADY_REQUESTED à venir seulement, pas de limite R-11.9 ni de table commune) | R-03, R-11 à R-14, R-19, T-18, T-19, T-26, A-29, A-31 | 8 | 86 |
+| `unit/meetings-answer.test.js` | `checkAccept` : droit de répondre (cible, représentant actif), ordre FORBIDDEN, INVALID_TRANSITION, WINDOW_CLOSED, SLOT_PAST, SLOT_TAKEN, TARGET_BUSY, NO_TABLE_LEFT ; plus petite table libre (trous, autres créneaux, stands, annulations, tables dédiées, séquence de T-26) ; `closeOnAccept` (A-30, tous les cas, exposant complet avec la demande acceptée comptée) ; `slotStates` (R-12, F-50) ; `meetingActions` (R-16, A-31, A-32) | R-10, R-12 à R-16, T-24, T-26, A-30, A-31, A-32 | 8 | 93 |
+| `unit/ics.test.js` | `buildCalendar` : CRLF, VERSION, PRODID, pliage à 74, 75 et 76 octets et sur les caractères à deux octets, échappements `\ ; , \n` et injection de lignes, VTIMEZONE Europe/Paris fixe, `DTSTART;TZID`, heure d'été, `DTSTAMP` en UTC, UID stable, champs facultatifs, 200 événements ; validateur des tests (6 cas actifs) | T-23, I-40, I-41 | 8 | 46 |
+| `unit/meeting-templates.test.js` | gabarits `meeting-request` (boutons « Accepter » et « Voir la demande », message, variante « nouvelle proposition »), `meeting-accepted` (lieu, `venue`, `booking`), `meeting-declined` (motif facultatif) : enveloppe commune, objet à espace insécable, échappement, couleur, pied, lien de gestion, aucun tiret cadratin, apostrophes typographiques, aucun « undefined » ni « [object Object] » | I-31, I-41, A-33, F-52, F-60, F-61, NF-05 | 8 | 56 |
+| `unit/meetings-cron-mailer.test.js` | `services/mailer.js` transmet `attachments` (le .ics), EmailLog « failed » sur pièce jointe invalide, aucun contenu joint dans le journal ; tâche `espaceMeetingExpiry` (`*/5`, Europe/Paris, un seul service, instant courant, erreur journalisée) | A-33, I-41, A-32, A-08 | 8 | 12 |
+| `unit/cards.test.js` | `initials`, `attendeeCard` (champs, sous-titre, photo, sujets, étiquette, stand, table dédiée, aucune donnée sensible, `publicOnly` de A-29), `exhibitorCard`, objets `populate` | R-42, R-43, A-29, A-34, A-36 | 9, actif | 46 |
+| `unit/profile-directory.test.js` | `profileCompletion` (R-30), `normalizeText`, `searchDirectory` (forme, recherche sans casse ni accents sur nom, fonction, entreprise, sujets, seuil de 2 caractères, type, sujets, tri, curseur par 30, `pageSize`) | R-30, T-11, F-40 à F-43, A-34 | 9, actif | 70 |
+| `unit/suggestions.test.js` | `suggest` : filtre (soi, exclus, sujets communs), trois au plus, ordre (sujets communs, intervenants et exposants, aléa stable), aléa stable par jour et par participant et indépendant de l'ordre d'entrée, repli sans sujet | R-50, F-23 | 9, actif | 29 |
+
+### Intégration (Strapi sur `TEST_DATABASE`)
+
+Chaque test crée ses personnes, et son édition quand les tables ou les demandes d'un créneau comptent : aucun test ne dépend de l'état laissé par un autre. Les éditions ont des dates relatives à l'horloge du poste, les tests ne vieillissent pas. Les rendez-vous de départ sont écrits par le Document Service, les réponses passent par l'API avec une vraie session.
+
+| Fichier | Ce qui est vérifié | Exigences | Lot | Tests |
+|---|---|---|---|---|
+| `integration/meetings-requests.test.js` | huit routes du lot 8 déclarées, aucune autre sur `/slots` et `/meetings`, 401 sans session ; `GET /slots` (modes `request`, `stand`, `booking`, états R-12 sans révéler l'autre partie, `blocked` SELF, TARGET_UNAVAILABLE, HOST_AT_TABLE, WINDOW_CLOSED, `pending`, créneaux commencés absents, 400 et 404) ; `POST /meetings` (T-14 : 201, forme exacte de Meeting, base, e-mail `meeting-request` avec deux liens d'action de 72 heures, `next` vers l'agenda, aucune action par GET, préférences, exposant, échappement ; T-10 ; 400 ; 404 ; tous les 409 : WINDOW_CLOSED, SLOT_PAST, HOST_AT_TABLE, TARGET_UNAVAILABLE ×6, SLOT_TAKEN (T-18), TARGET_BUSY, ALREADY_REQUESTED, NO_TABLE_LEFT, TOO_MANY_PENDING) ; `GET /meetings` (reçues, envoyées, agenda trié et sans séquence « -- », historique de 20, exposant et `viaExhibitor`, cloisonnement) | T-10, T-14, T-18, T-19, R-11, R-12, R-14, R-19, F-50 à F-57, A-33, NF-01, R-42 | 8 | 88 |
+| `integration/meetings-answers.test.js` | accepter (T-15 : forme, base, `.ics` joint valable, e-mails ; tables 1, 2, 3 puis NO_TABLE_LEFT ; T-21 table libérée ; T-26 table 2 dédiée ; stand ; T-19 ; A-30 ; T-16 complet), T-24 et 404 d'une autre édition, R-10 (toutes les transitions interdites), A-32 et R-16 (fenêtre fermée, créneau commencé), refuser, contre-proposer (T-20 : atomicité, COUNTER_UNAVAILABLE, validation), annuler (T-21, F-63, exposant), réservation d'une table dédiée (R-19.1 à R-19.5, A-29), e-mails malgré les préférences (A-33) | T-15, T-16, T-19 à T-21, T-24, T-26, R-10, R-13 à R-16, R-19, A-29 à A-33, I-41 | 8 | 79 |
+| `integration/meetings-concurrency.test.js` | **T-17** : 20 acceptations simultanées sur 3 tables, 3 `accepted` aux tables 1 à 3, 17 NO_TABLE_LEFT, aucun 5xx, clés distinctes, e-mails ; avec la table 2 dédiée ; deux vagues. **T-25** : 2, puis 6 réservations simultanées de la table dédiée, une seule réussit, les autres TARGET_BUSY ; trois créneaux disputés ; double clic. Doubles soumissions, dix cibles à la fois (R-11.9), acceptation et annulation croisées, exposant à 2 représentants sous charge, deux créneaux à la fois. Relancé trois fois de suite : stable | T-17, T-25, T-26, R-13, R-14, R-19, A-27 | 8 | 16 |
+| `integration/meetings-expiry-ics.test.js` | `expirePending({ now })` (T-22 : `expired`, acceptés et clos intacts, fenêtres ouverte et pas encore ouverte intactes, idempotence, aucun e-mail ni EmailLog, historique du demandeur) ; fermeture par défaut la veille à 18h00 Paris en été et en hiver, fermeture explicite ; `GET /meetings.ics` (T-23 : `text/calendar; charset=utf-8`, `jib-{slug}.ics`, fichier valable, rendez-vous acceptés seulement, lieux, séquences dont une sans fin à 30 minutes, UID stables, aucun e-mail dans le fichier, cloisonnement) ; tâche `espaceMeetingExpiry` enregistrée avec `CRON_ENABLED=true` | T-22, T-23, R-17, A-19, A-32, I-40, F-65 | 8 | 27 |
+| `integration/profile.test.js` | `GET /me` complet (clés, valeurs par défaut, R-30, exposant, table dédiée, préférences, `counts` : demandes reçues en attente, y compris au nom d'un exposant, messages non lus) ; `PATCH /me` (présentation de 280, sujets 0 à 3 distincts de l'édition, `emailPrefs`, `editedFields` inchangé par les champs de la phase 2, rôle et consentements ignorés) ; `GET /editions/:slug/topics` public, tri français | A-36, R-30, R-31, F-24, F-30, F-31, NF-01 | 9, actif | 38 |
+| `integration/directory.test.js` | six routes du lot 9 ; annuaire (T-10, A-26 dont ORGANIZER_EMAILS, R-43 et A-29 : intervenant à table dédiée en données publiques, exposants tous listés, recherche T-11, type, sujets, tri par nom de famille, pagination par 30) ; fiche d'une personne (T-12 : 404 sans consentement, 200 avec rendez-vous de tout statut ou conversation, `isSelf`, `canMessage`, T-13 : aucun e-mail ; sessions) ; fiche d'un exposant (représentants visibles, `isMine`) ; suggestions (R-50 : ordre, exclusions, refusé suggérable, stabilité, repli sans sujet, cloisonnement) | T-10 à T-13, R-41 à R-43, R-50, F-23, F-40 à F-44, A-26, A-29, A-34, NF-01 | 9, actif | 65 |
+| `integration/profile-photo.test.js` | `POST /me/photo` : PNG de 256 px enregistré (disque, base, `/me`, annuaire), l'ancienne photo supprimée (ligne et fichier), refus PHOTO_INVALID (texte renommé `.jpg`, GIF, SVG, PDF, fichier vide, sans fichier) sans toucher à la photo précédente ni laisser de fichier, PHOTO_TOO_LARGE à 6 Mo, 401, ORIGIN_REFUSED ; les fichiers créés sont supprimés à la fin | F-30, A-35, NF-04 | 9 | 19 |
+
+### Tests de la phase 1 modifiés par le lot 13
+
+- `integration/api.test.js` : la liste des routes admises passe aux sections 3.2 (lots 8, 9 et 14, déclarées d'avance : le contrôle est « déclarées incluses dans la liste ») ; le test « pas de CRUD » ne compte plus que les routes hors du plan ; `GET /api/espace/meetings` et `POST /api/espace/meetings` répondent 401 sans session au lieu de 404 ; un 404 ou 405 est exigé pour `GET/PUT/DELETE /meetings/:id` et `GET /slots/:id`.
+- `integration/espace-acces.test.js` : `GET /me` fige les clés de la phase 1 plus celles de la phase 2 et `counts` (A-36).
+- `unit/config-espace.test.js` et `integration/espace-sync.test.js` : le planning du cron admet `*/5 * * * *` (`espaceMeetingExpiry`, lot 8) en plus de `*/15` et `0 4` ; la règle `*/5` reste admise deux fois (le lot 14 y ajoute les notifications de messages).
+
+### Interprétations des contrats (à trancher par l'architecte si le code diffère)
+
+1. `assertTransition(status, action)` : actions `accept`, `decline`, `cancel`, `expire`.
+2. `hostedTables(attendees, tablesCount)` : lignes d'Attendee avec `id` numérique et `documentId` ; clés de `hosted` = `documentId` (A-28) ; le plus petit `id` numérique garde la table.
+3. `checkAccept` : le demandeur déjà pris par un rendez-vous accepté donne SLOT_TAKEN, la cible prise (personne ou exposant complet) TARGET_BUSY, comme R-11.5 et R-11.6. Les autres demandes en attente du demandeur ou de la cible n'empêchent pas d'accepter : A-30 les ferme (cas inatteignable par l'API pour le demandeur, R-11.5, mais prévu par A-30 ; le test unitaire l'exige).
+4. `closeOnAccept` : l'instantané précède l'écriture, la demande acceptée y est encore `pending` et compte pour remplir un exposant.
+5. `meetingActions` : `canAccept` faux quand la fenêtre est fermée (A-32) ou le créneau commencé ; `canCounter` faux depuis un exposant (A-31).
+6. `meeting-accepted` : `venue` est un texte (le nom du lieu de l'édition) ou vide, pas un objet.
+7. `emailPrefs` partiel accepté par `PATCH /me` (fusion avec l'existant) : non testé ; une valeur non booléenne est refusée.
+8. `CarteProfil` ne porte pas le nom de famille : le tri par nom de famille de A-34 se vérifie par l'API (`directory.test.js`), pas par `searchDirectory` seul (ses tests choisissent des noms dont les deux ordres coïncident).
+9. `photoUrl` d'une carte d'annuaire : le fichier téléversé ou sa miniature (préfixe du plugin Upload) ; `GET /me` rend le fichier.
+10. `GET /slots` : `session.start` et `session.end` sont les heures du programme en texte (« 10h45 »).
+
+### Limites et reste pour le lot 16
+
+- Lot 8 : retirer `pending('lot 8')` des six fichiers listés plus haut quand l'architecte le demande ; tous passent en mode strict contre le code livré.
+- Non écrits au lot 13 : contenus du seed du lot 12 dans `integration/seed.test.js` et `unit/fixtures.test.js` ; parcours e2e de Léa et d'Inès (`pending('lot 11')`) ; tests des lots 14 et 15 (messagerie, programme, statistiques, pages). Les e2e de l'E1 provisoire de la phase 1 casseront à la livraison du vrai E1 (lot 10) : le lot 16 les réécrit.
+- La photo JPEG et WebP n'est pas téléversée en test (aucun encodeur sans dépendance) : à vérifier à la main dans le navigateur, y compris le repli JPEG de Safari.
+- Jamais mesurés : temps de réponse de l'annuaire à 300 cartes (NF-21), couverture des branches de `lib/meetings.js` (`node --experimental-test-coverage`, porte de la phase 2).
 
 ### Écarts et ambiguïtés : tranchés
 
@@ -184,6 +247,18 @@ Navigateur Chromium contre Strapi `strapi_e2e` (seed de recette) et le front con
 | NF-23, NF-20, Q-14 | aucune requête sortante sous `/espace` (polices Google comprises), 0 JavaScript sur E0 et la vérification, îlot d'E2 sous 80 Ko compressés, polices servies par le site | `e2e/espace-securite.spec.ts`, `e2e/espace-acces.spec.ts`, `e2e/espace-parcours.spec.ts` |
 | NF-31 | E0 et vérification sans JavaScript : de la demande à la déconnexion | `e2e/espace-acces.spec.ts` |
 | Sitemap | `/espace` absent du sitemap, pages publiques présentes | `e2e/espace-securite.spec.ts` |
+| T-10 à T-13, R-41 à R-43, A-26, A-29 | annuaire et suggestions sans case cochée, recherche « econ », fiche 404 sans consentement ni lien (rendez-vous de tout statut, conversation), aucun e-mail ni identifiant HelloAsso dans aucune réponse, intervenant à table dédiée en données publiques, organisateurs (rôle ou `ORGANIZER_EMAILS`) jamais listés | `integration/directory.test.js`, `unit/cards.test.js`, `unit/profile-directory.test.js` |
+| R-30, R-31, A-36, F-24 | complétion du profil (40 + 4 × 15), `editedFields` limité aux quatre champs importés, `GET /me` complet et compteurs | `unit/profile-directory.test.js`, `integration/profile.test.js` |
+| R-50, F-23 | suggestions : sujets communs, exclusions, intervenants et exposants d'abord, aléa stable par jour, repli sans sujet | `unit/suggestions.test.js`, `integration/directory.test.js` |
+| T-14, T-18, R-11 | demande valable (201, e-mail avec lien « Accepter » de 72 heures), un code 409 par condition, ordre des contrôles | `unit/meetings-request.test.js`, `integration/meetings-requests.test.js` |
+| T-15, T-16, T-20, T-21, T-24, R-10, R-15, R-16, A-30, A-31 | acceptation et `.ics`, fermeture des autres demandes, contre-proposition atomique, annulation et table libérée, 403 d'un tiers, cycle de vie | `unit/meetings-answer.test.js`, `unit/meetings-basics.test.js`, `integration/meetings-answers.test.js` |
+| T-17, T-25 | 20 acceptations simultanées sur 3 tables, réservations simultanées d'une table dédiée, doubles soumissions, aucun 5xx | `integration/meetings-concurrency.test.js` |
+| T-19, T-26, R-03, R-13, R-14, R-19, A-29 | exposant à 2 représentants, table 2 dédiée (tables 1 et 3 pour les 1-to-1), réservation `accepted` d'emblée, annulation, `hostedTables` | `unit/meetings-request.test.js`, `unit/meetings-answer.test.js`, `unit/meetings-basics.test.js`, `integration/meetings-answers.test.js`, `integration/meetings-concurrency.test.js` |
+| T-22, R-17, A-32 | `expirePending({ now })`, fenêtre par défaut la veille 18h00 Paris, acceptation refusée après la fermeture, tâche `*/5` | `unit/meetings-basics.test.js`, `unit/meetings-cron-mailer.test.js`, `integration/meetings-expiry-ics.test.js`, `integration/meetings-answers.test.js` |
+| T-23, I-40, I-41 | `buildCalendar` (RFC 5545), `GET /meetings.ics`, `.ics` joint à `meeting-accepted` | `unit/ics.test.js`, `integration/meetings-expiry-ics.test.js`, `integration/meetings-answers.test.js` |
+| A-33, F-52, F-60, F-61 | gabarits `meeting-request`, `meeting-accepted`, `meeting-declined`, préférences `meetingRequests`, e-mails de réponse toujours envoyés | `unit/meeting-templates.test.js`, `integration/meetings-requests.test.js`, `integration/meetings-answers.test.js` |
+| F-30, A-35 | photo de profil : PNG enregistré, ancienne supprimée, PHOTO_INVALID, PHOTO_TOO_LARGE | `integration/profile-photo.test.js` |
+| NF-01 (routes nouvelles) | 401 sans session sur chaque route du lot 8 et du lot 9, 404 des ressources d'une autre édition (créneau, cible, rendez-vous, fiche, exposant, suggestions) | `integration/meetings-requests.test.js`, `integration/meetings-answers.test.js`, `integration/directory.test.js`, `integration/api.test.js` |
 
 ## Défauts
 
