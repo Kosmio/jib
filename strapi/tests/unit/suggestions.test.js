@@ -11,7 +11,6 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { pending } = require('../helpers/pending');
 
 const lib = () => require('../../src/api/espace/lib/suggestions');
 
@@ -43,7 +42,7 @@ const suggest = (options) => lib().suggest({ meId: 'me', myTopicIds: ['t1'], can
 const ids = (list) => list.map((card) => card.id);
 const days = (count, start = '2026-11-01') => Array.from({ length: count }, (_, index) => new Date(Date.parse(`${start}T12:00:00Z`) + index * 86_400_000).toISOString().slice(0, 10));
 
-describe('suggest : filtre (R-50)', pending('lot 9'), () => {
+describe('suggest : filtre (R-50)', () => {
   it('rend les candidats qui partagent au moins un sujet', () => {
     const candidates = [attendee('a', ['t1']), attendee('b', ['t2']), attendee('c', ['t1', 't2'])];
     assert.deepEqual(ids(suggest({ candidates })).sort(), ['a', 'c']);
@@ -83,7 +82,7 @@ describe('suggest : filtre (R-50)', pending('lot 9'), () => {
   });
 });
 
-describe('suggest : au plus trois (R-50)', pending('lot 9'), () => {
+describe('suggest : au plus trois (R-50)', () => {
   const many = Array.from({ length: 8 }, (_, index) => attendee(`p${index}`, ['t1']));
 
   it('trois par défaut', () => {
@@ -105,7 +104,7 @@ describe('suggest : au plus trois (R-50)', pending('lot 9'), () => {
   });
 });
 
-describe('suggest : ordre (R-50)', pending('lot 9'), () => {
+describe('suggest : ordre (R-50)', () => {
   it('par nombre de sujets communs décroissant', () => {
     const candidates = [attendee('un', ['t1']), attendee('trois', ['t1', 't2', 't3']), attendee('deux', ['t1', 't2'])];
     assert.deepEqual(ids(suggest({ myTopicIds: ['t1', 't2', 't3'], candidates })), ['trois', 'deux', 'un']);
@@ -136,7 +135,7 @@ describe('suggest : ordre (R-50)', pending('lot 9'), () => {
   });
 });
 
-describe('suggest : aléa stable par jour (R-50 : graine = identifiant du participant + date)', pending('lot 9'), () => {
+describe('suggest : aléa stable par jour (R-50 : graine = identifiant du participant + date)', () => {
   const tied = Array.from({ length: 8 }, (_, index) => attendee(`p${index}`, ['t1']));
   const run = (options = {}) => ids(suggest({ candidates: tied, ...options }));
 
@@ -182,7 +181,7 @@ describe('suggest : aléa stable par jour (R-50 : graine = identifiant du partic
   });
 });
 
-describe('suggest : sans sujet renseigné, les intervenants et les exposants (R-50)', pending('lot 9'), () => {
+describe('suggest : sans sujet renseigné, les intervenants et les exposants (R-50)', () => {
   const candidates = [
     attendee('p1', ['t1', 't2']),
     attendee('p2', ['t1']),

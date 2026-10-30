@@ -11,7 +11,6 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { pending } = require('../helpers/pending');
 
 const cards = () => require('../../src/api/espace/lib/cards');
 const CARD_KEYS = ['kind', 'id', 'displayName', 'subtitle', 'photoUrl', 'initials', 'tag', 'topics', 'standNumber', 'hostedTableNumber'];
@@ -40,7 +39,7 @@ const lea = (fields = {}) => ({
   ...fields,
 });
 
-describe('initials', pending('lot 9'), () => {
+describe('initials', () => {
   const initials = (name) => cards().initials(name);
 
   it('prénom et nom : « Léa Ducasse » donne « LD »', () => {
@@ -81,7 +80,7 @@ describe('initials', pending('lot 9'), () => {
   });
 });
 
-describe('attendeeCard : carte d’un participant', pending('lot 9'), () => {
+describe('attendeeCard : carte d’un participant', () => {
   const card = (attendee = lea(), options) => cards().attendeeCard(attendee, options);
 
   it('porte les champs de la CarteProfil et rien d’autre', () => {
@@ -243,7 +242,7 @@ describe('attendeeCard : carte d’un participant', pending('lot 9'), () => {
   });
 });
 
-describe('exhibitorCard : carte d’un exposant', pending('lot 9'), () => {
+describe('exhibitorCard : carte d’un exposant', () => {
   const exhibitor = (fields = {}) => ({
     id: 7,
     documentId: 'doc-sylvadour',
@@ -304,7 +303,7 @@ describe('exhibitorCard : carte d’un exposant', pending('lot 9'), () => {
   });
 });
 
-describe('ATTENDEE_CARD_POPULATE et EXHIBITOR_CARD_POPULATE : objets `populate` du Document Service (A-36)', pending('lot 9'), () => {
+describe('ATTENDEE_CARD_POPULATE et EXHIBITOR_CARD_POPULATE : objets `populate` du Document Service (A-36)', () => {
   it('sont des objets simples', () => {
     for (const populate of [cards().ATTENDEE_CARD_POPULATE, cards().EXHIBITOR_CARD_POPULATE]) {
       assert.equal(typeof populate, 'object');

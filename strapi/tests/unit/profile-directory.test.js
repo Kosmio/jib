@@ -14,12 +14,11 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { pending } = require('../helpers/pending');
 
 const profile = () => require('../../src/api/espace/lib/profile');
 const directory = () => require('../../src/api/espace/lib/directory');
 
-describe('profileCompletion (R-30)', pending('lot 9'), () => {
+describe('profileCompletion (R-30)', () => {
   const FULL = { firstName: 'Léa', lastName: 'Ducasse', company: 'Atelier Fictif', jobTitle: 'Cheffe de projet', photo: { url: '/uploads/lea.webp' }, bio: 'Je cherche des partenaires.', topics: [{ documentId: 't1' }] };
   const completion = (fields) => profile().profileCompletion({ ...FULL, ...fields });
   const BASE = { jobTitle: null, photo: null, bio: null, topics: [] };
@@ -86,7 +85,7 @@ describe('profileCompletion (R-30)', pending('lot 9'), () => {
   });
 });
 
-describe('normalizeText (A-34)', pending('lot 9'), () => {
+describe('normalizeText (A-34)', () => {
   const normalize = (text) => directory().normalizeText(text);
 
   it('met en minuscules', () => assert.equal(normalize('ÉCONOMIE Circulaire'), 'economie circulaire'));
@@ -97,7 +96,7 @@ describe('normalizeText (A-34)', pending('lot 9'), () => {
   it('est idempotent', () => assert.equal(normalize(normalize('Été à Pau')), normalize('Été à Pau')));
 });
 
-describe('searchDirectory (A-34, F-40 à F-43, T-11)', pending('lot 9'), () => {
+describe('searchDirectory (A-34, F-40 à F-43, T-11)', () => {
   const person = (id, displayName, { subtitle = '', tag = 'participant', topics = [] } = {}) => ({
     kind: 'attendee',
     id,
