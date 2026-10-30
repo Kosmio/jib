@@ -14,7 +14,7 @@ const DEFAULT_TABLES = 20;
 const TOP_EXHIBITORS = 5;
 // R-70 a: below 70 % a profile gets a reminder, from 70 % it counts as complete.
 const COMPLETE_FROM = 70;
-const NBSP = ' ';
+const NBSP = '\u00a0';
 
 const STATUSES = ['pending', 'accepted', 'declined', 'cancelled', 'expired'];
 const ROLES = ['participant', 'speaker', 'exhibitor_rep'];

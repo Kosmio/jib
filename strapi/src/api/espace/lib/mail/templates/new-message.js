@@ -1,6 +1,6 @@
 'use strict';
 
-const NBSP = ' ';
+const NBSP = '\u00a0';
 
 /**
  * `new-message` (R-62, F-73): sent when a message is still unread after 5 minutes, at most once per conversation and recipient every 30 minutes.
