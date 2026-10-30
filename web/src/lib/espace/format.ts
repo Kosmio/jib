@@ -50,3 +50,49 @@ export function editionLine(edition: Pick<EspaceEdition, "date" | "city">): stri
 export function editionSlugFromPath(path: string | null): string | null {
   return path?.match(/^\/espace\/([^/?#]+)\//)?.[1] ?? null;
 }
+
+/** Adresse d'une photo : `photoUrl` est le chemin d'Upload (`/uploads/…`), à préfixer par l'adresse publique de Strapi. */
+export function photoSrc(strapiUrl: string, photoUrl: string | null | undefined): string | null {
+  if (!photoUrl) return null;
+  return /^(https?:|blob:|data:)/.test(photoUrl) ? photoUrl : `${strapiUrl}${photoUrl}`;
+}
+
+/** Initiales d'une personne : « Léa Ducasse » donne « LD ». */
+export function initialsOf(firstName: string, lastName: string): string {
+  return `${firstName.trim().charAt(0)}${lastName.trim().charAt(0)}`.toUpperCase();
+}
+
+/** Jour calendaire de Paris d'un instant, « 2026-12-03 ». */
+export function parisDay(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+}
+
+/** Jours calendaires de Paris entre `now` et la date d'une édition (« 2026-12-03 ») : positif avant, 0 le jour J, négatif après. */
+export function daysUntil(date: string, now: Date = new Date()): number {
+  return Math.round((Date.parse(`${date}T00:00:00Z`) - Date.parse(`${parisDay(now)}T00:00:00Z`)) / 86_400_000);
+}
+
+export type Countdown = { state: "before" | "today" | "after"; label: string };
+
+/** F-20 : « J-16 », « Aujourd’hui » le jour J, puis « Merci de votre participation ». Null sans date d'édition. */
+export function countdown(date: string | null, now: Date = new Date()): Countdown | null {
+  if (!date || Number.isNaN(Date.parse(`${date}T00:00:00Z`))) return null;
+  const days = daysUntil(date, now);
+  if (days > 0) return { state: "before", label: `J-${days}` };
+  if (days === 0) return { state: "today", label: "Aujourd’hui" };
+  return { state: "after", label: "Merci de votre participation" };
+}
+
+/** Heure de Paris d'un instant ISO, à la française : « 10h45 », « 9h05 ». */
+export function timeLabel(iso: string): string {
+  const parts = new Intl.DateTimeFormat("fr-FR", { hour: "numeric", minute: "2-digit", hourCycle: "h23", timeZone: TIME_ZONE }).formatToParts(
+    new Date(iso),
+  );
+  const part = (type: string) => parts.find((item) => item.type === type)?.value ?? "";
+  return `${part("hour")}h${part("minute")}`;
+}
+
+/** « 1 profil », « 5 profils » : accord au pluriel, zéro au singulier. */
+export function plural(count: number, one: string, many: string = `${one}s`): string {
+  return `${count} ${count < 2 ? one : many}`;
+}

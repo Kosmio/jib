@@ -6,13 +6,14 @@ import { publicStrapiUrl } from "./lib/espace/api";
 // Google Fonts) : elle est écartée. Les scripts de page d'Astro (îlot d'E2) sont en ligne, d'où `'unsafe-inline'`.
 // Strapi est atteint par le navigateur : les formulaires lui sont envoyés (`form-action`) et l'îlot d'E2 l'appelle (`connect-src`).
 // `style-src` admet l'attribut `style` du bandeau, dont la couleur vient de Strapi.
+// `img-src` : les photos de profil sont servies par Strapi (`/uploads`), l'aperçu d'une photo recadrée est un `blob:` (A-35).
 function contentSecurityPolicy(siteUrl: URL): string {
   const strapi = new URL(publicStrapiUrl || "/", siteUrl).origin;
   return [
     "default-src 'self'",
     "script-src 'self' 'unsafe-inline'",
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data:",
+    `img-src 'self' data: blob: ${strapi}`,
     "font-src 'self'",
     `connect-src 'self' ${strapi}`,
     `form-action 'self' ${strapi}`,

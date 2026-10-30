@@ -1,14 +1,17 @@
 ---
 // Gabarit de l'espace participant : ni Header, ni Footer, ni Matomo, ni bandeau de cookies, ni Google Fonts (NF-07, NF-23).
 // Les en-têtes de sécurité viennent de src/middleware.ts.
+// Avec `shell` (pages à onglets, voir AppShell.astro), la barre d'onglets entre par le slot `nav`, avant `<main>`, et le contenu
+// laisse la place de la barre : en bas sur mobile, à gauche à partir de 1024 px.
 import "../styles/espace.css";
 
 export interface Props {
   /** État de la page : « Connexion », « Lien envoyé »… Le gabarit y ajoute le nom de l'espace. */
   title: string;
+  shell?: boolean;
 }
 
-const { title } = Astro.props;
+const { title, shell = false } = Astro.props;
 ---
 
 <!DOCTYPE html>
@@ -28,7 +31,8 @@ const { title } = Astro.props;
     >
       Aller au contenu
     </a>
-    <main id="main-content" class="min-h-screen pb-12">
+    <slot name="nav" />
+    <main id="main-content" class={`min-h-screen ${shell ? "pb-24 lg:pb-12 lg:pl-64" : "pb-12"}`}>
       <slot />
     </main>
   </body>

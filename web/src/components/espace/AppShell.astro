@@ -1,0 +1,160 @@
+---
+// Coquille des écrans à onglets de l'espace (E1, E3 à E9) : EspaceLayout plus la barre d'onglets, basse sur mobile (cinq onglets, filet
+// vert sur l'onglet actif) et latérale à partir de 1024 px (logo, onglets, « Mon profil »). À utiliser À LA PLACE de EspaceLayout :
+//   <AppShell title="Annuaire" active="directory" editionSlug={slug} me={me}> … </AppShell>
+// `me` : profil de `getMe` ou `guardSession` (api.ts), dont les `counts` posent les badges de F-24. `me` null, par exemple E8 sans
+// session : ni barre ni retrait, le contenu est celui d'un EspaceLayout. Les pages gardent leur propre en-tête (titre d'écran,
+// bandeau d'édition) et leur colonne de 720 px (`mx-auto max-w-180 px-4`).
+import EspaceLayout from "../../layouts/EspaceLayout.astro";
+import { initialsOf, photoSrc } from "../../lib/espace/format";
+import { publicStrapiUrl } from "../../lib/espace/api";
+import type { Me } from "../../lib/espace/client";
+
+export type ShellTab = "home" | "directory" | "agenda" | "messages" | "program" | "profile" | "organizer";
+
+export interface Props {
+  title: string;
+  active: ShellTab;
+  editionSlug: string;
+  me: Me | null;
+}
+
+const { title, active, editionSlug, me } = Astro.props;
+const base = `/espace/${encodeURIComponent(editionSlug)}`;
+
+// Icônes en trait (stroke 2 px) en SVG en ligne, décoratives : le libellé voisin porte le sens.
+const ICONS: Record<string, string> = {
+  home: '<path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z" />',
+  directory:
+    '<circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6" /><circle cx="17" cy="9" r="2.5" /><path d="M17.5 14c2.6.3 4 2.2 4 5" />',
+  agenda: '<rect x="3.5" y="5" width="17" height="15.5" rx="2" /><path d="M3.5 10h17M8 3v4M16 3v4" />',
+  messages: '<path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H10l-5 4v-4H6a2 2 0 0 1-2-2z" />',
+  program: '<path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" />',
+  profile: '<circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 3.6-6 8-6s8 2 8 6" />',
+  organizer: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />',
+};
+
+const tabs: { id: ShellTab; label: string; href: string; count?: number; countLabel?: (n: number) => string }[] = [
+  { id: "home", label: "Accueil", href: `${base}/` },
+  { id: "directory", label: "Annuaire", href: `${base}/annuaire` },
+  {
+    id: "agenda",
+    label: "Agenda",
+    href: `${base}/agenda`,
+    count: me?.counts?.pendingReceived,
+    countLabel: (n) => `${n} ${n > 1 ? "demandes reçues en attente" : "demande reçue en attente"}`,
+  },
+  {
+    id: "messages",
+    label: "Messages",
+    href: `${base}/messages`,
+    count: me?.counts?.unreadMessages,
+    countLabel: (n) => `${n} ${n > 1 ? "messages non lus" : "message non lu"}`,
+  },
+  { id: "program", label: "Programme", href: `${base}/programme` },
+];
+
+const photo = me ? photoSrc(publicStrapiUrl, me.photoUrl) : null;
+const linkBase =
+  "relative flex min-h-16 flex-col items-center justify-center gap-1 border-t-4 px-0.5 text-sm font-semibold lg:min-h-12 lg:flex-row lg:justify-start lg:gap-3 lg:rounded-lg lg:border-t-0 lg:border-l-4 lg:px-3 lg:text-base";
+const linkClass = (id: ShellTab) =>
+  `${linkBase} ${id === active ? "border-primary text-primary-ink lg:bg-surface" : "border-transparent text-muted hover:text-title lg:hover:bg-surface"}`;
+---
+
+<EspaceLayout title={title} shell={me !== null}>
+  {
+    me && (
+      <nav
+        slot="nav"
+        aria-label="Espace participant"
+        class="fixed inset-x-0 bottom-0 z-40 border-t border-surface-alt bg-white lg:inset-y-0 lg:right-auto lg:flex lg:w-64 lg:flex-col lg:justify-between lg:border-t-0 lg:border-r lg:p-4"
+      >
+        <div class="lg:flex lg:flex-col lg:gap-6">
+          <img
+            src="/assets/logo-jib.svg"
+            alt="La Journée de l’Innovation de la Filière Bois"
+            width="649"
+            height="160"
+            class="hidden h-12 w-auto self-start lg:block"
+          />
+          <ul class="grid grid-cols-5 lg:flex lg:flex-col lg:gap-1">
+            {tabs.map((tab) => (
+              <li>
+                <a href={tab.href} class={linkClass(tab.id)} aria-current={tab.id === active ? "page" : undefined}>
+                  <span class="relative">
+                    <svg
+                      aria-hidden="true"
+                      class="size-6"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      set:html={ICONS[tab.id]}
+                    />
+                    {tab.count ? (
+                      <span
+                        aria-hidden="true"
+                        class="absolute -top-2 -right-3 flex h-5 min-w-5 items-center justify-center rounded-full bg-gold px-1 text-xs font-bold text-gold-ink"
+                      >
+                        {tab.count > 99 ? "99+" : tab.count}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span>{tab.label}</span>
+                  {tab.count && tab.countLabel ? <span class="sr-only">, {tab.countLabel(tab.count)}</span> : null}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <ul class="hidden lg:flex lg:flex-col lg:gap-1">
+          {me.isOrganizer && (
+            <li>
+              <a
+                href={`${base}/organisateur`}
+                class={linkClass("organizer")}
+                aria-current={active === "organizer" ? "page" : undefined}
+              >
+                <svg
+                  aria-hidden="true"
+                  class="size-6"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  set:html={ICONS.organizer}
+                />
+                <span>Organisation</span>
+              </a>
+            </li>
+          )}
+          <li>
+            <a href={`${base}/profil`} class={linkClass("profile")} aria-current={active === "profile" ? "page" : undefined}>
+              {photo ? (
+                <img src={photo} alt="" width="96" height="96" class="size-8 shrink-0 rounded-full bg-surface-alt object-cover" />
+              ) : (
+                <span
+                  aria-hidden="true"
+                  class="flex size-8 shrink-0 items-center justify-center rounded-full bg-title text-sm font-semibold text-white"
+                >
+                  {initialsOf(me.firstName, me.lastName)}
+                </span>
+              )}
+              <span class="min-w-0">
+                <span class="block truncate">Mon profil</span>
+                <span class="block truncate text-sm font-normal text-muted">
+                  {me.firstName} {me.lastName}
+                </span>
+              </span>
+            </a>
+          </li>
+        </ul>
+      </nav>
+    )
+  }
+  <slot />
+</EspaceLayout>
