@@ -24,7 +24,7 @@ const SLOT_LABEL = 'jeudi 3 décembre à 13h00';
 const link = (path) => `${PUBLIC_URL}/espace/verifier?token=${path}-_123&next=%2Fespace%2F${EDITION.slug}%2Fagenda%3Fdemande%3Dabc123`;
 
 /** Assertions communes à tout gabarit de rendez-vous. */
-function describeTemplate(name, { data, urls, mustContain, hostile, defects = {} }) {
+function describeTemplate(name, { data, urls, mustContain, hostile }) {
   describe(`gabarit ${name}`, () => {
     const rendered = (overrides = {}) => renderEmail(name, { ...data, ...overrides });
 
@@ -34,7 +34,7 @@ function describeTemplate(name, { data, urls, mustContain, hostile, defects = {}
       assert.ok(!/[\r\n]/.test(subject), 'objet sur plusieurs lignes');
     });
 
-    it('espace insécable avant les deux-points de l’objet, jamais une espace ordinaire', defects.nbsp ? { todo: defects.nbsp } : {}, () => {
+    it('espace insécable avant les deux-points de l’objet, jamais une espace ordinaire', () => {
       const { subject } = rendered();
       assert.doesNotMatch(subject, / :/, `espace ordinaire avant « : » dans ${subject}`);
       if (subject.includes(':')) assert.ok(subject.includes(`${NBSP}:`), subject);
@@ -282,23 +282,18 @@ const NEW_MESSAGE = {
   threadUrl: link('fil'),
 };
 
-// D4 (mineur, ouvert) : `lib/mail/templates/new-message.js` définit `const NBSP = ' '` avec une espace ordinaire (U+0020), pas U+00A0 :
-// l'objet « Nouveau message : Mathis Lagrange » et les guillemets du corps n'ont pas d'espace insécable (convention du plan, section 3.3).
-// Reproduction : renderEmail('new-message', données).subject contient ' :' (U+0020). Les tests concernés sont `todo` jusqu'à la correction.
-const D4 = 'D4 : new-message.js emploie une espace ordinaire à la place de l’espace insécable';
-
+// D4 (corrigé au commit e936daa) : new-message.js employait une espace ordinaire à la place de l'espace insécable (U+00A0) dans l'objet et les guillemets.
 describeTemplate('new-message', {
   data: NEW_MESSAGE,
   urls: [NEW_MESSAGE.threadUrl],
   mustContain: ['Léa', 'Mathis Lagrange', 'J’apporterai nos échantillons de panneaux.'],
   hostile: ['firstName', 'authorName', 'excerpt'],
-  defects: { nbsp: D4 },
 });
 
 describe('new-message : objet, bouton et contenu limité à l’extrait (R-62, R-63, F-73)', () => {
   const rendered = (overrides = {}) => renderEmail('new-message', { ...NEW_MESSAGE, ...overrides });
 
-  it('objet « Nouveau message : {auteur} » avec espace insécable', { todo: D4 }, () => {
+  it('objet « Nouveau message : {auteur} » avec espace insécable', () => {
     assert.equal(rendered().subject, `Nouveau message${NBSP}: Mathis Lagrange`);
   });
 
@@ -308,7 +303,7 @@ describe('new-message : objet, bouton et contenu limité à l’extrait (R-62, R
     assert.match(text, /Lire et répondre/);
   });
 
-  it('l’extrait est entre guillemets français, avec espaces insécables', { todo: D4 }, () => {
+  it('l’extrait est entre guillemets français, avec espaces insécables', () => {
     assert.ok(rendered().text.includes(`«${NBSP}J’apporterai nos échantillons de panneaux.${NBSP}»`));
   });
 

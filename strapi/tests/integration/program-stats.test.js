@@ -370,10 +370,8 @@ describe('programme et tableau de bord (lot 14)', { timeout: 900_000 }, () => {
       assert.equal(warnings.find(({ code }) => code === 'HOSTED_TABLE_INVALID').tableNumber, 9);
     });
 
-    // D4 (mineur, ouvert) : `services/stats.js` définit `const NBSP = ' '` avec une espace ordinaire (U+0020) : le texte des avertissements
-    // affichés dans E9 n'a pas l'espace insécable avant les deux-points. Reproduction : un intervenant avec `hostedTableNumber` 9
-    // (tablesCount 3), puis GET /admin/{édition}/stats : `warnings[0].message` contient « ignorée : » avec U+0020. `todo` jusqu'à la correction.
-    it('A-29 : le message d’un avertissement porte une espace insécable avant les deux-points', { todo: 'D4 : stats.js emploie une espace ordinaire' }, async () => {
+    // D4 (corrigé au commit e936daa) : stats.js employait une espace ordinaire (U+0020) dans le texte des avertissements d'E9.
+    it('A-29 : le message d’un avertissement porte une espace insécable avant les deux-points', async () => {
       const { edition, p } = await statsScene();
       await person(edition, { firstName: 'Denis', lastName: 'Horsplage', role: 'speaker', hostedTableNumber: 9 });
       const [warning] = (await statsOf(edition, p.boss)).json.warnings;
