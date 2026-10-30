@@ -39,10 +39,10 @@ const ERRORS = {
   COUNTER_UNAVAILABLE: [409, 'Une autre date ne peut pas être proposée pour cette demande. Refusez-la et écrivez un message.'],
 };
 
-/** EspaceError of a code above. */
-function meetingError(code) {
-  const [status, message] = ERRORS[code] ?? [409, 'Action impossible.'];
-  return new EspaceError(status, code, message);
+/** EspaceError of a code above ; `message` replaces the usual text of the code when the case needs its own. */
+function meetingError(code, message) {
+  const [status, usual] = ERRORS[code] ?? [409, 'Action impossible.'];
+  return new EspaceError(status, code, message ?? usual);
 }
 
 const time = (value) => new Date(value).getTime();

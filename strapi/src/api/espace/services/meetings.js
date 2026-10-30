@@ -20,6 +20,7 @@ const CLOSED_LIMIT = 20;
 const DEFAULT_SESSION_MINUTES = 30;
 const LOCK_ATTEMPTS = 3;
 const CLOSED_BY_OTHER_MEETING = 'Créneau pris par un autre rendez-vous';
+const ALREADY_BOOKED = 'Vous avez déjà un rendez-vous à cette table.';
 const SLOT_NO_LONGER_AVAILABLE = 'Le créneau n’est plus disponible.';
 const dayFormat = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', weekday: 'long', day: 'numeric', month: 'long' });
 
@@ -392,6 +393,8 @@ function operations(strapi) {
         if (!ctx.snap.slots.has(slotId)) throw rules.meetingError('SLOT_NOT_FOUND');
         if (!targetExists(ctx, target)) throw rules.meetingError('TARGET_NOT_FOUND');
         const check = rules.checkRequest(ctx.snap, { requesterId: me, target, slotId });
+        // R-19.2: a second booking of the same dedicated table is not a pending request.
+        if (!check.ok && check.code === 'ALREADY_REQUESTED' && ctx.snap.hosted.has(target.id)) throw rules.meetingError(check.code, ALREADY_BOOKED);
         if (!check.ok) throw rules.meetingError(check.code);
 
         const booking = check.mode === 'booking';
