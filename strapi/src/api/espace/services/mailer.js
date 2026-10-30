@@ -10,16 +10,17 @@ module.exports = ({ strapi }) => {
     /**
      * Renders the template, sends it through the provider chosen by server.email (console or brevo, NF-53)
      * and writes the EmailLog. A failure never throws: the EmailLog gets the status "failed" and the error is logged.
+     * `attachments` goes to the provider as it is: [{ filename, content, contentType }], e.g. the .ics of meeting-accepted (A-33, I-41).
      * -> { status: 'sent' | 'failed', messageId }
      */
-    async send({ attendee, template, data, scenarioKey, now = new Date() }) {
+    async send({ attendee, template, data, scenarioKey, attachments, now = new Date() }) {
       let status = 'sent';
       let messageId;
       try {
         provider ??= createMailProvider({ ...strapi.config.get('server.email'), nodeEnv: process.env.NODE_ENV, logger: strapi.log });
         const { subject, html, text } = renderEmail(template, data);
         const name = [attendee.firstName, attendee.lastName].filter(Boolean).join(' ');
-        ({ messageId } = await provider.send({ to: { email: attendee.email, name }, subject, html, text }));
+        ({ messageId } = await provider.send({ to: { email: attendee.email, name }, subject, html, text, attachments }));
       } catch (error) {
         status = 'failed';
         strapi.log.error(`[mail] ${template} for attendee ${attendee.documentId} not sent: ${error.message.split('\n')[0]}`);
