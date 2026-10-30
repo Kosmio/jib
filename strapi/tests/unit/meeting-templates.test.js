@@ -10,7 +10,6 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { pending } = require('../helpers/pending');
 
 const MAIL = '../../src/api/espace/lib/mail';
 const renderEmail = (name, data) => require(`${MAIL}/render`).renderEmail(name, data);
@@ -25,8 +24,8 @@ const SLOT_LABEL = 'jeudi 3 décembre à 13h00';
 const link = (path) => `${PUBLIC_URL}/espace/verifier?token=${path}-_123&next=%2Fespace%2F${EDITION.slug}%2Fagenda%3Fdemande%3Dabc123`;
 
 /** Assertions communes à tout gabarit de rendez-vous. */
-function describeTemplate(name, { data, urls, mustContain, hostile }) {
-  describe(`gabarit ${name}`, pending('lot 8'), () => {
+function describeTemplate(name, { data, urls, mustContain, hostile, defects = {} }) {
+  describe(`gabarit ${name}`, () => {
     const rendered = (overrides = {}) => renderEmail(name, { ...data, ...overrides });
 
     it('renvoie objet, HTML et texte non vides, l’objet sur une ligne', () => {
@@ -35,7 +34,7 @@ function describeTemplate(name, { data, urls, mustContain, hostile }) {
       assert.ok(!/[\r\n]/.test(subject), 'objet sur plusieurs lignes');
     });
 
-    it('espace insécable avant les deux-points de l’objet, jamais une espace ordinaire', () => {
+    it('espace insécable avant les deux-points de l’objet, jamais une espace ordinaire', defects.nbsp ? { todo: defects.nbsp } : {}, () => {
       const { subject } = rendered();
       assert.doesNotMatch(subject, / :/, `espace ordinaire avant « : » dans ${subject}`);
       if (subject.includes(':')) assert.ok(subject.includes(`${NBSP}:`), subject);
@@ -126,7 +125,7 @@ describeTemplate('meeting-request', {
   hostile: ['firstName', 'requesterName', 'requesterSubtitle', 'sessionTitle', 'message'],
 });
 
-describe('meeting-request : boutons, message et nouvelle proposition (F-52, A-31, A-33)', pending('lot 8'), () => {
+describe('meeting-request : boutons, message et nouvelle proposition (F-52, A-31, A-33)', () => {
   const rendered = (overrides = {}) => renderEmail('meeting-request', { ...REQUEST, ...overrides });
   const everything = (result) => `${result.subject}\n${result.html}\n${result.text}`;
 
@@ -198,7 +197,7 @@ describeTemplate('meeting-accepted', {
   hostile: ['firstName', 'counterpartName', 'location', 'venue'],
 });
 
-describe('meeting-accepted : lieu, réservation et pièce jointe (A-33, I-41, R-19)', pending('lot 8'), () => {
+describe('meeting-accepted : lieu, réservation et pièce jointe (A-33, I-41, R-19)', () => {
   const rendered = (overrides = {}) => renderEmail('meeting-accepted', { ...ACCEPTED, ...overrides });
 
   it('donne le nom du lieu de l’édition à côté de la table', () => {
@@ -250,7 +249,7 @@ describeTemplate('meeting-declined', {
   hostile: ['firstName', 'counterpartName', 'reason'],
 });
 
-describe('meeting-declined : motif facultatif et invitation à choisir un autre créneau (F-61, R-15, A-30)', pending('lot 8'), () => {
+describe('meeting-declined : motif facultatif et invitation à choisir un autre créneau (F-61, R-15, A-30)', () => {
   const rendered = (overrides = {}) => renderEmail('meeting-declined', { ...DECLINED, ...overrides });
 
   it('affiche le motif quand il est donné', () => {
@@ -270,5 +269,59 @@ describe('meeting-declined : motif facultatif et invitation à choisir un autre 
     const { text } = rendered();
     assert.match(text, /annuaire|autre créneau|autre rendez-vous/i);
     assert.ok(text.includes(DECLINED.directoryUrl));
+  });
+});
+
+// Lot 14 : `new-message` (R-62, F-73). Même enveloppe que les gabarits de rendez-vous, mêmes contrôles.
+const NEW_MESSAGE = {
+  edition: EDITION,
+  publicUrl: PUBLIC_URL,
+  firstName: 'Léa',
+  authorName: 'Mathis Lagrange',
+  excerpt: 'J’apporterai nos échantillons de panneaux.',
+  threadUrl: link('fil'),
+};
+
+// D4 (mineur, ouvert) : `lib/mail/templates/new-message.js` définit `const NBSP = ' '` avec une espace ordinaire (U+0020), pas U+00A0 :
+// l'objet « Nouveau message : Mathis Lagrange » et les guillemets du corps n'ont pas d'espace insécable (convention du plan, section 3.3).
+// Reproduction : renderEmail('new-message', données).subject contient ' :' (U+0020). Les tests concernés sont `todo` jusqu'à la correction.
+const D4 = 'D4 : new-message.js emploie une espace ordinaire à la place de l’espace insécable';
+
+describeTemplate('new-message', {
+  data: NEW_MESSAGE,
+  urls: [NEW_MESSAGE.threadUrl],
+  mustContain: ['Léa', 'Mathis Lagrange', 'J’apporterai nos échantillons de panneaux.'],
+  hostile: ['firstName', 'authorName', 'excerpt'],
+  defects: { nbsp: D4 },
+});
+
+describe('new-message : objet, bouton et contenu limité à l’extrait (R-62, R-63, F-73)', () => {
+  const rendered = (overrides = {}) => renderEmail('new-message', { ...NEW_MESSAGE, ...overrides });
+
+  it('objet « Nouveau message : {auteur} » avec espace insécable', { todo: D4 }, () => {
+    assert.equal(rendered().subject, `Nouveau message${NBSP}: Mathis Lagrange`);
+  });
+
+  it('un bouton « Lire et répondre » vers le fil', () => {
+    const { html, text } = rendered();
+    assert.match(html, /Lire et répondre/);
+    assert.match(text, /Lire et répondre/);
+  });
+
+  it('l’extrait est entre guillemets français, avec espaces insécables', { todo: D4 }, () => {
+    assert.ok(rendered().text.includes(`«${NBSP}J’apporterai nos échantillons de panneaux.${NBSP}»`));
+  });
+
+  it('ne porte que l’extrait donné : rien du reste du message (R-63)', () => {
+    const { html, text } = rendered({ excerpt: 'Début du message…' });
+    assert.ok(!html.includes('échantillons') && !text.includes('échantillons'));
+  });
+
+  it('sans prénom : « Bonjour, »', () => {
+    assert.match(rendered({ firstName: '' }).text, /Bonjour,/);
+  });
+
+  it('ne parle pas de la gestion des messages d’un autre destinataire', () => {
+    assert.doesNotMatch(rendered().text, /Léa Ducasse/);
   });
 });
