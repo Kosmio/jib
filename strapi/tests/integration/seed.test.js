@@ -75,6 +75,9 @@ const ESPACE = {
   exhibitor: 'api::espace.exhibitor',
   attendee: 'api::espace.attendee',
   emailLog: 'api::espace.email-log',
+  meeting: 'api::espace.meeting',
+  conversation: 'api::espace.conversation',
+  message: 'api::espace.message',
 };
 // Tri en JavaScript (ordre des unités de code), identique pour l'état lu et l'état attendu : pas de dépendance à la collation de Postgres.
 const compare = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
@@ -94,6 +97,16 @@ async function readEspace(app) {
   const exhibitors = await many(ESPACE.exhibitor, { populate: ['organisation', 'topics', 'representatives'] });
   const attendees = await many(ESPACE.attendee, { populate: ['speaker', 'exhibitor', 'topics'] });
   const logs = await app.db.query(ESPACE.emailLog).findMany({ where: { attendee: { edition: { documentId: edition.documentId } } }, populate: ['attendee'] });
+  // Lot 12 : rendez-vous, conversations et messages. `tableKey` contient l'identifiant du créneau, qui peut changer d'un passage à l'autre :
+  // on garde « conforme » quand il vaut {créneau}:{table} (A-27), sinon la valeur trouvée.
+  const meetingRows = await many(ESPACE.meeting, { populate: ['slot', 'requester', 'targetAttendee', 'targetExhibitor', 'answeredBy'] });
+  const conversationRows = await many(ESPACE.conversation, { populate: ['participants'] });
+  const messageRows = await app.documents(ESPACE.message).findMany({
+    filters: { conversation: { edition: { documentId: edition.documentId } } },
+    populate: { author: true, conversation: { populate: ['participants'] } },
+    limit: 1000,
+  });
+  const standOf = new Map(exhibitors.map((exhibitor) => [exhibitor.documentId, exhibitor.standNumber]));
 
   return {
     settings: Object.fromEntries(SETTINGS.map((key) => [key, SETTINGS.slice(-2).includes(key) ? iso(edition[key]) : edition[key]])),
@@ -130,6 +143,35 @@ async function readEspace(app) {
     }))
       .sort((a, b) => compare(a.email, b.email)),
     emailLogs: logs.map((log) => ({ email: log.attendee?.email, template: log.template, status: log.status })).sort((a, b) => compare(a.email, b.email)),
+    hosted: attendees.map((attendee) => ({ email: attendee.email, hostedTableNumber: attendee.hostedTableNumber ?? null, bio: attendee.bio ?? null })).sort((a, b) => compare(a.email, b.email)),
+    meetings: meetingRows
+      .map((meeting) => ({
+        requester: meeting.requester?.email,
+        target: meeting.targetAttendee?.email ?? null,
+        exhibitor: meeting.targetExhibitor ? (standOf.get(meeting.targetExhibitor.documentId) ?? 'inconnu') : null,
+        slot: meeting.slot?.label,
+        status: meeting.status,
+        tableNumber: meeting.tableNumber ?? null,
+        tableKey: meeting.tableKey == null ? null : meeting.tableKey === `${meeting.slot?.documentId}:${meeting.tableNumber}` ? 'conforme' : meeting.tableKey,
+        location: meeting.location ?? null,
+        message: meeting.message ?? null,
+        answeredBy: meeting.answeredBy?.email ?? null,
+        answeredAt: iso(meeting.answeredAt),
+        cancelledAt: iso(meeting.cancelledAt),
+        cancelReason: meeting.cancelReason ?? null,
+        createdAt: iso(meeting.createdAt),
+      }))
+      .sort((a, b) => compare(`${a.requester}|${a.slot}`, `${b.requester}|${b.slot}`)),
+    conversations: conversationRows.map((conversation) => conversation.participants.map((person) => person.email).sort().join(' + ')).sort(compare),
+    messages: messageRows
+      .map((message) => ({
+        conversation: message.conversation.participants.map((person) => person.email).sort().join(' + '),
+        author: message.author?.email,
+        body: message.body,
+        read: Boolean(message.readAt),
+        at: iso(message.createdAt),
+      }))
+      .sort((a, b) => compare(`${a.conversation}|${a.at}`, `${b.conversation}|${b.at}`)),
   };
 }
 
@@ -496,6 +538,152 @@ describe('seed de recette sur la base de test', { timeout: 600_000 }, () => {
       assert.equal(second.emailLogs.length, 17);
       assert.deepEqual(second.attendees, espaceOf(espaceAfterFirst).attendees);
       assert.deepEqual(second.emailLogs, espaceOf(espaceAfterFirst).emailLogs);
+    });
+  });
+
+  describe('seed des phases 2 et 3, lot 12 : rendez-vous, conversations, présentations et table dédiée (plan, section 4)', () => {
+    const find = (list, predicate) => list.find(predicate);
+    const meetingsOf = (state) => espaceOf(state).meetings;
+    const meeting = (state, requester, slot) => find(meetingsOf(state), (item) => item.requester === `${requester}@example.org` && item.slot === slot);
+    const lines = (state) => meetingsOf(state).map((item) => `${item.requester.split('@')[0]} > ${item.target?.split('@')[0] ?? `stand ${item.exhibitor}`} ${item.slot} ${item.status}`).sort(compare);
+
+    it('crée les 8 rendez-vous du plan, avec leur demandeur, leur cible, leur créneau et leur statut', () => {
+      assert.deepEqual(lines(espaceAfterFirst), [
+        'alice.fourcade > stand 12 15h45 pending',
+        'eva.cazaux > nathan.lasserre 11h00 cancelled',
+        'hugo.peyrat > antoine.vergnes 10h45 accepted',
+        'ines.castaing > lea.ducasse 13h00 pending',
+        'jules.mazeres > lea.ducasse 13h15 declined',
+        'lea.ducasse > helene.marques 15h30 pending',
+        'lea.ducasse > mathis.lagrange 10h45 accepted',
+        'lea.ducasse > stand 4 12h30 accepted',
+      ].sort(compare));
+    });
+
+    it('Léa et Mathis : accepté par Mathis, table 1, clé de table {créneau}:1 (A-27)', () => {
+      const item = meeting(espaceAfterFirst, 'lea.ducasse', '10h45');
+      assert.deepEqual([item.target, item.tableNumber, item.location, item.tableKey, item.answeredBy], ['mathis.lagrange@example.org', 1, 'Table 1', 'conforme', 'mathis.lagrange@example.org']);
+      assert.ok(item.answeredAt);
+    });
+
+    it('R-19, A-29 : la réservation de Hugo à la table d’Antoine est acceptée d’emblée à la table 2, sans répondant', () => {
+      const item = meeting(espaceAfterFirst, 'hugo.peyrat', '10h45');
+      assert.deepEqual([item.status, item.tableNumber, item.location, item.tableKey, item.answeredBy], ['accepted', 2, 'Table 2', 'conforme', null]);
+      assert.ok(item.answeredAt, 'answeredAt = la date de la réservation');
+    });
+
+    it('Léa et Sylvadour : accepté par Benoît Tastet, au stand 4, sans table ni clé de table', () => {
+      const item = meeting(espaceAfterFirst, 'lea.ducasse', '12h30');
+      assert.deepEqual([item.exhibitor, item.answeredBy, item.location, item.tableNumber, item.tableKey], ['4', 'benoit.tastet@example.org', 'Stand 4', null, null]);
+    });
+
+    it('la demande d’Inès à Léa (13h00) attend sa réponse, avec son message ; celle de Léa à Hélène (15h30) aussi', () => {
+      const ines = meeting(espaceAfterFirst, 'ines.castaing', '13h00');
+      assert.deepEqual([ines.status, ines.message, ines.answeredBy, ines.tableNumber, ines.tableKey], ['pending', 'Bonjour Léa, échangeons sur la construction bois.', null, null, null]);
+      const helene = meeting(espaceAfterFirst, 'lea.ducasse', '15h30');
+      assert.deepEqual([helene.status, helene.target, helene.tableNumber], ['pending', 'helene.marques@example.org', null]);
+    });
+
+    it('la demande d’Alice à Résinéo (15h45) attend la réponse d’un représentant du stand 12', () => {
+      const alice = meeting(espaceAfterFirst, 'alice.fourcade', '15h45');
+      assert.deepEqual([alice.status, alice.exhibitor, alice.answeredBy], ['pending', '12', null]);
+    });
+
+    it('Jules : refusé par Léa ; Eva : annulé avec son motif et sa date', () => {
+      const jules = meeting(espaceAfterFirst, 'jules.mazeres', '13h15');
+      assert.deepEqual([jules.status, jules.answeredBy], ['declined', 'lea.ducasse@example.org']);
+      const eva = meeting(espaceAfterFirst, 'eva.cazaux', '11h00');
+      assert.equal(eva.status, 'cancelled');
+      assert.equal(eva.cancelReason, 'Empêchement');
+      assert.ok(eva.cancelledAt);
+    });
+
+    it('les dates sont celles du fichier de recette (fixes), pas celles de l’exécution', () => {
+      for (const item of meetingsOf(espaceAfterFirst)) {
+        assert.ok(item.createdAt < '2026-11-01', `${item.requester} ${item.slot} : ${item.createdAt}`);
+      }
+    });
+
+    it('cohérence avec lib/meetings.js : une seule table dédiée (Antoine, 2), aucun conflit ni numéro invalide (A-29)', () => {
+      const { hostedTables } = require('../../src/api/espace/lib/meetings');
+      const rows = espaceOf(espaceAfterFirst).attendees.map((attendee, index) => ({
+        id: index + 1,
+        documentId: attendee.email,
+        role: attendee.role,
+        status: attendee.status,
+        hostedTableNumber: espaceOf(espaceAfterFirst).hosted.find(({ email }) => email === attendee.email).hostedTableNumber,
+      }));
+      const { hosted, warnings } = hostedTables(rows, 3);
+      assert.deepEqual([...hosted], [['antoine.vergnes@example.org', 2]]);
+      assert.deepEqual(warnings, []);
+    });
+
+    it('cohérence avec les règles : aucune table en double (créneau, table), personne deux fois accepté sur un créneau, aucune demande en double (R-11.5 à R-11.7)', () => {
+      const all = meetingsOf(espaceAfterFirst);
+      const accepted = all.filter((item) => item.status === 'accepted');
+      const tables = accepted.filter((item) => item.tableNumber).map((item) => `${item.slot}:${item.tableNumber}`);
+      assert.equal(new Set(tables).size, tables.length, `table en double : ${tables}`);
+      const busy = accepted.flatMap((item) => [item.requester, item.target].filter(Boolean).map((person) => `${person}@${item.slot}`));
+      assert.equal(new Set(busy).size, busy.length, `personne prise deux fois : ${busy}`);
+      const pairs = all.filter((item) => ['pending', 'accepted'].includes(item.status)).map((item) => [item.requester, item.target ?? `x${item.exhibitor}`].sort().join('|'));
+      assert.equal(new Set(pairs).size, pairs.length, `demande en double : ${pairs}`);
+      for (const item of accepted.filter((candidate) => candidate.tableNumber && candidate.target !== 'antoine.vergnes@example.org')) {
+        assert.ok([1, 3].includes(item.tableNumber), `${item.requester} ${item.slot} : la table dédiée est réservée à Antoine`);
+      }
+    });
+
+    it('Antoine Vergnes est un intervenant à table dédiée 2 ; personne d’autre n’a de table dédiée', () => {
+      const { hosted } = espaceOf(espaceAfterFirst);
+      assert.deepEqual(hosted.filter((entry) => entry.hostedTableNumber !== null).map((entry) => [entry.email, entry.hostedTableNumber]), [['antoine.vergnes@example.org', 2]]);
+      assert.equal(find(espaceOf(espaceAfterFirst).attendees, (attendee) => attendee.email === 'antoine.vergnes@example.org').role, 'speaker');
+    });
+
+    it('présentations : Léa, Mathis, Inès, Antoine et Benoît en ont une, les autres non', () => {
+      const withBio = espaceOf(espaceAfterFirst).hosted.filter((entry) => entry.bio).map((entry) => entry.email);
+      assert.deepEqual(withBio, ['antoine.vergnes@example.org', 'benoit.tastet@example.org', 'ines.castaing@example.org', 'lea.ducasse@example.org', 'mathis.lagrange@example.org']);
+    });
+
+    it('2 conversations : Léa et Mathis, Inès et Léa ; 4 messages, dont 2 non lus de Léa', () => {
+      const state = espaceOf(espaceAfterFirst);
+      assert.deepEqual(state.conversations, ['ines.castaing@example.org + lea.ducasse@example.org', 'lea.ducasse@example.org + mathis.lagrange@example.org']);
+      assert.equal(state.messages.length, 4);
+      assert.equal(state.messages.filter((message) => !message.read && message.author !== 'lea.ducasse@example.org').length, 2);
+    });
+
+    it('la conversation de Léa et Mathis : Mathis, Léa (lus), puis Mathis (non lu) « J’apporterai nos échantillons de panneaux. »', () => {
+      const thread = espaceOf(espaceAfterFirst).messages.filter((message) => message.conversation.includes('mathis'));
+      assert.deepEqual(thread.map((message) => [message.author.split('.')[0], message.read]), [['mathis', true], ['lea', true], ['mathis', false]]);
+      assert.equal(thread[2].body, 'J’apporterai nos échantillons de panneaux.');
+    });
+
+    it('la conversation d’Inès et Léa : un seul message, d’Inès, non lu', () => {
+      const thread = espaceOf(espaceAfterFirst).messages.filter((message) => message.conversation.includes('ines'));
+      assert.equal(thread.length, 1);
+      assert.deepEqual([thread[0].author, thread[0].read], ['ines.castaing@example.org', false]);
+    });
+
+    it('le seed n’envoie rien de plus : toujours 17 EmailLog welcome, aucun meeting-*', () => {
+      const { emailLogs } = espaceOf(espaceAfterFirst);
+      assert.equal(emailLogs.length, 17);
+      assert.deepEqual([...new Set(emailLogs.map((log) => log.template))], ['welcome']);
+    });
+
+    it('le résumé final compte les rendez-vous, conversations et messages', () => {
+      assert.match(first.stdout, /Rendez-vous\s+8 \(3 acceptés, 3 en attente, 1 refusé, 1 annulé\)/);
+      assert.match(first.stdout, /Conversations\s+2/);
+      assert.match(first.stdout, /Messages\s+4 \(dont 2 non lus\)/);
+    });
+
+    it('second passage : mêmes rendez-vous, mêmes conversations, mêmes messages, sans doublon (idempotence)', () => {
+      const one = espaceOf(espaceAfterFirst);
+      const two = espaceOf(espaceAfterSecond);
+      assert.equal(two.meetings.length, 8);
+      assert.equal(two.messages.length, 4);
+      assert.deepEqual(two.meetings, one.meetings);
+      assert.deepEqual(two.conversations, one.conversations);
+      assert.deepEqual(two.messages, one.messages);
+      assert.deepEqual(two.hosted, one.hosted);
+      assert.match(second.stdout, /Rendez-vous\s+8 /);
     });
   });
 });

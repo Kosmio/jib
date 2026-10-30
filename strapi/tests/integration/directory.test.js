@@ -144,6 +144,17 @@ describe('annuaire, fiches et suggestions (lot 9)', { timeout: 900_000 }, () => 
       assert.ok(!ids((await search(world, p.lea)).items).includes(organizer.documentId));
     });
 
+    // Relevé au lot 16 (essai du soir) : Léa se voit dans son propre annuaire. Ni F-40, ni R-41, ni R-43, ni A-34 n'excluent le visiteur de
+    // la liste (seul R-50 écrit « hors soi », pour les suggestions) et F-54 prévoit « C'est votre profil » sur sa propre fiche, qu'on n'ouvre
+    // que depuis l'annuaire. Comportement actuel consigné ici ; si l'architecte décide d'exclure le visiteur, ce test change avec la règle.
+    it('F-40, F-54 : un visiteur qui a coché l’annuaire figure dans sa propre liste, et sa fiche porte isSelf (seules les suggestions l’excluent, R-50)', async () => {
+      const { world, p } = await scene();
+      const own = (await search(world, p.lea)).items.find((item) => item.id === p.lea.documentId);
+      assert.ok(own, 'le visiteur n’est pas exclu de la liste');
+      assert.equal(own.displayName, 'Léa Ducasse');
+      assert.equal((await (await as(world.edition, p.lea)).get(`/directory/p/${p.lea.documentId}`)).json.isSelf, true);
+    });
+
     it('un représentant sans consentement n’est pas listé ; son exposant l’est', async () => {
       const { world, p, sylvadour } = await scene();
       const listed = ids((await search(world, p.lea)).items);
