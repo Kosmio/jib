@@ -1018,9 +1018,9 @@ describe('tâches planifiées (lot 4, A-08, critère 7)', { timeout: 180_000 }, 
   describe('CRON_ENABLED=true', () => {
     const espace = useEspace({ overrides: { CRON_ENABLED: 'true' } });
 
-    it('enregistre la synchronisation toutes les 15 minutes et la purge quotidienne à 4 h, en Europe/Paris', () => {
+    it('enregistre la synchronisation toutes les 15 minutes, l’expiration des demandes toutes les 5 minutes et la purge quotidienne à 4 h, en Europe/Paris', () => {
       const rules = rulesOf(espace().app);
-      assert.deepEqual(rules.map((entry) => entry.rule).sort(), ['*/15 * * * *', '0 4 * * *']);
+      assert.deepEqual([...new Set(rules.map((entry) => entry.rule))].sort(), ['*/15 * * * *', '*/5 * * * *', '0 4 * * *']);
       assert.ok(rules.every((entry) => entry.tz === 'Europe/Paris'));
     });
   });

@@ -137,8 +137,10 @@ describe('config/cron-tasks.js : synchronisation toutes les 15 minutes et purge 
     assert.equal(typeof purge.task, 'function');
   });
 
-  it('ne planifie rien d’autre en phase 1', () => {
-    assert.deepEqual(tasks().map((entry) => entry.rule).sort(), ['*/15 * * * *', '0 4 * * *']);
+  it('ne planifie rien d’autre que la synchronisation, l’expiration des demandes (`*/5`, lot 8) et la purge', () => {
+    // Le lot 14 ajoute les notifications de messages, aussi en `*/5 * * * *` : la règle reste dans l’ensemble admis.
+    const rules = new Set(tasks().map((entry) => entry.rule));
+    assert.deepEqual([...rules].sort(), ['*/15 * * * *', '*/5 * * * *', '0 4 * * *']);
   });
 });
 
