@@ -73,6 +73,9 @@ export default defineConfig({
         timezoneId: 'Europe/Paris',
         colorScheme: 'light',
         trace: 'retain-on-failure',
+        // Le service worker de /espace/ (PWA, F-05) intercepte les navigations : bloqué par défaut pour que les tests qui lisent ou
+        // coupent le réseau restent déterministes. Le test dédié (espace-pwa.spec.ts) le réautorise.
+        serviceWorkers: 'block',
       },
     },
   ],

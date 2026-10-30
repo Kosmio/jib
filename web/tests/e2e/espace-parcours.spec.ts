@@ -4,7 +4,7 @@ import { capture, ESPACE, expect, receiveLink, test } from './espace';
 /**
  * Parcours complet de la phase 1 dans le navigateur (lot 7, critère 1 du lot 6) avec Tom Laffitte, l'inscrit de la recette qui n'a
  * encore ni activé son espace ni donné son consentement :
- *   E0, message d'envoi, lien lu dans la boîte de sortie, bouton « Ouvrir mon espace », E2 (F-10 à F-12), « Continuer », E1, déconnexion, E0.
+ *   E0, message d'envoi, lien lu dans la boîte de sortie, bouton « Ouvrir mon espace », E2 (F-10 à F-12), « Continuer », E1, E3 et sa déconnexion, E0.
  * Comprend l'îlot d'E2 contre Strapi sur une autre origine (CORS avec cookie, NF-04) et son poids (NF-20).
  *
  * Un seul test à étapes : chaque étape dépend de la précédente, et le lien comme le consentement ne se refont pas.
@@ -109,23 +109,27 @@ test('Tom : E0, lien, vérification, E2, E1, déconnexion, E0', async ({ page, c
 
     await expect(page).toHaveURL(`${baseURL}${ESPACE}/`);
     await expect(page).toHaveTitle(/^Accueil \| /);
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Bonjour Thomas');
+    // Le vrai E1 : l'édition en titre, la date, la carte « Votre profil » (profil incomplet), le prochain rendez-vous, l'onglet « Mon profil ».
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Nouvelle-Aquitaine (test)');
     await expect(page.getByText('Jeudi 3 décembre 2026 à Bordeaux')).toBeVisible();
-    await expect(page.getByRole('heading', { level: 2 })).toHaveText('Connexion réussie');
-    await capture(page, 'E1-provisoire');
+    await expect(page.getByRole('heading', { level: 2, name: 'Votre profil' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 2, name: 'Prochain rendez-vous' })).toBeVisible();
+    await expect(page.getByText('Aucun rendez-vous pour le moment.')).toBeVisible();
+    await expect(page.getByRole('link', { name: /^Mon profil Thomas Laffitte$/ })).toBeVisible();
+    await capture(page, 'E1-premiere-visite');
 
     // Le consentement est enregistré : E1 ne renvoie plus vers E2, et la session survit au rechargement.
     await page.reload();
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Bonjour Thomas');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Nouvelle-Aquitaine (test)');
     await page.goto(`${ESPACE}/bienvenue`);
     await expect(page.getByRole('checkbox', { name: 'Apparaître dans l’annuaire des participants' })).toBeChecked();
     await expect(page.getByRole('checkbox', { name: 'Recevoir des demandes de rendez-vous et des messages' })).toBeChecked();
     await expect(page.getByRole('checkbox', { name: 'Recevoir des nouvelles des prochaines éditions' })).not.toBeChecked();
     await expect(page.getByLabel('Prénom')).toHaveValue('Thomas');
-    await page.goto(`${ESPACE}/`);
+    await page.goto(`${ESPACE}/profil`);
   });
 
-  await test.step('déconnexion : retour à E0, session fermée', async () => {
+  await test.step('déconnexion depuis E3 : retour à E0, session fermée', async () => {
     await page.getByRole('button', { name: 'Me déconnecter' }).click();
     await expect(page).toHaveURL(`${baseURL}${ESPACE}/connexion?deconnecte=1`);
     await expect(page.getByRole('status')).toHaveText('Déconnexion effectuée.');

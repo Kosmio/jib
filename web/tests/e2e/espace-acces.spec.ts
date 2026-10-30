@@ -3,6 +3,7 @@ import {
   capture,
   ESPACE,
   expect,
+  expectOnlyServiceWorkerScript,
   linkOf,
   mailsTo,
   nextMail,
@@ -21,6 +22,7 @@ import {
  * Tom Laffitte, seul inscrit sans consentement, est réservé au parcours complet (espace-parcours.spec.ts).
  */
 
+const EDITION_TITLE = 'Nouvelle-Aquitaine (test)';
 const SENT = 'Si cette adresse est inscrite, un lien vient de vous être envoyé.';
 const TITLE_SUFFIX = 'Espace participant, Journées de l’Innovation Filière Bois';
 
@@ -46,7 +48,8 @@ test.describe('E0 : page de connexion (F-01)', () => {
     await expect(page.getByText(/Pas de mot de passe\s*: un lien valable 30\s+minutes/)).toBeVisible();
     await expect(page.getByRole('link', { name: 'Confidentialité' })).toHaveAttribute('href', '/confidentialite');
 
-    expect(await page.locator('script').count(), 'balises <script> dans E0').toBe(0);
+    // F-05 : la page porte l'enregistrement du service worker (une balise en ligne), et rien d'autre : aucun fichier, aucun îlot.
+    await expectOnlyServiceWorkerScript(page);
     expect(await page.locator('astro-island').count(), 'îlots dans E0').toBe(0);
     expect(scripts, 'fichiers JavaScript chargés par E0').toEqual([]);
     await capture(page, 'E0-initial');
@@ -141,7 +144,8 @@ test.describe('T-03 : lien réutilisé ou invalide (F-03, F-04, A-18)', () => {
     expect(headers['origin']).toBe(new URL(baseURL!).origin);
     expect(headers['referer']).toBe(`${new URL(baseURL!).origin}/`);
     await expect(page).toHaveURL(`${baseURL}${ESPACE}/`);
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Bonjour Eva');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(EDITION_TITLE);
+    await expect(page.getByRole('link', { name: /^Mon profil Eva Cazaux$/ })).toBeVisible();
 
     // Même lien dans un navigateur sans session : lien utilisé.
     const context = await browser.newContext({ baseURL, extraHTTPHeaders: { 'X-Forwarded-For': '10.200.0.3' } });
@@ -182,8 +186,8 @@ test.describe('T-03 : lien réutilisé ou invalide (F-03, F-04, A-18)', () => {
       if (response.request().resourceType() === 'script') scripts.push(response.url());
     });
     await page.goto('/espace/verifier?token=jeton-inconnu');
-    expect(await page.locator('script').count()).toBe(0);
-    expect(scripts).toEqual([]);
+    await expectOnlyServiceWorkerScript(page);
+    expect(scripts, 'fichiers JavaScript chargés par la vérification').toEqual([]);
   });
 });
 
@@ -221,7 +225,8 @@ test.describe('sans JavaScript (NF-31, Q-13)', () => {
     await page.goto(link);
     await expect(page.getByRole('heading', { level: 2 })).toHaveText('Votre lien est valable');
     await page.getByRole('button', { name: 'Ouvrir mon espace' }).click();
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Bonjour Mathis');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(EDITION_TITLE);
+    await expect(page.getByRole('link', { name: /^Mon profil Mathis Lagrange$/ })).toBeVisible();
 
     // E2 est le seul écran qui demande JavaScript : le message de repli est dans le HTML servi. Playwright, qui coupe JavaScript par
     // l'émulation du protocole, n'affiche pas le contenu de <noscript> ; on lit donc la page telle qu'elle est envoyée.
@@ -234,18 +239,16 @@ test.describe('sans JavaScript (NF-31, Q-13)', () => {
     await page.getByRole('checkbox', { name: 'Apparaître dans l’annuaire des participants' }).uncheck();
     await expect(page.locator('form [role="status"]')).toBeEmpty();
 
-    await page.goto(`${ESPACE}/`);
+    // La déconnexion est dans E3 depuis le vrai E1 : un formulaire HTML qui poste à Strapi, qui répond 303 vers E0.
+    await page.goto(`${ESPACE}/profil`);
     await page.getByRole('button', { name: 'Me déconnecter' }).click();
     await expect(page).toHaveURL(/\/connexion\?deconnecte=1$/);
     await expect(page.getByRole('status')).toHaveText('Déconnexion effectuée.');
   });
 
-  // Défaut D3 (basse, à trancher par l'architecte), marqué comme un échec attendu : le test s'exécute sans faire échouer la suite, et
-  // Playwright le signale dès qu'il passe, c'est-à-dire quand le défaut est corrigé. Il faut alors retirer `test.fail`.
-  // Reproduction : JavaScript coupé, ouvrir E2 avec une session, cliquer sur « Continuer » : le formulaire de l'îlot, rendu côté serveur,
-  // n'a ni `action` ni `method` et part en GET sur la page, avec prénom, nom, fonction et entreprise dans l'URL (journalisée par Traefik).
+  // D3 (corrigé au commit 1115b05, NF-07) : le formulaire d'E2, rendu côté serveur, partait en GET sur la page avec prénom, nom, fonction
+  // et entreprise dans l'URL (journalisée par Traefik). Sans JavaScript, « Continuer » ne doit plus rien mettre dans l'URL.
   test('D3 : « Continuer » d’E2 sans JavaScript ne met aucune donnée personnelle dans l’URL', async ({ page }) => {
-    test.fail(true, 'D3 : le formulaire d’E2 part en GET avec prénom, nom, fonction et entreprise dans l’URL');
     await page.goto(await receiveLink(page, 'nathan.lasserre@example.org'));
     await page.getByRole('button', { name: 'Ouvrir mon espace' }).click();
     await page.goto(`${ESPACE}/bienvenue`);
