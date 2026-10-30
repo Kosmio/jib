@@ -1,0 +1,67 @@
+---
+// E9, tableau de bord organisateur (F-90) : réservé au rôle organisateur de l'édition de l'URL ; un participant reçoit 403.
+// Le serveur lit les statistiques et l'historique de synchronisation ; l'îlot OrganizerPanel les affiche et déclenche
+// « Synchroniser maintenant ». Aucun contenu de message n'est lu ni affiché (R-63).
+import AppShell from "../../../components/espace/AppShell.astro";
+import EspaceButton from "../../../components/espace/EspaceButton.astro";
+import Notice from "../../../components/espace/Notice.astro";
+import OrganizerPanel from "../../../react-components/espace/OrganizerPanel";
+import { espaceGet, guardSession, publicStrapiUrl } from "../../../lib/espace/api";
+import type { Stats, SyncRun } from "../../../lib/espace/admin";
+import { bannerColor, editionLine } from "../../../lib/espace/format";
+
+const slug = Astro.params.edition ?? "";
+const cookie = Astro.request.headers.get("cookie");
+const guard = await guardSession(slug, cookie);
+if ("redirect" in guard) return Astro.redirect(guard.redirect);
+if ("notFound" in guard) return Astro.rewrite("/espace/introuvable");
+const { edition, me } = guard;
+
+const base = `/espace/${encodeURIComponent(slug)}`;
+const forbidden = !me.isOrganizer;
+if (forbidden) Astro.response.status = 403;
+
+const [stats, runs] = forbidden
+  ? [null, null]
+  : await Promise.all([
+      espaceGet<Stats>(`/admin/${encodeURIComponent(slug)}/stats`, cookie),
+      espaceGet<SyncRun[]>(`/admin/${encodeURIComponent(slug)}/sync-runs`, cookie),
+    ]);
+if (stats && !stats.ok && stats.status === 401) return Astro.redirect(`${base}/connexion`);
+if (stats && !stats.ok && stats.status === 403) Astro.response.status = 403;
+const refused = forbidden || (stats !== null && !stats.ok && stats.status === 403);
+---
+
+<AppShell title={refused ? "Accès réservé" : "Pilotage"} active={refused ? "home" : "organizer"} editionSlug={slug} me={me}>
+  {
+    refused ? (
+      <div class="mx-auto max-w-180 px-4 pt-8">
+        <h1 class="text-2xl md:text-3xl">Accès réservé</h1>
+        <Notice kind="alert">Le tableau de bord est réservé aux organisateurs de l’édition.</Notice>
+        <EspaceButton variant="secondary" href={`${base}/`} class="mt-6">
+          Retour à l’accueil
+        </EspaceButton>
+      </div>
+    ) : (
+      <div class="mx-auto max-w-6xl px-4 pt-8">
+        <h1 class="text-2xl md:text-3xl">Pilotage de l’édition</h1>
+        <p class="mt-2 text-lg text-muted">{editionLine(edition)}</p>
+        <div class="mt-6">
+          {stats?.ok ? (
+            <OrganizerPanel
+              client:load
+              strapiUrl={publicStrapiUrl}
+              editionSlug={slug}
+              nowIso={new Date().toISOString()}
+              themeColor={bannerColor(edition.themeColor)}
+              initialStats={stats.data}
+              initialRuns={runs?.ok ? runs.data : []}
+            />
+          ) : (
+            <Notice kind="alert">Les statistiques ne sont pas disponibles pour le moment. Rechargez la page dans quelques instants.</Notice>
+          )}
+        </div>
+      </div>
+    )
+  }
+</AppShell>
