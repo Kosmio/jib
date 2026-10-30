@@ -18,6 +18,7 @@ const LIMIT = 1000;
 
 const notFound = () => new EspaceError(404, 'PROFILE_NOT_FOUND', 'Ce profil est introuvable.');
 const withoutSortName = ({ sortName, ...card }) => card;
+const byFullName = (a, b) => `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`, 'fr', { sensitivity: 'base' });
 const timeText = (text) => (parseProgramTime(text) ? text : null);
 
 /** Day at Paris, "2026-12-03" (the seed of the daily shuffle of R-50). */
@@ -159,6 +160,7 @@ module.exports = ({ strapi }) => {
       const speaker = attendee.speaker;
       const program = !full && speaker;
       const { jobTitle, company } = identity(attendee);
+      const represented = attendee.exhibitor?.organisation ? attendee.exhibitor : null;
       return {
         ...card,
         firstName: attendee.firstName,
@@ -167,7 +169,7 @@ module.exports = ({ strapi }) => {
         company: program ? (speaker.organisation?.name ?? null) : company,
         bio: full ? (attendee.bio ?? null) : null,
         sessions: speaker ? await sessionsOf(speaker, edition) : [],
-        exhibitor: full && attendee.exhibitor?.organisation ? { id: attendee.exhibitor.documentId, name: attendee.exhibitor.organisation.name, standNumber: attendee.exhibitor.standNumber ?? null } : null,
+        exhibitor: full && represented ? { id: represented.documentId, name: represented.organisation.name, standNumber: represented.standNumber ?? null } : null,
         isSelf,
         canMessage: !isSelf && attendee.status === 'active' && (Boolean(attendee.meetingsOptIn) || conversed.has(attendee.documentId)),
       };
@@ -196,7 +198,7 @@ module.exports = ({ strapi }) => {
         ...exhibitorCard(exhibitor),
         description: exhibitor.organisation.description ?? null,
         website: exhibitor.organisation.website ?? null,
-        representatives: representatives.sort((a, b) => `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`, 'fr', { sensitivity: 'base' })).map((attendee) => attendeeCard(attendee)),
+        representatives: representatives.sort(byFullName).map((attendee) => attendeeCard(attendee)),
         isMine: viewer.exhibitor?.documentId === exhibitor.documentId,
       };
     },
