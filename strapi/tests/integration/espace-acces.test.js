@@ -31,6 +31,9 @@ const DAY = 24 * 3600 * 1000;
 const ORGANIZERS = ['organisation@example.org', 'orga.deux@example.org', 'orga.trois@example.org', 'orga.quatre@example.org'];
 const [ORGANIZER, ORGANIZER_2, ORGANIZER_3, ORGANIZER_4] = ORGANIZERS;
 const ME_KEYS = ['company', 'consent', 'edition', 'firstName', 'id', 'isOrganizer', 'jobTitle', 'lastName', 'role'];
+// Phase 2 (A-36) : `GET /me` ajoute le profil complet et les compteurs ; `counts` ne figure que dans `GET /me`. Le détail est dans profile.test.js.
+const ME_PHASE_2_KEYS = ['bio', 'emailPrefs', 'exhibitor', 'hostedTableNumber', 'photoUrl', 'profileCompletion', 'topics'];
+const ME_FULL_KEYS = [...ME_KEYS, ...ME_PHASE_2_KEYS, 'counts'].sort();
 
 describe('accès à l’espace (lot 5)', { timeout: 300_000 }, () => {
   const espace = useEspace({ overrides: { ORGANIZER_EMAILS: ORGANIZERS.join(',') } });
@@ -911,7 +914,7 @@ describe('accès à l’espace (lot 5)', { timeout: 300_000 }, () => {
       assert.deepEqual([ra.json.id, rb.json.id, rc.json.id], [A.attendee.documentId, B.attendee.documentId, C.attendee.documentId]);
       assert.equal(ra.json.lastName, 'Alpha');
       assert.equal(rc.json.edition.slug, 'edition-c');
-      assert.deepEqual(Object.keys(ra.json).sort(), ME_KEYS);
+      assert.deepEqual(Object.keys(ra.json).sort(), ME_FULL_KEYS);
     });
 
     it('un paramètre ou un en-tête désignant B ne change pas la personne servie', async () => {

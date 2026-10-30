@@ -41,7 +41,7 @@ function makePng({ width = 256, height = 256, rgb = [186, 135, 72], padTo = 0 } 
 /** Requête multipart (champ de fichier unique) vers Strapi, avec Origin admis et IP choisie, sans suivre les redirections. */
 async function postFile(espace, path, { cookie, field = 'photo', filename = 'photo.png', type = 'image/png', bytes, origin, ip }) {
   const form = new FormData();
-  if (bytes !== undefined) form.append(field, new Blob([bytes], { type }), filename);
+  if (bytes != null) form.append(field, new Blob([bytes], { type }), filename);
   const headers = { 'x-forwarded-for': ip ?? `10.250.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}` };
   const sentOrigin = origin === undefined ? espace.origin : origin;
   if (sentOrigin) headers.origin = sentOrigin;

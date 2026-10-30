@@ -82,7 +82,8 @@ describe('Strapi sur la base de test', { timeout: 180_000 }, () => {
   });
 
   describe('aucune route CRUD sous /api/espace (A-02)', () => {
-    // Table de la section 4.2 du plan de la phase 1 (06-api.md). Les noms de paramètres sont sans importance (`:x`).
+    // Table de la section 4.2 du plan de la phase 1 (06-api.md), étendue aux sections 3.2 du plan des phases 2 et 3 : lots 8 (rendez-vous),
+    // 9 (profil, annuaire, suggestions) et 14 (programme, messagerie, statistiques). Les noms de paramètres sont sans importance (`:x`).
     // Le test reste vrai à chaque lot : une route de plus doit figurer ici, ce qui oblige à la déclarer au plan.
     const ALLOWED = new Set([
       'GET /api/espace/health',
@@ -97,13 +98,36 @@ describe('Strapi sur la base de test', { timeout: 180_000 }, () => {
       'GET /api/espace/me',
       'PATCH /api/espace/me',
       'PUT /api/espace/me/consent',
+      // Lot 8 : créneaux et rendez-vous.
+      'GET /api/espace/slots',
+      'POST /api/espace/meetings',
+      'GET /api/espace/meetings',
+      'POST /api/espace/meetings/:x/accept',
+      'POST /api/espace/meetings/:x/decline',
+      'POST /api/espace/meetings/:x/counter',
+      'POST /api/espace/meetings/:x/cancel',
+      'GET /api/espace/meetings.ics',
+      // Lot 9 : photo, sujets, annuaire, suggestions.
+      'POST /api/espace/me/photo',
+      'GET /api/espace/editions/:x/topics',
+      'GET /api/espace/directory',
+      'GET /api/espace/directory/p/:x',
+      'GET /api/espace/directory/x/:x',
+      'GET /api/espace/suggestions',
+      // Lot 14 : programme, messagerie, statistiques.
+      'GET /api/espace/editions/:x/program',
+      'GET /api/espace/conversations',
+      'POST /api/espace/conversations',
+      'GET /api/espace/conversations/:x/messages',
+      'POST /api/espace/conversations/:x/messages',
+      'GET /api/espace/admin/:x/stats',
     ]);
     const declared = () =>
       espaceRoutes().flatMap((route) =>
         route.methods.filter((method) => method !== 'HEAD').map((method) => `${method} ${route.path.replace(/:[A-Za-z]+/g, ':x')}`)
       );
 
-    it('ne déclare sous /api/espace que des routes de la section 4.2 du plan de la phase 1', () => {
+    it('ne déclare sous /api/espace que des routes du plan (phase 1, section 4.2 ; phases 2 et 3, section 3.2)', () => {
       const unexpected = declared().filter((route) => !ALLOWED.has(route));
       assert.deepEqual(unexpected, [], 'routes hors du plan');
     });
@@ -113,9 +137,18 @@ describe('Strapi sur la base de test', { timeout: 180_000 }, () => {
       assert.equal(new Set(declared()).size, declared().length);
     });
 
-    it('ne déclare aucune route d’écriture sur une ressource (attendees, meetings, slots…) : pas de CRUD', () => {
-      const crud = declared().filter((route) => /\/api\/espace\/(attendees|exhibitors|topics|slots|meetings|conversations|messages|magic-tokens|email-logs|sync-runs)(\/|$)/.test(route));
+    it('ne déclare aucune route de ressource hors du plan (attendees, meetings, slots…) : pas de CRUD', () => {
+      // Les routes du plan portent parfois le nom d’une ressource (`/slots`, `/meetings`, `/conversations`) : seules les autres comptent.
+      const crud = declared().filter(
+        (route) => !ALLOWED.has(route) && /\/api\/espace\/(attendees|exhibitors|topics|slots|meetings|conversations|messages|magic-tokens|email-logs|sync-runs)(\/|$|\.)/.test(route)
+      );
       assert.deepEqual(crud, []);
+    });
+
+    it('ne déclare ni lecture, ni modification, ni suppression d’un rendez-vous ou d’un créneau par identifiant', () => {
+      for (const route of ['GET /api/espace/meetings/:x', 'PUT /api/espace/meetings/:x', 'PATCH /api/espace/meetings/:x', 'DELETE /api/espace/meetings/:x', 'GET /api/espace/slots/:x', 'DELETE /api/espace/conversations/:x']) {
+        assert.ok(!declared().includes(route), route);
+      }
     });
 
     it('ne sert aucune route de l’API espace hors du préfixe /api/espace', () => {
@@ -138,7 +171,7 @@ describe('Strapi sur la base de test', { timeout: 180_000 }, () => {
 
     // Un GET sur un chemin inconnu donne 404. Une écriture donne 404 ou 405 : le service de fichiers statiques
     // de Strapi déclare un GET fourre-tout, d'où le 405 de koa-router. Dans les deux cas, rien n'est servi.
-    for (const path of ['/api/espace', '/api/espace/', '/api/espace/attendees', '/api/espace/editions', '/api/espace/meetings', '/api/attendees', '/api/espaces']) {
+    for (const path of ['/api/espace', '/api/espace/', '/api/espace/attendees', '/api/espace/editions', '/api/espace/meetings/abc123', '/api/espace/slots/abc123', '/api/attendees', '/api/espaces']) {
       it(`répond 404 à GET ${path}`, async () => {
         assert.equal((await request(path)).status, 404);
       });
@@ -148,7 +181,8 @@ describe('Strapi sur la base de test', { timeout: 180_000 }, () => {
       ['POST', '/api/espace/attendees'],
       ['PUT', '/api/espace/attendees/1'],
       ['DELETE', '/api/espace/attendees/1'],
-      ['POST', '/api/espace/meetings'],
+      ['PUT', '/api/espace/meetings/abc123'],
+      ['DELETE', '/api/espace/meetings/abc123'],
     ]) {
       it(`ne sert pas ${method} ${path} (404 ou 405)`, async () => {
         const response = await request(path, {
@@ -157,6 +191,20 @@ describe('Strapi sur la base de test', { timeout: 180_000 }, () => {
           body: method === 'DELETE' ? undefined : '{}',
         });
         assert.ok([404, 405].includes(response.status), `statut ${response.status}`);
+      });
+    }
+  });
+
+  describe('rendez-vous (lot 8) : sans session, 401 UNAUTHENTICATED au lieu du 404 de la phase 1 (NF-01)', () => {
+    for (const [method, path] of [['GET', '/api/espace/meetings'], ['POST', '/api/espace/meetings'], ['GET', '/api/espace/slots?target=p:abc'], ['GET', '/api/espace/meetings.ics']]) {
+      it(`${method} ${path} répond 401`, async () => {
+        const response = await request(path, {
+          method,
+          headers: { 'content-type': 'application/json', origin: 'http://localhost:4321' },
+          body: method === 'POST' ? '{}' : undefined,
+        });
+        assert.equal(response.status, 401);
+        assert.equal((await response.json()).error.code, 'UNAUTHENTICATED');
       });
     }
   });
