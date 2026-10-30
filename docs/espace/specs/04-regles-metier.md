@@ -6,7 +6,7 @@ Ces règles sont la source de vérité des rendez-vous. Elles doivent être impl
 
 - **R-01** Les créneaux sont générés à partir des sessions `kind = b2b_break` de l'édition : de `start` à `end` par pas de `slotDurationMinutes`, le dernier créneau devant se terminer au plus tard à `end`. Exemple Nouvelle-Aquitaine (pas de 15 min) : 10h45, 11h00 ; 12h30, 12h45, 13h00, 13h15, 13h30, 13h45 ; 15h30, 15h45, soit 10 créneaux.
 - **R-02** La génération est idempotente (commande ou action organisateur « Régénérer les créneaux ») : un créneau existant qui a des rendez-vous `pending` ou `accepted` n'est jamais supprimé ; s'il ne correspond plus à une pause, il est signalé à l'organisateur.
-- **R-03** Capacité d'un créneau en tables = `tablesCount` de l'édition. Les stands d'exposants ne consomment pas de table.
+- **R-03** Capacité d'un créneau en tables = `tablesCount` de l'édition. Les stands d'exposants ne consomment pas de table. Les tables dédiées des intervenants (R-19) font partie des `tablesCount` mais sont retirées du lot commun : les rendez-vous 1-to-1 se répartissent sur les autres tables.
 
 ## Cycle de vie d'un rendez-vous
 
@@ -31,15 +31,27 @@ pending ──────────────► accepted ─────�
   6. la cible n'a pas de rendez-vous accepté sur ce créneau ;
   7. il n'existe pas déjà une demande en attente entre ces deux mêmes parties, quel que soit le créneau ;
   8. pour une table : il reste au moins une table libre sur le créneau (R-13) ;
-  9. le demandeur a moins de **10 demandes en attente** au total (anti-abus).
-  En cas d'échec : 409 avec un code d'erreur stable (`SLOT_TAKEN`, `TARGET_BUSY`, `ALREADY_REQUESTED`, `WINDOW_CLOSED`, `TARGET_UNAVAILABLE`, `TOO_MANY_PENDING`, `NO_TABLE_LEFT`) que le front traduit.
+  9. le demandeur a moins de **10 demandes en attente** au total (anti-abus) ;
+  10. le demandeur ne tient pas de table dédiée (R-19). Une demande adressée à un intervenant qui en tient une est une réservation, traitée par R-19.
+  En cas d'échec : 409 avec un code d'erreur stable (`SLOT_TAKEN`, `TARGET_BUSY`, `ALREADY_REQUESTED`, `WINDOW_CLOSED`, `TARGET_UNAVAILABLE`, `TOO_MANY_PENDING`, `NO_TABLE_LEFT`, `HOST_AT_TABLE`) que le front traduit.
 - **R-12** État d'un créneau pour le visiteur d'une fiche : « indisponible » si l'une des conditions 2, 5, 6 ou 8 échoue ; sinon « disponible ». L'API ne révèle jamais avec qui la cible a rendez-vous.
-- **R-13** Attribution du lieu à l'acceptation : pour une cible exposant, `location = "Stand {standNumber}"`, `tableNumber = null` ; sinon la plus petite table libre du créneau, `location = "Table {n}"`. Contrainte d'unicité (slot, tableNumber) en base pour les rendez-vous acceptés ; en cas de collision concurrente, réessayer avec la table suivante (3 essais), puis 409 `NO_TABLE_LEFT`.
+- **R-13** Attribution du lieu à l'acceptation : pour une cible exposant, `location = "Stand {standNumber}"`, `tableNumber = null` ; sinon la plus petite table libre du créneau, hors tables dédiées (R-19), `location = "Table {n}"`. Contrainte d'unicité (slot, tableNumber) en base pour les rendez-vous acceptés ; en cas de collision concurrente, réessayer avec la table suivante (3 essais), puis 409 `NO_TABLE_LEFT`.
 - **R-14** Rendez-vous avec un exposant : la cible est l'Exhibitor ; tous ses représentants voient la demande dans leur agenda et n'importe lequel peut répondre (`answeredBy`). La règle 6 s'applique à l'exposant : un exposant peut tenir **autant de rendez-vous simultanés qu'il a de représentants** actifs.
 - **R-15** À l'acceptation d'une demande, les autres demandes `pending` adressées à la même cible sur le même créneau passent à `declined` avec notification au demandeur (« le créneau n'est plus disponible ») ; les demandes `pending` envoyées par le demandeur ou la cible sur ce créneau sont également closes.
 - **R-16** Annulation : possible jusqu'au début du créneau ; libère la table.
 - **R-17** Fenêtre de prise de rendez-vous : entre `meetingRequestsOpenAt` et `meetingRequestsCloseAt` (par défaut veille 18h00). À la fermeture, les demandes `pending` passent à `expired` (tâche planifiée) et les deux parties sont informées par le récapitulatif de la veille (R-70 c), sans e-mail spécifique.
 - **R-18** Un participant dont la commande HelloAsso est annulée (`status = cancelled`) voit ses rendez-vous `pending` et `accepted` passer à `cancelled` avec notification aux autres parties.
+
+## Tables dédiées des intervenants
+
+Trois formes de rendez-vous coexistent : au stand d'un exposant (R-13, R-14, participation « Stand »), à la table dédiée d'un intervenant (R-19, participation « Meeting »), et en 1-to-1 entre deux participants quelconques sur une table du lot commun (R-11, R-13).
+
+- **R-19** Un intervenant dont l'Attendee porte `hostedTableNumber` tient cette table pendant toutes les pauses B2B de l'édition. L'organisateur la règle dans le back-office.
+  1. Un participant réserve un créneau directement : le rendez-vous est créé `accepted`, sans demande ni validation, avec `location = "Table {n}"` et `tableNumber = n`. Une seule personne par créneau en plus de l'intervenant.
+  2. S'appliquent les conditions 1, 2, 4 et 5 de R-11, puis : l'intervenant est actif (`status`) ; le créneau de sa table est libre, sinon `TARGET_BUSY` ; le participant n'a pas déjà un rendez-vous à venir à cette table, sinon `ALREADY_REQUESTED`. Deux réservations simultanées du même créneau sont départagées par l'unicité de `tableKey` : une seule réussit, l'autre reçoit `TARGET_BUSY`.
+  3. L'intervenant reste à sa table : il n'envoie pas de demande (409 `HOST_AT_TABLE`) et ne reçoit que des réservations à sa table.
+  4. Annulation par l'un ou l'autre jusqu'au début du créneau (R-16), qui libère le créneau. Les deux reçoivent les e-mails d'un rendez-vous accepté puis annulé (`meeting-accepted`, `meeting-cancelled`), .ics compris.
+  5. La table est réservable dès qu'elle est réglée, sans attendre que l'intervenant ait activé son espace ni coché `meetingsOptIn`. Sa fiche montre les informations publiques du programme (R-43).
 
 ## Profil
 

@@ -32,6 +32,8 @@
 | T-22 | Fermeture de la fenêtre | Demandes `pending` passent `expired` |
 | T-23 | Export .ics | Fichier valide (validateur RFC 5545), fuseau Europe/Paris |
 | T-24 | Participant A tente d'accepter une demande adressée à B | 403 |
+| T-25 | Deux participants réservent en même temps le même créneau de la table dédiée d'un intervenant | Un seul rendez-vous `accepted` à « Table {n} », sans demande ; l'autre reçoit 409 `TARGET_BUSY` (R-19) |
+| T-26 | Rendez-vous 1-to-1 acceptés sur un créneau à 3 tables dont la table 2 est dédiée | Tables 1 et 3 attribuées, jamais la 2 ; la troisième acceptation reçoit `NO_TABLE_LEFT` (R-03, R-13) |
 | T-30 | Premier message à une personne sans `meetingsOptIn` | 403 `TARGET_UNAVAILABLE` |
 | T-31 | Message non lu après 5 min | Un seul e-mail `new-message` sur 30 min |
 | T-32 | 31 messages en une heure | 429 au 31e |

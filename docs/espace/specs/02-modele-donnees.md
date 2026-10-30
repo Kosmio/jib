@@ -125,6 +125,7 @@ Génération : voir R-01. Unicité (edition, startsAt) garantie par le service d
 | role | enumeration `participant`, `speaker`, `exhibitor_rep`, `organizer` | défaut `participant` |
 | speaker | relation manyToOne → intervenant, unidirectionnelle | si role = speaker ; rattachement par l'organisateur dans Strapi |
 | exhibitor | relation manyToOne → Exhibitor (`inversedBy: representatives`) | si role = exhibitor_rep |
+| hostedTableNumber | integer | **ajout** (D-04) : facultatif ; si role = speaker, numéro de sa table dédiée (participation « Meeting », R-19), réglé par l'organisateur ; entre 1 et `tablesCount`, unique par édition parmi les Attendee actifs |
 | photo | media | facultatif, recadré carré 256 px |
 | bio | text | 280 caractères max |
 | topics | relation manyToMany → Topic | 0 à 3 |

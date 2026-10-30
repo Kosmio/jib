@@ -29,10 +29,10 @@ Porte : T-01 à T-06 verts ; import du formulaire bac à sable idempotent (deux 
 
 - `/me`, E3 et R-30, R-31.
 - Annuaire et fiches (E4, E5 partie fiche), visibilité (R-40 à R-43), suggestions (R-50), E1.
-- Service des rendez-vous : création, acceptation, refus, contre-proposition, annulation, expiration (R-10 à R-18), attribution des tables (R-13), concurrence.
+- Service des rendez-vous : création, acceptation, refus, contre-proposition, annulation, expiration (R-10 à R-18), attribution des tables (R-13), tables dédiées des intervenants (R-19), concurrence.
 - E5 partie demande, E6, export .ics (I-40, I-41), gabarits `meeting-*`.
 
-Porte : T-10 à T-24 verts, dont le test de concurrence T-17 (20 demandes simultanées sur le dernier créneau libre : exactement une table attribuée par rendez-vous accepté, aucune collision) ; couverture des règles R-10 à R-18 à 100 % des branches du service.
+Porte : T-10 à T-26 verts, dont le test de concurrence T-17 (20 demandes simultanées sur le dernier créneau libre : exactement une table attribuée par rendez-vous accepté, aucune collision) ; couverture des règles R-10 à R-18 à 100 % des branches du service.
 
 ## Phase 3 : messagerie, relances, pilotage, PWA (16 au 18 novembre)
 
