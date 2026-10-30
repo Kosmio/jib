@@ -3,6 +3,9 @@ import { EspaceApiError, saveConsent, updateProfile, type Consent, type Profile 
 
 // E2 (F-10 à F-12) : les quatre champs importés de l'inscription et les trois choix de visibilité, décochés à la première visite.
 // « Continuer » envoie PATCH /me puis PUT /me/consent, puis ouvre E1. Textes et classes : phase-1-design.md, question 1.
+// Aucun champ n'a d'attribut `name` (D3, NF-07) : le formulaire est rendu côté serveur, et sans JavaScript « Continuer » le soumet en
+// GET sur la page. Sans `name`, le navigateur ne sérialise rien : ni prénom, nom, fonction, entreprise ni choix dans l'URL, qui est
+// journalisée. Les valeurs vivent dans l'état React ; `id` et `autoComplete` suffisent à l'accessibilité et à la saisie automatique.
 
 type Props = {
   /** REACT_STRAPI_URL : adresse publique de Strapi, atteinte par le navigateur. */
@@ -123,7 +126,6 @@ export default function WelcomeForm({ strapiUrl, editionSlug, initial }: Props) 
             </label>
             <input
               id={name}
-              name={name}
               type="text"
               autoComplete={autoComplete}
               required={required}
@@ -151,7 +153,6 @@ export default function WelcomeForm({ strapiUrl, editionSlug, initial }: Props) 
             <label key={name} className="flex min-h-11 gap-3 py-1">
               <input
                 type="checkbox"
-                name={name}
                 checked={consent[name]}
                 onChange={(event) => setConsent({ ...consent, [name]: event.target.checked })}
                 aria-labelledby={`${name}-libelle`}
