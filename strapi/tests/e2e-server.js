@@ -18,6 +18,10 @@
  * La boîte de sortie des e-mails est le fichier de `buildTestEnv` pour la base e2e (dossier temporaire du système, un fichier
  * par base) : supprimée au démarrage, elle ne contient que les messages de cette exécution, et les tests la relisent
  * (web/tests/e2e/espace.ts).
+ *
+ * Lot 16 des phases 2 et 3 : le faux HelloAsso (scripts/espace/fake-helloasso.js) tourne dans ce processus, sur un port libre de la
+ * boucle locale, et Strapi y est branché (HELLOASSO_API_BASE, identifiants factices). « Synchroniser maintenant » d'E9 s'exécute donc
+ * pour de bon dans le navigateur : sur une base fraîchement seedée, 0 créé, 0 mis à jour, 0 annulé (4.4, point 6).
  */
 
 const { spawnSync } = require('node:child_process');
@@ -27,6 +31,7 @@ const path = require('node:path');
 const { STRAPI_DIR, buildTestEnv, e2eDatabaseName } = require('./helpers/env');
 const { resetDatabase } = require('./helpers/database');
 const { startStrapi } = require('./helpers/strapi');
+const { startFakeHelloAsso } = require('../scripts/espace/fake-helloasso');
 
 const NO_NETWORK = path.join(__dirname, 'helpers/no-network.js');
 const PORT = Number(process.env.E2E_STRAPI_PORT) || 1348;
@@ -50,11 +55,14 @@ async function main() {
   // Boîte de sortie propre à cette exécution : le seed n'envoie rien, mais une exécution précédente a pu y écrire.
   fs.rmSync(buildTestEnv({ database }).EMAIL_OUTBOX_FILE, { force: true });
 
-  const strapi = await startStrapi({ database, reset: false, port: PORT, overrides: { PUBLIC_URL: WEB_URL, CORS_ORIGINS: WEB_URL } });
-  console.log(`Strapi des tests e2e prêt sur ${strapi.baseUrl} (base ${database})`);
+  const fake = await startFakeHelloAsso();
+  const helloasso = { HELLOASSO_API_BASE: fake.apiBase, HELLOASSO_CLIENT_ID: 'fake-client-id', HELLOASSO_CLIENT_SECRET: 'fake-client-secret' };
+  const strapi = await startStrapi({ database, reset: false, port: PORT, overrides: { PUBLIC_URL: WEB_URL, CORS_ORIGINS: WEB_URL, ...helloasso } });
+  console.log(`Strapi des tests e2e prêt sur ${strapi.baseUrl} (base ${database}), faux HelloAsso sur ${fake.apiBase}`);
 
   const stop = async () => {
     await strapi.stop();
+    await fake.close();
     process.exit(0);
   };
   process.once('SIGTERM', stop);
