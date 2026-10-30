@@ -1,29 +1,219 @@
 ---
-// E1 provisoire : cible de la redirection après connexion, avec la déconnexion. La phase 2 le remplace par l'accueil complet.
-// Sans session valable pour l'édition de l'URL : E0. Sans consentement enregistré : E2.
-import EspaceLayout from "../../../layouts/EspaceLayout.astro";
-import EditionBanner from "../../../components/espace/EditionBanner.astro";
-import EspaceCard from "../../../components/espace/EspaceCard.astro";
+// E1 : accueil (F-20 à F-24, R-50). Carte d'édition avec compte à rebours, carte « Votre profil » (masquée à 100 %), « Prochain rendez-vous »
+// et « Ils partagent vos sujets ». Page serveur sans îlot : tout est rendu avec la session du navigateur (`Cookie` relayé).
+// Sans session valable pour l'édition de l'URL : E0. Sans consentement enregistré : E2. Les rendez-vous (lot 8) et les suggestions (lot 9)
+// sont facultatifs : une réponse d'erreur retire la carte ou la section, jamais la page.
+import AppShell from "../../../components/espace/AppShell.astro";
+import ProgressBar from "../../../components/espace/ProgressBar.astro";
 import EspaceButton from "../../../components/espace/EspaceButton.astro";
-import { getMe, getOpenEdition, publicStrapiUrl } from "../../../lib/espace/api";
-import { editionLine } from "../../../lib/espace/format";
+import Icon from "../../../components/espace/Icon.astro";
+import ProfileCardView from "../../../react-components/espace/ProfileCardView";
+import { espaceGet, guardSession, publicStrapiUrl } from "../../../lib/espace/api";
+import type { ProfileCard } from "../../../lib/espace/client";
+import type { Meeting, MeetingsResponse } from "../../../lib/espace/meetings";
+import { bannerColor, countdown, editionLine, initialsOf, photoSrc, timeLabel } from "../../../lib/espace/format";
 
 const slug = Astro.params.edition ?? "";
-const edition = await getOpenEdition(slug);
-if (!edition) return Astro.rewrite("/espace/introuvable");
+const cookie = Astro.request.headers.get("cookie");
+const guard = await guardSession(slug, cookie);
+if ("notFound" in guard) return Astro.rewrite("/espace/introuvable");
+if ("redirect" in guard) return Astro.redirect(guard.redirect);
+const { edition, me } = guard;
 
-const me = await getMe(Astro.request.headers.get("cookie"));
-if (me?.edition.slug !== slug) return Astro.redirect(`/espace/${encodeURIComponent(slug)}/connexion`);
-if (!me.consent.consentAt) return Astro.redirect(`/espace/${encodeURIComponent(slug)}/bienvenue`);
+const base = `/espace/${encodeURIComponent(slug)}`;
+const count = countdown(edition.date);
+const over = count?.state === "after";
+
+const [meetingsResult, suggestionsResult] = await Promise.all([
+  espaceGet<MeetingsResponse>("/meetings", cookie).catch(() => null),
+  espaceGet<ProfileCard[]>("/suggestions", cookie).catch(() => null),
+]);
+const meetings = meetingsResult?.ok ? meetingsResult.data : null;
+const suggestions = !over && suggestionsResult?.ok ? suggestionsResult.data.slice(0, 3) : [];
+
+// F-22 : le prochain rendez-vous accepté ; à défaut le prochain en attente de réponse. L'agenda est déjà trié par heure.
+const upcoming = (meetings?.agenda ?? []).flatMap((item) =>
+  item.type === "meeting" && item.meeting.slot.endsAt > new Date().toISOString() ? [item.meeting] : [],
+);
+const next: Meeting | undefined = upcoming.find((meeting) => meeting.status === "accepted") ?? upcoming.find((meeting) => meeting.status === "pending");
+// Nombre affiché sur le lien vers l'agenda : les rendez-vous de l'agenda et les demandes reçues à traiter.
+const meetingCount = upcoming.length + (meetings?.received.length ?? 0);
+
+// F-21 : phrase d'aide selon ce qui manque au profil (R-30).
+const missing = [
+  !me.photoUrl && "une photo",
+  !me.topics.length && "vos sujets d’intérêt",
+  !me.bio && "une présentation",
+  !me.jobTitle && "votre fonction",
+].filter((item): item is string => Boolean(item));
+const profileHelp = !me.photoUrl && !me.topics.length
+  ? "Ajoutez une photo et vos sujets d’intérêt pour recevoir des suggestions de rendez-vous."
+  : `Ajoutez ${missing.length > 1 ? `${missing.slice(0, -1).join(", ")} et ${missing.at(-1)}` : missing[0]} pour compléter votre profil.`;
+
+const color = bannerColor(edition.themeColor);
+const avatar = photoSrc(publicStrapiUrl, me.photoUrl);
+const targetPath = (card: ProfileCard) => `${base}/annuaire/${card.kind === "exhibitor" ? "x" : "p"}/${encodeURIComponent(card.id)}`;
+const headingClass = "font-heading text-lg font-semibold normal-case sm:text-xl";
 ---
 
-<EspaceLayout title="Accueil">
-  <EditionBanner title={`Bonjour ${me.firstName}`} subtitle={editionLine(edition)} themeColor={edition.themeColor} />
-  <EspaceCard heading="Connexion réussie">
-    <p class="mt-4">L’annuaire, les rendez-vous et la messagerie arrivent bientôt.</p>
-    <form method="post" action={`${publicStrapiUrl}/api/espace/auth/logout`} class="mt-6">
-      <input type="hidden" name="editionSlug" value={slug} />
-      <EspaceButton variant="secondary">Me déconnecter</EspaceButton>
-    </form>
-  </EspaceCard>
-</EspaceLayout>
+<AppShell title="Accueil" active="home" editionSlug={slug} me={me}>
+  <header class="border-b border-surface-alt lg:hidden">
+    <div class="mx-auto flex max-w-180 items-center justify-between px-4 py-3">
+      <img src="/assets/logo-jib.svg" alt="La Journée de l’Innovation de la Filière Bois" width="649" height="160" class="h-10 w-auto" />
+      <a href={`${base}/profil`} aria-label="Mon profil" class="flex size-11 items-center justify-center rounded-full ring-2 ring-gold">
+        {
+          avatar ? (
+            <img src={avatar} alt="" width="96" height="96" class="size-11 rounded-full bg-surface-alt object-cover" />
+          ) : (
+            <span class="flex size-11 items-center justify-center rounded-full bg-title font-heading font-semibold text-white" aria-hidden="true">
+              {initialsOf(me.firstName, me.lastName)}
+            </span>
+          )
+        }
+      </a>
+    </div>
+  </header>
+
+  <div class="mx-auto max-w-180 space-y-4 px-4 py-4">
+    <section
+      class={`relative overflow-hidden rounded-2xl p-5 text-white ${color ? "" : "bg-title"}`}
+      style={color ? `background-color: ${color}` : undefined}
+    >
+      <div
+        aria-hidden="true"
+        class="absolute inset-0 bg-[radial-gradient(circle_at_75%_25%,color-mix(in_srgb,var(--color-gold)_15%,transparent),transparent_60%)]"
+      >
+      </div>
+      <svg aria-hidden="true" class="absolute top-0 right-0 h-full w-auto" viewBox="0 0 240 220" fill="none" preserveAspectRatio="xMaxYMin slice">
+        <g class="stroke-gold/25" stroke-width="1.5">
+          <line x1="206" y1="14" x2="142" y2="96"></line>
+          <line x1="142" y1="96" x2="98" y2="152"></line>
+          <line x1="142" y1="96" x2="224" y2="132"></line>
+          <line x1="224" y1="132" x2="186" y2="204"></line>
+        </g>
+        <g class="fill-gold/50">
+          <circle cx="206" cy="14" r="3"></circle>
+          <circle cx="142" cy="96" r="5"></circle>
+          <circle cx="98" cy="152" r="3"></circle>
+          <circle cx="224" cy="132" r="4"></circle>
+          <circle cx="186" cy="204" r="3"></circle>
+        </g>
+      </svg>
+      <div class="relative">
+        {
+          count && !over && (
+            <p class="flex items-center gap-3">
+              <span class="rounded-full bg-gold px-3 py-1 font-heading font-semibold text-gold-ink">{count.label}</span>
+              <span class="text-lg">Votre édition</span>
+            </p>
+          )
+        }
+        {
+          over && (
+            <p class="flex flex-wrap items-center gap-x-4">
+              <span class="font-heading text-lg font-semibold">{count?.label}</span>
+              <a href={`${base}/agenda`} class="inline-flex min-h-11 items-center font-semibold underline">
+                Voir mon agenda
+              </a>
+            </p>
+          )
+        }
+        <h1 class={`${count ? "mt-3" : ""} text-3xl leading-tight text-white`}>{edition.title}</h1>
+        <p class="mt-4 flex items-center gap-2 text-lg font-semibold">
+          <svg aria-hidden="true" class="size-6 shrink-0 text-gold" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3.5" y="5" width="17" height="15.5" rx="2"></rect>
+            <path d="M3.5 10h17M8 3v4M16 3v4"></path>
+          </svg>
+          {editionLine(edition)}
+        </p>
+      </div>
+    </section>
+
+    {
+      me.profileCompletion < 100 && (
+        <section class="rounded-xl border border-surface-alt bg-white p-5" aria-labelledby="profil-titre">
+          <div class="flex flex-wrap items-baseline justify-between gap-x-4">
+            <h2 id="profil-titre" class={headingClass}>
+              Votre profil
+            </h2>
+            <p class="font-heading text-lg font-semibold text-title">{me.profileCompletion}&nbsp;%</p>
+          </div>
+          <div class="mt-3">
+            <ProgressBar value={me.profileCompletion} label={`Profil complété à ${me.profileCompletion} %`} />
+          </div>
+          <p class="mt-3 text-lg">{profileHelp}</p>
+          <a href={`${base}/profil`} class="mt-2 inline-flex min-h-11 items-center text-lg font-bold text-primary-ink underline">
+            Compléter mon profil
+          </a>
+        </section>
+      )
+    }
+
+    {
+      !over && (
+        <section class="rounded-xl border border-surface-alt bg-white p-5" aria-labelledby="rdv-titre">
+          <div class="flex flex-wrap items-baseline justify-between gap-x-4">
+            <h2 id="rdv-titre" class={headingClass}>
+              Prochain rendez-vous
+            </h2>
+            <a href={`${base}/agenda`} class="inline-flex min-h-11 shrink-0 items-center font-semibold text-title underline">
+              Mon agenda{meetingCount > 0 && <>&nbsp;({meetingCount})</>}
+            </a>
+          </div>
+          {
+            next ? (
+              <div class="mt-3 flex items-start gap-4">
+                <div class="min-w-20 shrink-0 rounded-lg bg-surface px-3 py-2 text-center">
+                  <p class="font-heading text-xl font-semibold text-title">{timeLabel(next.slot.startsAt)}</p>
+                  {next.location && <p class="text-muted">{next.location}</p>}
+                </div>
+                <div class="min-w-0 flex-1">
+                  <p class="text-lg leading-snug font-bold text-ink">{next.counterpart.displayName}</p>
+                  {next.counterpart.subtitle && <p class="leading-snug text-muted">{next.counterpart.subtitle}</p>}
+                  {next.status === "accepted" ? (
+                    <p class="mt-2 flex items-center gap-1 font-semibold text-primary-ink">
+                      <Icon name="check" />
+                      Confirmé
+                    </p>
+                  ) : (
+                    <p class="mt-2 flex items-center gap-1 font-semibold text-wood-dark">
+                      <svg aria-hidden="true" class="size-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="9" />
+                        <path d="M12 7v5l3 2" />
+                      </svg>
+                      En attente de réponse
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div class="mt-2">
+                <p class="text-lg text-muted">Aucun rendez-vous pour le moment.</p>
+                <EspaceButton variant="secondary" href={`${base}/annuaire`} class="mt-4">
+                  Trouver des interlocuteurs
+                </EspaceButton>
+              </div>
+            )
+          }
+        </section>
+      )
+    }
+
+    {
+      suggestions.length > 0 && (
+        <section aria-labelledby="suggestions-titre">
+          <h2 id="suggestions-titre" class={`${headingClass} mt-6 mb-3`}>
+            Ils partagent vos sujets
+          </h2>
+          <ul class="space-y-3">
+            {suggestions.map((card) => (
+              <li>
+                <ProfileCardView card={card} strapiUrl={publicStrapiUrl} action={{ label: "Rencontrer", href: targetPath(card) }} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )
+    }
+  </div>
+</AppShell>

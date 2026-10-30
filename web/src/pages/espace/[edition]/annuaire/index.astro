@@ -1,0 +1,35 @@
+---
+// E4 : annuaire (F-40 à F-44). La première page (sans filtre) est lue côté serveur et passée à l'îlot DirectoryBrowser, qui gère
+// recherche, type, sujets et défilement. Sans session valable pour l'édition de l'URL : E0. Sans consentement enregistré : E2.
+import AppShell from "../../../../components/espace/AppShell.astro";
+import DirectoryBrowser from "../../../../react-components/espace/DirectoryBrowser";
+import { espaceGet, guardSession, publicStrapiUrl } from "../../../../lib/espace/api";
+import type { ProfileCard, Topic } from "../../../../lib/espace/client";
+
+const slug = Astro.params.edition ?? "";
+const cookie = Astro.request.headers.get("cookie");
+const guard = await guardSession(slug, cookie);
+if ("notFound" in guard) return Astro.rewrite("/espace/introuvable");
+if ("redirect" in guard) return Astro.redirect(guard.redirect);
+const { me } = guard;
+
+const [topicsResult, firstPage] = await Promise.all([
+  espaceGet<Topic[]>(`/editions/${encodeURIComponent(slug)}/topics`, cookie).catch(() => null),
+  espaceGet<{ items: ProfileCard[]; nextCursor: string | null; total: number }>("/directory?type=all", cookie).catch(() => null),
+]);
+const topics = topicsResult?.ok ? topicsResult.data : [];
+// Première page illisible : l'îlot la demande lui-même au montage et affiche l'erreur éventuelle.
+const initial = firstPage?.ok ? firstPage.data : null;
+---
+
+<AppShell title="Annuaire" active="directory" editionSlug={slug} me={me}>
+  <div class="mx-auto max-w-180 px-4 pt-4">
+    <h1 class="text-3xl leading-tight">Annuaire</h1>
+    <noscript>
+      <p class="mt-2 font-semibold">La recherche demande JavaScript. Activez-le ou utilisez un autre navigateur.</p>
+    </noscript>
+    <div class="mt-3">
+      <DirectoryBrowser client:load strapiUrl={publicStrapiUrl} editionSlug={slug} topics={topics} initial={initial} />
+    </div>
+  </div>
+</AppShell>

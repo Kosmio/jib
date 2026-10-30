@@ -1,0 +1,73 @@
+---
+// E3 : mon profil (F-30 à F-32, F-12). Un seul îlot, ProfileForm ; la déconnexion est un formulaire HTML (POST /auth/logout, 303 vers E0).
+// Sans session valable pour l'édition de l'URL : E0. Sans consentement enregistré : E2.
+import AppShell from "../../../components/espace/AppShell.astro";
+import EspaceButton from "../../../components/espace/EspaceButton.astro";
+import ProfileForm from "../../../react-components/espace/ProfileForm";
+import { espaceGet, guardSession, publicStrapiUrl } from "../../../lib/espace/api";
+import type { Topic } from "../../../lib/espace/client";
+
+const slug = Astro.params.edition ?? "";
+const cookie = Astro.request.headers.get("cookie");
+const guard = await guardSession(slug, cookie);
+if ("notFound" in guard) return Astro.rewrite("/espace/introuvable");
+if ("redirect" in guard) return Astro.redirect(guard.redirect);
+const { me } = guard;
+
+const base = `/espace/${encodeURIComponent(slug)}`;
+// Sans sujets (route absente ou en erreur), le formulaire omet simplement le bloc des sujets.
+const topicsResult = await espaceGet<Topic[]>(`/editions/${encodeURIComponent(slug)}/topics`, cookie).catch(() => null);
+const topics = topicsResult?.ok ? topicsResult.data : [];
+
+const initial = {
+  firstName: me.firstName,
+  lastName: me.lastName,
+  jobTitle: me.jobTitle ?? "",
+  company: me.company ?? "",
+  bio: me.bio ?? "",
+  photoUrl: me.photoUrl,
+  topics: me.topics.map((topic) => topic.id),
+  emailPrefs: me.emailPrefs,
+  directoryOptIn: me.consent.directoryOptIn,
+  meetingsOptIn: me.consent.meetingsOptIn,
+  newsOptIn: me.consent.newsOptIn,
+};
+---
+
+<AppShell title="Mon profil" active="profile" editionSlug={slug} me={me}>
+  <div class="mx-auto max-w-180 space-y-4 px-4 py-4">
+    <h1 class="text-2xl leading-tight">Mon profil</h1>
+
+    {
+      me.exhibitor && (
+        <p class="rounded-xl border border-surface-alt bg-white p-4">
+          Vous représentez <strong>{me.exhibitor.name}</strong>
+          {me.exhibitor.standNumber ? <>, stand&nbsp;{me.exhibitor.standNumber}</> : null}.
+          <a href={`${base}/annuaire/x/${encodeURIComponent(me.exhibitor.id)}`} class="mt-1 flex min-h-11 items-center font-bold text-primary-ink underline">
+            Voir la fiche de mon exposant
+          </a>
+        </p>
+      )
+    }
+
+    <section class="rounded-xl border border-surface-alt bg-white p-5">
+      <noscript>
+        <p class="font-semibold">Cette page demande JavaScript. Activez-le ou utilisez un autre navigateur.</p>
+      </noscript>
+      <ProfileForm client:load strapiUrl={publicStrapiUrl} editionSlug={slug} initial={initial} topics={topics} />
+    </section>
+
+    {
+      me.isOrganizer && (
+        <EspaceButton variant="secondary" href={`${base}/organisateur`}>
+          Tableau de bord organisateur
+        </EspaceButton>
+      )
+    }
+
+    <form method="post" action={`${publicStrapiUrl}/api/espace/auth/logout`}>
+      <input type="hidden" name="editionSlug" value={slug} />
+      <EspaceButton variant="secondary">Me déconnecter</EspaceButton>
+    </form>
+  </div>
+</AppShell>
