@@ -158,7 +158,7 @@ export default function SlotPicker({
     if (code === "SELF") {
       blockedText = (
         <>
-          C’est votre profil.{" "}
+          <span className="block">C’est votre profil.</span>
           <a href={`/espace/${encodeURIComponent(editionSlug)}/profil`} className="inline-flex min-h-11 items-center text-title underline">
             Modifier mon profil
           </a>
@@ -209,12 +209,12 @@ export default function SlotPicker({
             <span className="text-primary-ink">
               <Icon name="check" />
             </span>
-            <p>
-              {sent}{" "}
+            <div>
+              <p>{sent}</p>
               <a href={agendaUrl} className="inline-flex min-h-11 items-center text-title underline">
                 Voir mon agenda
               </a>
-            </p>
+            </div>
           </>
         )}
       </div>
@@ -230,12 +230,12 @@ export default function SlotPicker({
           <span className="text-danger">
             <Icon name="alert" />
           </span>
-          <p>
-            {loadError}{" "}
+          <div>
+            <p>{loadError}</p>
             <button type="button" onClick={() => void refresh()} className="inline-flex min-h-11 items-center text-title underline">
               Réessayer
             </button>
-          </p>
+          </div>
         </div>
       )}
 
@@ -256,7 +256,9 @@ export default function SlotPicker({
                 <Icon name="clock" />
               </span>
               <span>
-                Demande envoyée pour {data.pending.slotLabel}, {targetName} n’a pas encore répondu.{" "}
+                <span className="block">
+                  Demande envoyée pour {data.pending.slotLabel}, {targetName} n’a pas encore répondu.
+                </span>
                 <a href={agendaUrl} className="inline-flex min-h-11 items-center text-title underline">
                   Voir mon agenda
                 </a>

@@ -109,7 +109,7 @@ function ConfirmDialog({ confirm, onConfirm, onClose }: { confirm: Confirm | nul
       ref={ref}
       aria-labelledby={titleId}
       onClose={onClose}
-      className="m-auto w-[calc(100%-2rem)] max-w-md rounded-xl border border-surface-alt bg-white p-6 text-ink backdrop:bg-title/60"
+      className="m-auto w-11/12 max-w-md rounded-xl border border-surface-alt bg-white p-6 text-ink backdrop:bg-title/60"
     >
       {view && meeting && (
         <>
