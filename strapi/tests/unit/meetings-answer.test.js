@@ -117,6 +117,15 @@ describe('checkAccept : ordre des contrôles FORBIDDEN, INVALID_TRANSITION, WIND
     assert.equal(verdict(accept(s)), 'SLOT_TAKEN');
   });
 
+  it('A-30 : les autres demandes en attente du demandeur et de la cible sur le créneau ne bloquent pas l’acceptation (closeOnAccept les ferme)', () => {
+    // Seules les demandes `accepted` rendent un créneau pris à l’acceptation. Le cas « le demandeur a une seconde demande en attente
+    // sur le même créneau » n’est pas créable par l’API (R-11.5) ; A-30 le prévoit pourtant (« son demandeur est A ou B »).
+    const byTarget = snapshot({ meetings: [meeting('m1'), meeting('m2', { requesterId: 'b', targetAttendeeId: 'c' })] });
+    assert.equal(verdict(accept(byTarget)), 'OK', 'la cible a envoyé une demande sur ce créneau');
+    const byRequester = snapshot({ meetings: [meeting('m1'), meeting('m2', { requesterId: 'a', targetAttendeeId: 'c' })] });
+    assert.equal(verdict(accept(byRequester)), 'OK', 'le demandeur a envoyé une autre demande sur ce créneau');
+  });
+
   it('TARGET_BUSY : la cible a un autre rendez-vous accepté sur ce créneau', () => {
     const s = snapshot({ meetings: [meeting('m1'), accepted('m2', { requesterId: 'c', targetAttendeeId: 'b', tableNumber: 1 })] });
     assert.equal(verdict(accept(s)), 'TARGET_BUSY');
