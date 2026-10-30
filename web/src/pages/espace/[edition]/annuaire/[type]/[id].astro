@@ -89,7 +89,7 @@ const role = person ? [person.jobTitle, person.company].filter(Boolean) : [];
               {person && role.length === 0 && card.subtitle && <p class="mt-1 text-lg leading-snug text-muted">{card.subtitle}</p>}
               {person?.jobTitle && <p class="mt-1 text-lg leading-snug text-muted">{person.jobTitle}</p>}
               {person?.company && <p class="text-lg leading-snug font-bold text-ink">{person.company}</p>}
-              {exhibitor && card.subtitle && <p class="mt-1 text-lg leading-snug text-muted">{card.subtitle}</p>}
+              {exhibitor && card.subtitle && card.subtitle !== exhibitor.description && <p class="mt-1 text-lg leading-snug text-muted">{card.subtitle}</p>}
             </div>
           </div>
           <div class="mx-auto mt-4 max-w-180 px-4">

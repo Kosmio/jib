@@ -158,7 +158,7 @@ export default function SlotPicker({
     if (code === "SELF") {
       blockedText = (
         <>
-          <span className="block">C’est votre profil.</span>
+          <span className="block">{target.startsWith("x:") ? "Vous représentez cet exposant." : "C’est votre profil."}</span>
           <a href={`/espace/${encodeURIComponent(editionSlug)}/profil`} className="inline-flex min-h-11 items-center text-title underline">
             Modifier mon profil
           </a>
