@@ -353,17 +353,20 @@ describe('routes organisateur (lots 2, 4 et 5)', { timeout: 600_000 }, () => {
       // 1. Première synchronisation.
       const first = await sync(organizer.cookie);
       assert.equal(first.status, 200);
+      // Billets actifs à adresse unique et valable : 16 du jeu de recette (le 17e est annulé), 1 pour la commande groupée (910001, les
+      // deux autres sont en DUPLICATE_EMAIL), 910004 (Email invalide, repli sur le payeur, I-11), Zoe (910005) et 120 figurants.
+      // Les billets Canceled, Refused, Deleted, Abandoned et à paiement Refunded sont annulés sans erreur ; Waiting et Unknown sont signalés.
       const firstCodes = sortedPairs(first.json.errors);
-      for (const expected of [['910002', 'DUPLICATE_EMAIL'], ['910003', 'DUPLICATE_EMAIL'], ['910006', 'WAITING'], ['910010', 'UNKNOWN']]) {
-        assert.ok(firstCodes.some(([id, code]) => id === expected[0] && code === expected[1]), `erreur ${expected.join(' ')} absente`);
-      }
-      assert.ok(first.json.created >= 138, `${first.json.created} créations`);
+      assert.deepEqual(firstCodes, [['910002', 'DUPLICATE_EMAIL'], ['910003', 'DUPLICATE_EMAIL'], ['910006', 'WAITING'], ['910010', 'UNKNOWN']]);
+      assert.equal(first.json.created, 16 + 1 + 1 + 1 + 120);
       assert.deepEqual([first.json.updated, first.json.cancelled], [0, 0]);
       const afterFirst = await app.documents(UID.attendee).findMany({ filters: { edition: { documentId: edition.documentId }, role: { $ne: 'organizer' } }, limit: 1000 });
       assert.equal(afterFirst.length, first.json.created);
       await sleep(800);
       const logsAfterFirst = await app.db.query(UID.emailLog).findMany({ where: { template: 'welcome', attendee: { edition: { documentId: edition.documentId } } } });
       assert.equal(logsAfterFirst.length, first.json.created, 'un welcome par Attendee créé');
+      const welcomeMails = () => outbox().slice(since).filter((mail) => /espace participant est prêt/.test(mail.subject));
+      assert.equal(welcomeMails().length, first.json.created, 'un welcome par Attendee créé dans la boîte de sortie');
       const tokensAfterFirst = fake.stats().tokenRequests;
 
       // 2. Seconde synchronisation, plus d'une seconde après : le jeton mis en cache a expiré.
@@ -381,6 +384,7 @@ describe('routes organisateur (lots 2, 4 et 5)', { timeout: 600_000 }, () => {
       assert.ok(runs.every((run) => run.endedAt), '2 SyncRun clos');
       await sleep(500);
       assert.equal((await app.db.query(UID.emailLog).findMany({ where: { template: 'welcome', attendee: { edition: { documentId: edition.documentId } } } })).length, logsAfterFirst.length, 'aucun welcome de plus');
+      assert.equal(welcomeMails().length, first.json.created, 'aucun welcome de plus dans la boîte de sortie');
       assert.ok(fake.stats().tokenRequests > tokensAfterFirst, 'jeton renouvelé après expiration (I-10)');
 
       // 3. T-06 : deux Attendee annulés côté HelloAsso (Canceled et paiement Refunded), avec rendez-vous et session ouverte.
