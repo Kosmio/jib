@@ -16,6 +16,11 @@ module.exports = {
     task: safely('espaceSync', (strapi) => strapi.service('api::espace.sync').runAll()),
     options: { rule: '*/15 * * * *', tz: TIME_ZONE },
   },
+  // R-17, A-32: every 5 minutes, the pending meeting requests of the editions whose request window is closed become expired.
+  espaceMeetingExpiry: {
+    task: safely('espaceMeetingExpiry', (strapi) => strapi.service('api::espace.meetings').expirePending()),
+    options: { rule: '*/5 * * * *', tz: TIME_ZONE },
+  },
   // I-20, A-21: every night, the link and session tokens expired for more than 7 days.
   espaceTokenPurge: {
     task: safely('espaceTokenPurge', (strapi) => strapi.service('api::espace.tokens').purgeExpired()),
