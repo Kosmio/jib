@@ -1,0 +1,86 @@
+---
+// E7, liste des conversations (F-70) : dernier message d'abord, avatar, nom, extrait, heure, pastille de messages non lus.
+// Page serveur sans îlot : la liste se recharge à chaque visite, seul le fil ouvert est interrogé toutes les 20 s (F-71).
+import AppShell from "../../../../components/espace/AppShell.astro";
+import EmptyState from "../../../../components/espace/EmptyState.astro";
+import Notice from "../../../../components/espace/Notice.astro";
+import { Avatar } from "../../../../react-components/espace/ProfileCardView";
+import { espaceGet, guardSession, publicStrapiUrl } from "../../../../lib/espace/api";
+import { listTime, type ConversationSummary } from "../../../../lib/espace/messages";
+
+const slug = Astro.params.edition ?? "";
+const cookie = Astro.request.headers.get("cookie");
+const guard = await guardSession(slug, cookie);
+if ("redirect" in guard) return Astro.redirect(guard.redirect);
+if ("notFound" in guard) return Astro.rewrite("/espace/introuvable");
+const { me } = guard;
+
+const base = `/espace/${encodeURIComponent(slug)}`;
+const result = await espaceGet<ConversationSummary[]>("/conversations", cookie);
+if (!result.ok && result.status === 401) return Astro.redirect(`${base}/connexion`);
+const conversations = result.ok ? result.data : [];
+const now = new Date();
+---
+
+<AppShell title="Messages" active="messages" editionSlug={slug} me={me}>
+  <div class="mx-auto max-w-180 px-4 pt-8">
+    <h1 class="text-2xl md:text-3xl">Messages</h1>
+
+    {!result.ok && <Notice kind="alert">Les messages ne sont pas disponibles pour le moment. Réessayez dans quelques instants.</Notice>}
+
+    {
+      result.ok && conversations.length === 0 && (
+        <EmptyState
+          class="mt-6"
+          title="Aucun message pour l’instant"
+          text="Écrivez à un participant depuis sa fiche dans l’annuaire."
+          action={{ label: "Ouvrir l’annuaire", href: `${base}/annuaire` }}
+        />
+      )
+    }
+
+    {
+      conversations.length > 0 && (
+        <ul class="mt-6 space-y-3">
+          {conversations.map((conversation) => {
+            const unread = Number(conversation.unread) || 0;
+            const { counterpart, lastMessage } = conversation;
+            return (
+              <li>
+                <a
+                  href={`${base}/messages/${encodeURIComponent(conversation.id)}`}
+                  class="flex min-h-11 items-center gap-4 rounded-xl border border-surface-alt bg-white p-4 hover:bg-surface"
+                >
+                  <Avatar card={counterpart} strapiUrl={publicStrapiUrl} />
+                  <span class="min-w-0 flex-1">
+                    <span class="flex items-baseline justify-between gap-3">
+                      <span class="truncate text-lg font-bold text-ink">{counterpart.displayName}</span>
+                      <time class="shrink-0 text-sm text-muted" datetime={lastMessage.at}>
+                        {listTime(lastMessage.at, now)}
+                      </time>
+                    </span>
+                    <span class={`block truncate ${unread ? "font-semibold text-ink" : "text-muted"}`}>
+                      {lastMessage.mine ? "Vous\u00a0: " : ""}
+                      {lastMessage.excerpt}
+                    </span>
+                  </span>
+                  {unread > 0 && (
+                    <>
+                      <span
+                        aria-hidden="true"
+                        class="flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-gold px-1.5 text-sm font-bold text-gold-ink"
+                      >
+                        {unread}
+                      </span>
+                      <span class="sr-only">{`, ${unread} ${unread > 1 ? "messages non lus" : "message non lu"}`}</span>
+                    </>
+                  )}
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+      )
+    }
+  </div>
+</AppShell>

@@ -1,0 +1,71 @@
+---
+// E7, premier message à une personne (F-70, F-74, A-37) : `?avec=p:{id}` vient du lien « Écrire un message » de la fiche (E5).
+// La conversation n'existe pas encore : elle est créée à l'envoi du premier message (ChatThread), puis le fil s'ouvre.
+// Une conversation déjà ouverte avec cette personne s'ouvre directement. Une personne qui ne reçoit pas de demandes
+// (`canMessage` faux, R-61) ne peut pas être contactée en premier.
+import AppShell from "../../../../components/espace/AppShell.astro";
+import EmptyState from "../../../../components/espace/EmptyState.astro";
+import ChatThread from "../../../../react-components/espace/ChatThread";
+import type { ProfileCard } from "../../../../lib/espace/client";
+import { espaceGet, guardSession, publicStrapiUrl } from "../../../../lib/espace/api";
+import { parseTarget, type ConversationSummary } from "../../../../lib/espace/messages";
+
+type Profile = ProfileCard & { isSelf: boolean; canMessage: boolean };
+
+const slug = Astro.params.edition ?? "";
+const cookie = Astro.request.headers.get("cookie");
+const guard = await guardSession(slug, cookie);
+if ("redirect" in guard) return Astro.redirect(guard.redirect);
+if ("notFound" in guard) return Astro.rewrite("/espace/introuvable");
+
+const base = `/espace/${encodeURIComponent(slug)}`;
+const target = parseTarget(Astro.url.searchParams.get("avec"));
+if (!target) return Astro.redirect(`${base}/messages`);
+const personId = target.slice(2);
+
+const conversations = await espaceGet<ConversationSummary[]>("/conversations", cookie);
+const existing = conversations.ok
+  ? conversations.data.find(({ counterpart }) => counterpart.kind === "attendee" && counterpart.id === personId)
+  : undefined;
+if (existing) return Astro.redirect(`${base}/messages/${encodeURIComponent(existing.id)}`);
+
+const profile = await espaceGet<Profile>(`/directory/p/${encodeURIComponent(personId)}`, cookie);
+if (!profile.ok) {
+  if (profile.status === 401) return Astro.redirect(`${base}/connexion`);
+  if (profile.status === 404) return Astro.rewrite("/espace/introuvable");
+  throw new Error(`GET /directory/p/:id : ${profile.status}`);
+}
+if (profile.data.isSelf) return Astro.redirect(`${base}/messages`);
+
+const { kind, id, displayName, subtitle, photoUrl, initials, tag, topics, canMessage } = profile.data;
+const counterpart: ProfileCard = { kind, id, displayName, subtitle, photoUrl, initials, tag, topics };
+const firstName = displayName.split(" ")[0];
+---
+
+<AppShell title={`Message à ${displayName}`} active="messages" editionSlug={slug} me={guard.me}>
+  {
+    canMessage ? (
+      <ChatThread
+        client:load
+        strapiUrl={publicStrapiUrl}
+        editionSlug={slug}
+        conversationId={null}
+        target={target}
+        counterpart={counterpart}
+        initialMeeting={null}
+        initialMessages={[]}
+        initialGetsEmail={false}
+      />
+    ) : (
+      <div class="mx-auto max-w-180 px-4 pt-8">
+        <h1 class="text-2xl md:text-3xl">Nouveau message</h1>
+        <EmptyState
+          class="mt-6"
+          title={`${firstName} ne reçoit pas de nouveaux messages`}
+          text="Vous pourrez lui écrire si cette personne vous écrit la première."
+          action={{ label: "Retour à la fiche", href: `${base}/annuaire/p/${encodeURIComponent(personId)}` }}
+        />
+      </div>
+    )
+  }
+</AppShell>

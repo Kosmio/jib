@@ -1,0 +1,39 @@
+---
+// E7, fil d'une conversation (F-70 à F-72, F-74, A-37). Le serveur lit le fil, ce qui marque lus les messages reçus (R-63), puis
+// relit le profil : les badges de l'onglet Messages comptent alors ce qui reste à lire. L'îlot ChatThread prend le relais : il
+// interroge le fil toutes les 20 s tant que l'onglet est visible. Un tiers reçoit 404 (R-63), rendu en « page introuvable ».
+import AppShell from "../../../../components/espace/AppShell.astro";
+import ChatThread from "../../../../react-components/espace/ChatThread";
+import { espaceGet, getMe, guardSession, publicStrapiUrl } from "../../../../lib/espace/api";
+import type { Thread } from "../../../../lib/espace/messages";
+
+const slug = Astro.params.edition ?? "";
+const cookie = Astro.request.headers.get("cookie");
+const guard = await guardSession(slug, cookie);
+if ("redirect" in guard) return Astro.redirect(guard.redirect);
+if ("notFound" in guard) return Astro.rewrite("/espace/introuvable");
+
+const base = `/espace/${encodeURIComponent(slug)}`;
+const thread = await espaceGet<Thread>(`/conversations/${encodeURIComponent(Astro.params.id ?? "")}/messages`, cookie);
+if (!thread.ok) {
+  if (thread.status === 401) return Astro.redirect(`${base}/connexion`);
+  if (thread.status === 404) return Astro.rewrite("/espace/introuvable");
+  throw new Error(`GET /conversations/:id/messages : ${thread.status}`);
+}
+const { conversation, messages } = thread.data;
+const me = (await getMe(cookie)) ?? guard.me;
+---
+
+<AppShell title={`Conversation avec ${conversation.counterpart.displayName}`} active="messages" editionSlug={slug} me={me}>
+  <ChatThread
+    client:load
+    strapiUrl={publicStrapiUrl}
+    editionSlug={slug}
+    conversationId={conversation.id}
+    target={null}
+    counterpart={conversation.counterpart}
+    initialMeeting={conversation.meeting}
+    initialMessages={messages}
+    initialGetsEmail={conversation.counterpartGetsEmail}
+  />
+</AppShell>
