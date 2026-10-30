@@ -6,6 +6,8 @@ Routes personnalisées Strapi sous le préfixe `/api/espace`. JSON, dates ISO 86
 
 Le developer peut ajuster les chemins aux conventions Strapi découvertes en phase 0, à condition de mettre à jour ce fichier dans le même commit.
 
+Phases 2 et 3 (30 octobre 2026) : les formes de `/me`, de l'annuaire, des créneaux, des rendez-vous, de la messagerie, du programme et des statistiques, ainsi que les codes d'erreur ajoutés (`SLOT_PAST`, `SLOT_NOT_FOUND`, `TARGET_NOT_FOUND`, `MEETING_NOT_FOUND`, `PROFILE_NOT_FOUND`, `INVALID_TRANSITION`, `COUNTER_UNAVAILABLE`, `PHOTO_INVALID`, `PHOTO_TOO_LARGE`), sont fixées par `docs/espace/journal/phase-2-plan.md`, section 3, qui prime sur les tableaux ci-dessous jusqu'à leur report ici par l'architecte. Les developers ne modifient pas ce fichier pendant ces lots : ils signalent tout écart dans leur compte rendu.
+
 ## Conventions transverses (décidées en phase 0)
 
 Détail et justification : `docs/espace/journal/phase-0-plan.md`.
