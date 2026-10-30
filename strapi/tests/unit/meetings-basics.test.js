@@ -14,13 +14,12 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { pending } = require('../helpers/pending');
 const { EspaceError } = require('../../src/api/espace/lib/errors');
 
 const meetings = () => require('../../src/api/espace/lib/meetings');
 const iso = (value) => (value == null ? null : new Date(value).toISOString());
 
-describe('parseTarget : « p:{id} » ou « x:{id} » (06-api, POST /meetings et GET /slots)', pending('lot 8'), () => {
+describe('parseTarget : « p:{id} » ou « x:{id} » (06-api, POST /meetings et GET /slots)', () => {
   it('lit une personne', () => {
     assert.deepEqual(meetings().parseTarget('p:abc123'), { kind: 'p', id: 'abc123' });
   });
@@ -47,7 +46,7 @@ describe('parseTarget : « p:{id} » ou « x:{id} » (06-api, POST /meetings et 
   }
 });
 
-describe('requestWindow : fenêtre de prise de rendez-vous (R-17, F-55, A-32)', pending('lot 8'), () => {
+describe('requestWindow : fenêtre de prise de rendez-vous (R-17, F-55, A-32)', () => {
   const EDITION = { date: '2026-12-03', meetingRequestsOpenAt: '2026-10-01T08:00:00.000Z', meetingRequestsCloseAt: '2026-12-02T17:00:00.000Z' };
   const window = (edition, now) => meetings().requestWindow(edition, new Date(now));
 
@@ -126,7 +125,7 @@ describe('requestWindow : fenêtre de prise de rendez-vous (R-17, F-55, A-32)', 
   });
 });
 
-describe('hostedTables : tables dédiées des intervenants (R-19, A-29)', pending('lot 8'), () => {
+describe('hostedTables : tables dédiées des intervenants (R-19, A-29)', () => {
   const row = (n, fields = {}) => ({ id: n, documentId: `doc${n}`, role: 'speaker', status: 'active', hostedTableNumber: null, ...fields });
   const hostedTables = (rows, tablesCount = 3) => meetings().hostedTables(rows, tablesCount);
   const entries = (result) => Object.fromEntries(result.hosted);
@@ -238,7 +237,7 @@ describe('hostedTables : tables dédiées des intervenants (R-19, A-29)', pendin
   });
 });
 
-describe('assertTransition : cycle de vie d’un rendez-vous (R-10)', pending('lot 8'), () => {
+describe('assertTransition : cycle de vie d’un rendez-vous (R-10)', () => {
   const attempt = (status, action) => () => meetings().assertTransition(status, action);
   const isInvalidTransition = (error) => {
     assert.ok(error instanceof EspaceError, 'EspaceError attendue');

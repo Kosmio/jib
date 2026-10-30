@@ -14,7 +14,6 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { pending } = require('../helpers/pending');
 
 const EDITION = { slug: 'nouvelle-aquitaine-test', title: 'Nouvelle-Aquitaine (test)', themeColor: '#600e24' };
 const ATTENDEE = { documentId: 'doc-lea', email: 'lea.ducasse@example.org', firstName: 'Léa', lastName: 'Ducasse' };
@@ -64,7 +63,7 @@ describe('services/mailer.js : pièces jointes (A-33, I-41)', () => {
     assert.equal(emailLogs()[0].data.status, 'sent');
   });
 
-  describe('avec pièces jointes', pending('lot 8'), () => {
+  describe('avec pièces jointes', () => {
     it('transmet le .ics au fournisseur : nom, type et contenu en base64', async () => {
       await send({ attachments: [{ filename: 'rendez-vous.ics', content: ICS, contentType: 'text/calendar; charset=utf-8; method=PUBLISH' }] });
       const [{ attachments }] = outbox();
@@ -105,7 +104,7 @@ describe('services/mailer.js : pièces jointes (A-33, I-41)', () => {
   });
 });
 
-describe('config/cron-tasks.js : expiration des demandes toutes les 5 minutes (A-32, R-17, A-08)', pending('lot 8'), () => {
+describe('config/cron-tasks.js : expiration des demandes toutes les 5 minutes (A-32, R-17, A-08)', () => {
   const cron = () => require('../../config/cron-tasks');
   const entryOf = (rule) => Object.values(cron()).find((value) => value?.options?.rule === rule);
 

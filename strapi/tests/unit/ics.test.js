@@ -10,7 +10,6 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { pending } = require('../helpers/pending');
 const { contentLines, eventsOf, firstProp, parseIcs, propsNamed, unescapeText, unfold, validateIcs } = require('../helpers/ics-validate');
 
 const VALID = [
@@ -76,7 +75,7 @@ describe('validateIcs (helper des tests) : accepte un fichier valable, refuse le
   });
 });
 
-describe('buildCalendar : forme du fichier (RFC 5545, T-23)', pending('lot 8'), () => {
+describe('buildCalendar : forme du fichier (RFC 5545, T-23)', () => {
   const NOW = new Date('2026-10-30T10:15:00.000Z');
   const EVENT = {
     uid: 'meeting-k3j9d0sfn2l8m1q7r6t5y4uw@jib',

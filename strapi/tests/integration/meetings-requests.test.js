@@ -15,14 +15,13 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { pending } = require('../helpers/pending');
 const { SESSION_COOKIE, sleep, useEspace } = require('../helpers/espace');
 const { UID } = require('../helpers/espace-data');
 const W = require('../helpers/meetings-world');
 
 const NBSP = String.fromCharCode(0xa0);
 
-describe('rendez-vous : demandes et consultation (lot 8)', pending('lot 8', { timeout: 600_000 }), () => {
+describe('rendez-vous : demandes et consultation (lot 8)', { timeout: 600_000 }, () => {
   const espace = useEspace({ overrides: { ORGANIZER_EMAILS: 'organisation@example.org' } });
   const login = W.useLogin(espace);
   const api = W.useApi(espace);

@@ -12,14 +12,13 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { pending } = require('../helpers/pending');
 const { useEspace } = require('../helpers/espace');
 const W = require('../helpers/meetings-world');
 
 const codeOf = (response) => (response.status < 400 ? 'OK' : response.json?.error?.code ?? `HTTP ${response.status}`);
 const tally = (responses) => responses.reduce((counts, response) => ({ ...counts, [codeOf(response)]: (counts[codeOf(response)] ?? 0) + 1 }), {});
 
-describe('rendez-vous : concurrence (lot 8)', pending('lot 8', { timeout: 900_000 }), () => {
+describe('rendez-vous : concurrence (lot 8)', { timeout: 900_000 }, () => {
   const espace = useEspace({ overrides: { ORGANIZER_EMAILS: 'organisation@example.org' } });
   const login = W.useLogin(espace);
   const api = W.useApi(espace);

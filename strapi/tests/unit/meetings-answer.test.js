@@ -16,7 +16,6 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { pending } = require('../helpers/pending');
 const { exhibitorEntry, meeting, person, snapshot, verdict } = require('../helpers/meetings-snapshot');
 
 const lib = () => require('../../src/api/espace/lib/meetings');
@@ -25,7 +24,7 @@ const X = (id) => ({ kind: 'x', id });
 const accepted = (id, fields) => meeting(id, { status: 'accepted', ...fields });
 const sorted = (list) => [...list].sort();
 
-describe('checkAccept : qui peut accepter (T-24)', pending('lot 8'), () => {
+describe('checkAccept : qui peut accepter (T-24)', () => {
   const snap = () => snapshot({ meetings: [meeting('m1')] });
   const accept = (s, viewerId, meetingId = 'm1') => lib().checkAccept(s, meetingId, viewerId);
 
@@ -76,7 +75,7 @@ describe('checkAccept : qui peut accepter (T-24)', pending('lot 8'), () => {
   });
 });
 
-describe('checkAccept : ordre des contrôles FORBIDDEN, INVALID_TRANSITION, WINDOW_CLOSED, SLOT_PAST, SLOT_TAKEN, TARGET_BUSY, NO_TABLE_LEFT', pending('lot 8'), () => {
+describe('checkAccept : ordre des contrôles FORBIDDEN, INVALID_TRANSITION, WINDOW_CLOSED, SLOT_PAST, SLOT_TAKEN, TARGET_BUSY, NO_TABLE_LEFT', () => {
   const accept = (s, viewerId = 'b') => lib().checkAccept(s, 'm1', viewerId);
   const crowd = [person('p1'), person('q1'), person('p2'), person('q2'), person('p3'), person('q3')];
   const table = (id, n) => accepted(id, { requesterId: `p${id}`, targetAttendeeId: `q${id}`, tableNumber: n });
@@ -156,7 +155,7 @@ describe('checkAccept : ordre des contrôles FORBIDDEN, INVALID_TRANSITION, WIND
   });
 });
 
-describe('checkAccept : lieu et table (R-13, R-03, R-19, T-15, T-26)', pending('lot 8'), () => {
+describe('checkAccept : lieu et table (R-13, R-03, R-19, T-15, T-26)', () => {
   const crowd = ['1', '2', '3', '4'].flatMap((id) => [person(`p${id}`), person(`q${id}`)]);
   const table = (id, n, extra) => accepted(id, { requesterId: `p${id}`, targetAttendeeId: `q${id}`, tableNumber: n, ...extra });
   const accept = (s) => lib().checkAccept(s, 'm1', 'b');
@@ -279,7 +278,7 @@ describe('checkAccept : lieu et table (R-13, R-03, R-19, T-15, T-26)', pending('
   });
 });
 
-describe('closeOnAccept : fermeture des demandes du créneau (R-15, A-30)', pending('lot 8'), () => {
+describe('closeOnAccept : fermeture des demandes du créneau (R-15, A-30)', () => {
   const close = (s, id = 'm1') => lib().closeOnAccept(s, s.meetings.find((candidate) => candidate.id === id));
   const asSets = (result) => ({ cancel: sorted(result.cancel), decline: sorted(result.decline) });
 
@@ -416,7 +415,7 @@ describe('closeOnAccept : fermeture des demandes du créneau (R-15, A-30)', pend
   });
 });
 
-describe('slotStates : états des créneaux d’une fiche (R-12, F-50)', pending('lot 8'), () => {
+describe('slotStates : états des créneaux d’une fiche (R-12, F-50)', () => {
   const states = (s, target = P('b'), viewerId = 'a') => lib().slotStates(s, { viewerId, target });
   const stateOf = (map, slotId) => map.get(slotId);
   const crowd = ['1', '2', '3'].flatMap((id) => [person(`p${id}`), person(`q${id}`)]);
@@ -552,7 +551,7 @@ describe('slotStates : états des créneaux d’une fiche (R-12, F-50)', pending
   });
 });
 
-describe('meetingActions : boutons calculés par le serveur (R-16, A-31, A-32, F-60 à F-63)', pending('lot 8'), () => {
+describe('meetingActions : boutons calculés par le serveur (R-16, A-31, A-32, F-60 à F-63)', () => {
   const actions = (s, id, viewerId) => lib().meetingActions(s, s.meetings.find((candidate) => candidate.id === id), viewerId);
   const only = (result, ...trueKeys) => ({
     canAccept: trueKeys.includes('canAccept'),

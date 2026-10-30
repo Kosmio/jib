@@ -12,7 +12,6 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { pending } = require('../helpers/pending');
 const { useEspace } = require('../helpers/espace');
 const { UID } = require('../helpers/espace-data');
 const { eventsOf, firstProp, unescapeText, validateIcs } = require('../helpers/ics-validate');
@@ -20,7 +19,7 @@ const W = require('../helpers/meetings-world');
 
 const COLLISION_REASON = 'Créneau pris par un autre rendez-vous';
 
-describe('rendez-vous : réponses, annulation, tables et e-mails (lot 8)', pending('lot 8', { timeout: 900_000 }), () => {
+describe('rendez-vous : réponses, annulation, tables et e-mails (lot 8)', { timeout: 900_000 }, () => {
   const espace = useEspace({ overrides: { ORGANIZER_EMAILS: 'organisation@example.org' } });
   const login = W.useLogin(espace);
   const api = W.useApi(espace);

@@ -11,7 +11,6 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { pending } = require('../helpers/pending');
 const { exhibitorEntry, meeting, person, snapshot, verdict } = require('../helpers/meetings-snapshot');
 
 const lib = () => require('../../src/api/espace/lib/meetings');
@@ -20,7 +19,7 @@ const X = (id) => ({ kind: 'x', id });
 const check = (snap, { requesterId = 'a', target = P('b'), slotId = 's1', ...rest } = {}) => lib().checkRequest(snap, { requesterId, target, slotId, ...rest });
 const accepted = (id, fields) => meeting(id, { status: 'accepted', ...fields });
 
-describe('checkRequest : une demande valable', pending('lot 8'), () => {
+describe('checkRequest : une demande valable', () => {
   it('entre deux participants : mode « request », sans table (elle est attribuée à l’acceptation)', () => {
     const result = check(snapshot());
     assert.equal(result.ok, true);
@@ -61,7 +60,7 @@ describe('checkRequest : une demande valable', pending('lot 8'), () => {
   });
 });
 
-describe('checkRequest : un code par condition (R-11)', pending('lot 8'), () => {
+describe('checkRequest : un code par condition (R-11)', () => {
   describe('R-11.1 WINDOW_CLOSED : fenêtre de prise de rendez-vous (R-17)', () => {
     it('fermée', () => assert.equal(verdict(check(snapshot({ window: 'closed' }))), 'WINDOW_CLOSED'));
     it('pas encore ouverte', () => assert.equal(verdict(check(snapshot({ window: 'not_open' }))), 'WINDOW_CLOSED'));
@@ -369,7 +368,7 @@ describe('checkRequest : un code par condition (R-11)', pending('lot 8'), () => 
   });
 });
 
-describe('checkRequest : ordre des contrôles (section 3.1)', pending('lot 8'), () => {
+describe('checkRequest : ordre des contrôles (section 3.1)', () => {
   const crowd = [person('p1'), person('q1'), person('p2'), person('q2'), person('p3'), person('q3'), ...Array.from({ length: 10 }, (_, index) => person(`t${index}`))];
   const table = (id, n) => accepted(id, { requesterId: `p${id}`, targetAttendeeId: `q${id}`, tableNumber: n });
   const tenPending = Array.from({ length: 10 }, (_, index) => meeting(`pm${index}`, { slotId: 's2', requesterId: 'a', targetAttendeeId: `t${index}` }));
@@ -437,7 +436,7 @@ describe('checkRequest : ordre des contrôles (section 3.1)', pending('lot 8'), 
   });
 });
 
-describe('checkRequest : réservation d’une table dédiée (R-19)', pending('lot 8'), () => {
+describe('checkRequest : réservation d’une table dédiée (R-19)', () => {
   const host = (extra = {}) => snapshot({ hosted: { h: 2 }, ...extra });
   const booking = (id, requesterId, slotId, extra = {}) => accepted(id, { slotId, requesterId, targetAttendeeId: 'h', tableNumber: 2, ...extra });
   const book = (snap, options = {}) => check(snap, { target: P('h'), ...options });

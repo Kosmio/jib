@@ -11,7 +11,6 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { pending } = require('../helpers/pending');
 const { sleep, useEspace } = require('../helpers/espace');
 const { UID } = require('../helpers/espace-data');
 const { eventsOf, firstProp, unescapeText, validateIcs } = require('../helpers/ics-validate');
@@ -19,7 +18,7 @@ const W = require('../helpers/meetings-world');
 
 const iso = (value) => new Date(value).toISOString();
 
-describe('rendez-vous : expiration (T-22) et export .ics (T-23) (lot 8)', pending('lot 8', { timeout: 600_000 }), () => {
+describe('rendez-vous : expiration (T-22) et export .ics (T-23) (lot 8)', { timeout: 600_000 }, () => {
   const espace = useEspace({ overrides: { ORGANIZER_EMAILS: 'organisation@example.org' } });
   const login = W.useLogin(espace);
   const api = W.useApi(espace);
@@ -288,7 +287,7 @@ describe('rendez-vous : expiration (T-22) et export .ics (T-23) (lot 8)', pendin
   });
 });
 
-describe('tâche planifiée espaceMeetingExpiry (lot 8)', pending('lot 8', { timeout: 300_000 }), () => {
+describe('tâche planifiée espaceMeetingExpiry (lot 8)', { timeout: 300_000 }, () => {
   const espace = useEspace({ overrides: { CRON_ENABLED: 'true', ORGANIZER_EMAILS: 'organisation@example.org' } });
   // Strapi enregistre ses propres tâches (métriques) : seules celles de l'espace comptent.
   const STRAPI_JOBS = new Set(['uploadWeekly', 'sendProjectInformation']);
