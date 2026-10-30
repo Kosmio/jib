@@ -1,0 +1,175 @@
+---
+// E5 : fiche d'une personne (`p`) ou d'un exposant (`x`) et demande de rendez-vous (F-50 à F-57, R-12, R-19).
+// Le rendu serveur lit la fiche et la grille des créneaux ; l'îlot SlotPicker envoie la demande (ou la réservation d'une table
+// dédiée) et recharge la grille. Fiche invisible pour le visiteur (R-41) : 404 sans rien révéler de plus.
+import AppShell from "../../../../../components/espace/AppShell.astro";
+import EspaceButton from "../../../../../components/espace/EspaceButton.astro";
+import { Avatar, tagOf } from "../../../../../react-components/espace/ProfileCardView";
+import ProfileCardView from "../../../../../react-components/espace/ProfileCardView";
+import { Icon } from "../../../../../react-components/espace/MeetingStatus";
+import SlotPicker from "../../../../../react-components/espace/SlotPicker";
+import { espaceGet, guardSession, publicStrapiUrl } from "../../../../../lib/espace/api";
+import { bannerColor } from "../../../../../lib/espace/format";
+import {
+  dayLabelOf,
+  firstName,
+  hourRange,
+  targetOf,
+  type DirectoryExhibitor,
+  type DirectoryPerson,
+  type SlotsResponse,
+} from "../../../../../lib/espace/meetings";
+
+const slug = Astro.params.edition ?? "";
+const type = Astro.params.type;
+const id = Astro.params.id ?? "";
+if (type !== "p" && type !== "x") return Astro.rewrite("/espace/introuvable");
+
+const cookie = Astro.request.headers.get("cookie");
+const guard = await guardSession(slug, cookie);
+if ("redirect" in guard) return Astro.redirect(guard.redirect);
+if ("notFound" in guard) return Astro.rewrite("/espace/introuvable");
+const { edition, me } = guard;
+
+const base = `/espace/${encodeURIComponent(slug)}`;
+const profile = await espaceGet<DirectoryPerson | DirectoryExhibitor>(`/directory/${type}/${encodeURIComponent(id)}`, cookie);
+if (!profile.ok && profile.status === 401) return Astro.redirect(`${base}/connexion`);
+if (!profile.ok && profile.status !== 404) throw new Error(`GET /directory/${type}/${id} : ${profile.status}`);
+if (!profile.ok) Astro.response.status = 404;
+
+const card = profile.ok ? profile.data : null;
+const person = card && card.kind === "attendee" ? (card as DirectoryPerson) : null;
+const exhibitor = card && card.kind === "exhibitor" ? (card as DirectoryExhibitor) : null;
+
+// Grille des créneaux : lue ici pour le premier affichage ; en cas d'échec, l'îlot la charge lui-même (avec « Réessayer »).
+const target = card ? targetOf(card) : "";
+const slotsResult = card ? await espaceGet<SlotsResponse>(`/slots?target=${encodeURIComponent(target)}`, cookie) : null;
+if (slotsResult && !slotsResult.ok && slotsResult.status === 401) return Astro.redirect(`${base}/connexion`);
+const slots = slotsResult?.ok ? slotsResult.data : undefined;
+
+const title = card ? card.displayName : "Profil introuvable";
+const tag = card ? tagOf(card) : null;
+const role = person ? [person.jobTitle, person.company].filter(Boolean) : [];
+---
+
+<AppShell title={title} active="directory" editionSlug={slug} me={me}>
+  <div class="border-b border-surface-alt bg-white">
+    <div class="mx-auto max-w-180 px-4 pt-2">
+      <a href={`${base}/annuaire`} class="inline-flex min-h-11 items-center gap-2 font-heading text-lg font-semibold text-title">
+        <Icon name="back" />
+        Annuaire
+      </a>
+    </div>
+  </div>
+
+  {
+    !card && (
+      <div class="mx-auto mt-6 max-w-180 px-4">
+        <section class="rounded-xl border border-surface-alt bg-white p-6">
+          <h1 class="font-heading text-2xl leading-tight font-bold normal-case">Profil introuvable</h1>
+          <p class="mt-3">Ce profil n’existe pas, ou son auteur ne l’a pas rendu visible dans l’annuaire.</p>
+          <EspaceButton variant="secondary" href={`${base}/annuaire`} class="mt-6">
+            Retour à l’annuaire
+          </EspaceButton>
+        </section>
+      </div>
+    )
+  }
+
+  {
+    card && tag && (
+      <>
+        <header class="border-b border-surface-alt bg-white pb-6">
+          <div class="mx-auto flex max-w-180 items-center gap-4 px-4 pt-4">
+            <span class="inline-flex shrink-0 rounded-full border-4 border-gold p-1">
+              <Avatar card={card} strapiUrl={publicStrapiUrl} size="size-20" />
+            </span>
+            <div class="min-w-0">
+              <h1 class="font-heading text-2xl leading-tight font-bold normal-case">{card.displayName}</h1>
+              {person && role.length === 0 && card.subtitle && <p class="mt-1 text-lg leading-snug text-muted">{card.subtitle}</p>}
+              {person?.jobTitle && <p class="mt-1 text-lg leading-snug text-muted">{person.jobTitle}</p>}
+              {person?.company && <p class="text-lg leading-snug font-bold text-ink">{person.company}</p>}
+              {exhibitor && card.subtitle && <p class="mt-1 text-lg leading-snug text-muted">{card.subtitle}</p>}
+            </div>
+          </div>
+          <div class="mx-auto mt-4 max-w-180 px-4">
+            <ul class="flex flex-wrap gap-2">
+              <li class={`rounded-md px-2 py-1 text-sm font-bold ${tag.classes}`}>{tag.label}</li>
+              {(person?.sessions ?? []).map((session) => (
+                <li class="rounded-md bg-surface px-2 py-1 text-sm font-bold text-ink">
+                  {[session.title, hourRange(session.start, session.end)].filter(Boolean).join(", ")}
+                </li>
+              ))}
+            </ul>
+            {person?.exhibitor && (
+              <p class="mt-3 text-ink">
+                Représentant de{" "}
+                <a href={`${base}/annuaire/x/${encodeURIComponent(person.exhibitor.id)}`} class="font-semibold text-title underline">
+                  {person.exhibitor.name}
+                  {person.exhibitor.standNumber ? `, stand ${person.exhibitor.standNumber}` : ""}
+                </a>
+              </p>
+            )}
+            {person?.bio && <p class="mt-4 text-lg text-ink">{person.bio}</p>}
+            {exhibitor?.description && <p class="mt-4 text-lg text-ink">{exhibitor.description}</p>}
+            {exhibitor?.website && /^https?:\/\//.test(exhibitor.website) && (
+              <p class="mt-3">
+                <a href={exhibitor.website} rel="noopener noreferrer" target="_blank" class="inline-flex min-h-11 items-center font-semibold text-title underline">
+                  Site web de {card.displayName}
+                  <span class="sr-only"> (s’ouvre dans un nouvel onglet)</span>
+                </a>
+              </p>
+            )}
+            {(card.topics ?? []).length > 0 && (
+              <ul aria-label="Sujets" class="mt-4 flex flex-wrap gap-2">
+                {(card.topics ?? []).map((topic) => (
+                  <li class="rounded-full bg-surface px-3 py-1 text-sm font-semibold text-title">{topic.name}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </header>
+
+        <div class="mx-auto max-w-180 px-4 py-6">
+          <noscript>
+            <p class="font-semibold">Cette étape demande JavaScript. Activez-le ou utilisez un autre navigateur.</p>
+          </noscript>
+          <SlotPicker
+            client:load
+            strapiUrl={publicStrapiUrl}
+            editionSlug={slug}
+            target={target}
+            targetName={firstName(card)}
+            themeColor={bannerColor(edition.themeColor)}
+            dayLabel={dayLabelOf(edition.date)}
+            initial={slots}
+            standNumber={card.standNumber ?? null}
+            tableNumber={card.hostedTableNumber ?? null}
+          />
+
+          {person?.canMessage && (
+            <EspaceButton variant="secondary" href={`${base}/messages/nouveau?avec=${encodeURIComponent(target)}`} class="mt-6">
+              Écrire un message
+              <span class="sr-only">{` à ${person.displayName}`}</span>
+            </EspaceButton>
+          )}
+
+          {exhibitor && (exhibitor.representatives ?? []).length > 0 && (
+            <section aria-labelledby="representants" class="mt-8">
+              <h2 id="representants" class="font-heading text-xl font-semibold normal-case">
+                Représentants
+              </h2>
+              <ul class="mt-3 grid gap-3">
+                {exhibitor.representatives.map((representative) => (
+                  <li>
+                    <ProfileCardView card={representative} strapiUrl={publicStrapiUrl} href={`${base}/annuaire/p/${encodeURIComponent(representative.id)}`} />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </div>
+      </>
+    )
+  }
+</AppShell>

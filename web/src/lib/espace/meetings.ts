@@ -60,6 +60,28 @@ export type MeetingsResponse = {
   closed: Meeting[];
 };
 
+/** `GET /directory/p/:id` (E5) : la carte plus les champs de la fiche. Jamais d'e-mail (R-42). */
+export type DirectoryPerson = ProfileCard & {
+  firstName: string;
+  lastName: string;
+  jobTitle: string | null;
+  company: string | null;
+  bio: string | null;
+  /** Séquences de l'intervenant, heures du programme en texte (« 11h15 »). */
+  sessions: { title: string; start: string | null; end: string | null }[];
+  exhibitor: { id: string; name: string; standNumber?: string | number | null } | null;
+  isSelf: boolean;
+  canMessage: boolean;
+};
+
+/** `GET /directory/x/:id` (E5) : la carte de l'exposant plus sa fiche, avec ses représentants visibles. */
+export type DirectoryExhibitor = ProfileCard & {
+  description: string | null;
+  website: string | null;
+  representatives: ProfileCard[];
+  isMine: boolean;
+};
+
 /** F-56 : texte affiché quand le créneau a été pris entre le chargement de la grille et l'envoi. */
 export const SLOT_TAKEN_MESSAGE = "Ce créneau vient d’être pris, choisissez-en un autre";
 
@@ -87,6 +109,13 @@ export function hourLabel(value: string | null | undefined): string {
   const parts = new Intl.DateTimeFormat("fr-FR", { hour: "numeric", minute: "2-digit", hourCycle: "h23", timeZone: TIME_ZONE }).formatToParts(date);
   const part = (type: string) => parts.find((item) => item.type === type)?.value ?? "";
   return `${Number(part("hour"))}h${part("minute")}`;
+}
+
+/** « jeudi 3 décembre » d'une date d'édition (« 2026-12-03 », sans heure), ou null. */
+export function dayLabelOf(date: string | null | undefined): string | null {
+  const day = date ? new Date(`${date}T12:00:00Z`) : null;
+  if (!day || Number.isNaN(day.getTime())) return null;
+  return new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", timeZone: TIME_ZONE }).format(day);
 }
 
 /** « 10h45 à 11h15 », ou « 10h45 » sans fin. */
