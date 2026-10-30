@@ -49,6 +49,17 @@ function shorten(text) {
 }
 
 /**
+ * Function and company of an attendee as the directory shows them: what the attendee gave, else what the program knows
+ * (the function and structure of the linked intervenant, the name of the exhibitor represented).
+ */
+function identity(attendee) {
+  return {
+    jobTitle: clean(attendee.jobTitle) || clean(attendee.speaker?.title) || null,
+    company: clean(attendee.company) || clean(attendee.speaker?.organisation?.name) || clean(attendee.exhibitor?.organisation?.name) || null,
+  };
+}
+
+/**
  * Card of an Attendee loaded with ATTENDEE_CARD_POPULATE.
  * `publicOnly` (A-29, R-43): the public data of the program only, taken from the linked `intervenant` (name, function,
  * structure, photo), never the personal profile (own photo, topics). Without a linked intervenant, the identity imported
@@ -58,7 +69,8 @@ function attendeeCard(attendee, { publicOnly = false } = {}) {
   const speaker = attendee.speaker ?? null;
   const program = publicOnly && speaker;
   const displayName = program ? clean(speaker.name) : joined(' ', attendee.firstName, attendee.lastName);
-  const subtitle = program ? joined(', ', speaker.title, speaker.organisation?.name) : joined(', ', attendee.jobTitle, attendee.company);
+  const { jobTitle, company } = identity(attendee);
+  const subtitle = program ? joined(', ', speaker.title, speaker.organisation?.name) : joined(', ', jobTitle, company);
   const photo = publicOnly ? speaker?.photo : (attendee.photo ?? speaker?.photo);
   const stand = clean(attendee.exhibitor?.standNumber);
 
@@ -95,4 +107,4 @@ function exhibitorCard(exhibitor) {
   };
 }
 
-module.exports = { ATTENDEE_CARD_POPULATE, EXHIBITOR_CARD_POPULATE, initials, attendeeCard, exhibitorCard };
+module.exports = { ATTENDEE_CARD_POPULATE, EXHIBITOR_CARD_POPULATE, initials, identity, attendeeCard, exhibitorCard };

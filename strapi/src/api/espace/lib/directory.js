@@ -66,28 +66,9 @@ function searchDirectory({ cards, q, type = 'all', topicIds = [], cursor, pageSi
 }
 
 /**
- * A-29: the dedicated tables. An attendee counts when it is an active speaker with an integer `hostedTableNumber`
- * between 1 and `tablesCount` ; two attendees on the same number: the smallest `id` keeps it, the other is ignored.
- * `attendees` carry `{ id, documentId, role, status, hostedTableNumber }`. -> Map(documentId -> table number)
- */
-function hostedTableOwners(attendees, tablesCount) {
-  const owners = new Map();
-  const candidates = attendees
-    .filter(({ role, status, hostedTableNumber }) => role === 'speaker' && status === 'active' && Number.isInteger(hostedTableNumber) && hostedTableNumber >= 1 && hostedTableNumber <= tablesCount)
-    .sort((a, b) => a.id - b.id);
-  const taken = new Set();
-  for (const { documentId, hostedTableNumber } of candidates) {
-    if (taken.has(hostedTableNumber)) continue;
-    taken.add(hostedTableNumber);
-    owners.set(documentId, hostedTableNumber);
-  }
-  return owners;
-}
-
-/**
  * R-41, R-43, A-26, A-34: what a viewer may see of an attendee -> 'full' (personal profile), 'public' (the public data of
  * the program only, A-29) or null (404). `related`: the documentIds of the people the viewer has a meeting (any status) or
- * a conversation with ; `hosted`: Map of hostedTableOwners. An organizer is never visible, except to himself.
+ * a conversation with ; `hosted`: the Map of the dedicated tables (hostedTables of lib/meetings.js). An organizer is never visible, except to himself.
  */
 function profileVisibility({ viewerId, attendee, isOrganizer, related, hosted }) {
   if (attendee.documentId === viewerId) return 'full';
@@ -97,4 +78,4 @@ function profileVisibility({ viewerId, attendee, isOrganizer, related, hosted })
   return related.has(attendee.documentId) ? 'full' : null;
 }
 
-module.exports = { normalizeText, searchDirectory, hostedTableOwners, profileVisibility };
+module.exports = { normalizeText, searchDirectory, profileVisibility };
