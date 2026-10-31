@@ -5,7 +5,8 @@ import { photoSrc } from "../../lib/espace/format";
 // Carte de profil (E1 suggestions, E4 annuaire, E5 représentants, E7 interlocuteurs) : avatar ou initiales, nom, sous-titre, étiquette.
 // Composant sans état : rendu serveur sans hydratation dans les pages (aucune directive `client:`), réutilisable dans un îlot.
 //  - `href` : la carte entière est un lien, avec chevron (annuaire) ;
-//  - `action` : un bouton à droite de la carte (suggestions : « Rencontrer ») ;
+//  - `action` : un bouton (suggestions : « Rencontrer »), sous le texte et sur toute la largeur tant que la carte fait moins de
+//    28 rem (`@md`, requête de conteneur : la largeur de la carte, pas celle de l'écran), à droite au-delà ;
 //  - ni l'un ni l'autre : carte seule.
 // `strapiUrl` (REACT_STRAPI_URL passé en propriété) préfixe le chemin de photo renvoyé par l'API.
 
@@ -89,10 +90,12 @@ export default function ProfileCardView({ card, strapiUrl, href, action }: Props
     );
   }
 
+  if (!action) return <div className={frame}>{body}</div>;
+
   return (
-    <div className={frame}>
-      {body}
-      {action && (
+    <div className="@container">
+      <div className="flex flex-col gap-4 rounded-xl border border-surface-alt bg-white p-4 @md:flex-row @md:items-center">
+        <div className="flex min-w-0 flex-1 items-center gap-4">{body}</div>
         <a
           href={action.href}
           className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg bg-gold px-5 font-bold text-gold-ink shadow-md shadow-gold/25 hover:bg-gold-light"
@@ -100,7 +103,7 @@ export default function ProfileCardView({ card, strapiUrl, href, action }: Props
           {action.label}
           <span className="sr-only">{` : ${card.displayName}`}</span>
         </a>
-      )}
+      </div>
     </div>
   );
 }

@@ -47,6 +47,7 @@ Tant qu'une question n'est pas tranchée par Xylofutur, les agents appliquent l'
 | D-02 | Réalisation par l'équipe d'agents décrite dans `09-phases.md` (architecte, designer, developer, tester), avec les portes de validation prévues. | Mathieu |
 | D-03 | Aucun paramètre d'édition en dur : tout ce qui varie d'une édition à l'autre se règle dans Strapi. | Mathieu |
 | D-04 | Participation « Stand » ou « Meeting ». Un exposant reçoit au stand (R-13, R-14). Un intervenant peut tenir une table dédiée (`hostedTableNumber`) : il y reste pendant toutes les pauses B2B, un participant à la fois, réservation directe sans validation (R-19). Les autres tables forment le lot commun des rendez-vous 1-to-1 entre participants quelconques, table attribuée automatiquement à l'acceptation (R-03, R-13). Hypothèse par défaut : la table dédiée est réservable dès que l'organisateur l'a réglée, sans attendre l'activation de l'espace de l'intervenant. | Mathieu, 30 octobre |
+| D-05 | Participant de plusieurs éditions : chaque édition garde son propre compte (même adresse e-mail), consultable tant que son espace reste ouvert, jusqu'à la purge à 12 mois (R-44). Durée jugée suffisante, les éditions étant renouvelées chaque année : pas de compte unique multi-éditions ni de carnet de contacts commun. Laisser `participantSpaceEnabled` activé après l'événement pour que l'espace reste consultable. | Mathieu, 31 octobre |
 
 ## Constats préalables pour la phase 0
 
