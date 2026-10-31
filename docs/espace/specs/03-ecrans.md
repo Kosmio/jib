@@ -131,6 +131,7 @@ Maquette : 09-pilotage. Accès réservé au rôle organisateur.
 - **F-91 (P0)** Exports CSV UTF-8 avec BOM, séparateur point-virgule (Excel FR) : participants, rendez-vous, exposants avec nombre de demandes, statistiques agrégées. Aucun contenu de message exporté (R-63).
 - **F-92 (P0)** Relance manuelle : choix du scénario (R-70), aperçu du nombre de destinataires et d'un e-mail exemple, confirmation, envoi ; respecte l'idempotence (R-71).
 - **F-93 (P1)** Ouverture et fermeture de la prise de rendez-vous depuis ce tableau (sinon : dans Strapi).
+- **F-94 (P0)** Bouton « Régénérer les créneaux » (R-02) dans la carte des pauses B2B : appelle `POST /admin/{edition}/slots/regenerate`, puis affiche le compte rendu (créneaux créés, conservés, supprimés), les pauses écartées avec leur motif (`MISSING_END`, `INVALID_TIME`, `TOO_SHORT`, `OVERLAP`) et les créneaux conservés parce qu'ils portent des rendez-vous. Sans pause B2B utilisable, un message dit comment en déclarer une dans Strapi. Seul moyen, hors script, de créer les créneaux d'une nouvelle édition (Mathieu, 31 octobre).
 
 ## E10. E-mails
 

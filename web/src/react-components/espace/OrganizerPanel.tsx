@@ -6,15 +6,18 @@ import {
   groupSlots,
   normalizeWarning,
   percent,
+  regenerateSlots,
   runSync,
+  type SlotsReport,
   type Stats,
   type SyncRun,
 } from "../../lib/espace/admin";
 import { EspaceApiError } from "../../lib/espace/client";
 import { plural, timeLabel } from "../../lib/espace/format";
 
-// E9, tableau de bord organisateur (F-90) : synchronisation HelloAsso, indicateurs, remplissage par pause B2B, exposants les plus
-// sollicités, avertissements, historique. Les chiffres viennent de `GET /admin/{edition}/stats` ; aucun contenu de message (R-63).
+// E9, tableau de bord organisateur (F-90) : synchronisation HelloAsso, indicateurs, remplissage par pause B2B et régénération des
+// créneaux (R-02, F-94), exposants les plus sollicités, avertissements, historique. Les chiffres viennent de
+// `GET /admin/{edition}/stats` ; aucun contenu de message (R-63).
 // Les exports CSV (F-91) et la relance manuelle (F-92) viennent après la recette du 30 octobre.
 
 type Props = {
@@ -48,8 +51,19 @@ const WARNING_LABELS: Record<string, string> = {
   HOSTED_TABLE_INVALID: "Une table dédiée est hors des tables de l’édition ou n’est pas portée par un intervenant\u00a0: elle est ignorée.",
 };
 
+/** Pauses B2B écartées par le calcul des créneaux (R-01) : la pause n'a aucun créneau. */
+const SLOT_WARNING_LABELS: Record<string, string> = {
+  MISSING_END: "pas d’heure de fin",
+  INVALID_TIME: "horaires invalides",
+  TOO_SHORT: "plus courte qu’un créneau",
+  OVERLAP: "chevauche une autre pause B2B",
+};
+
 const SYNC_FAILED = "La synchronisation a échoué. Vérifiez votre connexion et réessayez.";
+const SLOTS_FAILED = "Les créneaux n’ont pas pu être régénérés. Vérifiez votre connexion et réessayez.";
 const LOAD_FAILED = "Les chiffres n’ont pas pu être actualisés. Rechargez la page.";
+
+type Feedback = { kind: "alert" | "status"; text: string; lines?: string[] };
 
 const number = (value: number) => value.toLocaleString("fr-FR");
 const percentLabel = (value: number) => `${value} %`;
@@ -107,6 +121,63 @@ function syncSummary(run: SyncRun): { kind: "alert" | "status"; text: string } {
     : { kind: "status", text: `Synchronisation terminée\u00a0: ${counts}.` };
 }
 
+/** Compte rendu de R-02 : pauses écartées et créneaux conservés parce qu'ils portent encore des rendez-vous. */
+function slotsSummary(report: SlotsReport): Feedback {
+  const lines = [
+    ...report.warnings.map(
+      ({ title, code }) => `« ${title} » : ${SLOT_WARNING_LABELS[code] ?? code}, aucun créneau.`,
+    ),
+    ...report.orphans.map(
+      ({ label, activeMeetings }) =>
+        `Le créneau de ${label} ne correspond plus à aucune pause, mais porte encore ${plural(activeMeetings, "rendez-vous", "rendez-vous")} accepté${activeMeetings > 1 ? "s" : ""} ou en attente : il est conservé.`,
+    ),
+  ];
+  if (report.created + report.kept + report.orphans.length === 0) {
+    return {
+      kind: "alert",
+      text: `Aucun créneau : le programme publié de l’édition n’a pas de pause B2B utilisable. Dans Strapi, donnez le type b2b_break aux séquences des pauses, avec leurs heures de début et de fin.${report.removed ? ` ${plural(report.removed, "créneau supprimé", "créneaux supprimés")}.` : ""}`,
+      lines,
+    };
+  }
+  const counts = `${plural(report.created, "créneau créé", "créneaux créés")}, ${plural(report.kept, "conservé")}, ${plural(report.removed, "supprimé")}`;
+  return { kind: lines.length ? "alert" : "status", text: `Créneaux régénérés : ${counts}.`, lines };
+}
+
+/** Message d'état (`role="status"`, toujours présent pour être annoncé) ou d'alerte, avec ses lignes de détail. */
+function FeedbackArea({ feedback }: { feedback: Feedback | null }) {
+  return (
+    <>
+      <div role="status" className="empty:hidden">
+        {feedback?.kind === "status" && (
+          <p className="mt-4 flex items-start gap-3 rounded-lg bg-surface p-3 font-semibold">
+            <span className="text-primary-ink">
+              <Icon name="check" />
+            </span>
+            {feedback.text}
+          </p>
+        )}
+      </div>
+      {feedback?.kind === "alert" && (
+        <div role="alert" className="mt-4 rounded-lg border-2 border-danger bg-white p-3">
+          <p className="flex items-start gap-3 font-semibold">
+            <span className="text-danger">
+              <Icon name="alert" />
+            </span>
+            {feedback.text}
+          </p>
+          {feedback.lines && feedback.lines.length > 0 && (
+            <ul className="mt-2 list-disc pl-13 text-muted">
+              {feedback.lines.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
 /** Erreurs d'un SyncRun regroupées par code : « 2 billets sans adresse e-mail valable ». */
 function errorLines(run: SyncRun): string[] {
   const counts = new Map<string, number>();
@@ -124,7 +195,9 @@ export default function OrganizerPanel({ strapiUrl, editionSlug, nowIso, themeCo
   const [stats, setStats] = useState(initialStats);
   const [runs, setRuns] = useState(initialRuns);
   const [syncing, setSyncing] = useState(false);
-  const [notice, setNotice] = useState<{ kind: "alert" | "status"; text: string } | null>(null);
+  const [notice, setNotice] = useState<Feedback | null>(null);
+  const [regenerating, setRegenerating] = useState(false);
+  const [slotsNotice, setSlotsNotice] = useState<Feedback | null>(null);
   const [now, setNow] = useState(() => new Date(nowIso));
 
   useEffect(() => {
@@ -158,6 +231,32 @@ export default function OrganizerPanel({ strapiUrl, editionSlug, nowIso, themeCo
       setNotice({ kind: "alert", text: `${syncSummary(run).text} ${LOAD_FAILED}` });
     }
     setSyncing(false);
+  }
+
+  async function regenerate() {
+    if (regenerating) return;
+    setRegenerating(true);
+    setSlotsNotice(null);
+    let report: SlotsReport;
+    try {
+      report = await regenerateSlots(strapiUrl, editionSlug);
+    } catch (failure) {
+      setRegenerating(false);
+      if (failure instanceof EspaceApiError && failure.status === 401) {
+        window.location.assign(`/espace/${encodeURIComponent(editionSlug)}/connexion`);
+        return;
+      }
+      setSlotsNotice({ kind: "alert", text: (failure instanceof EspaceApiError && failure.status !== 0 && failure.message) || SLOTS_FAILED });
+      return;
+    }
+    const summary = slotsSummary(report);
+    try {
+      setStats(await getStats(strapiUrl, editionSlug));
+      setSlotsNotice(summary);
+    } catch {
+      setSlotsNotice({ ...summary, kind: "alert", text: `${summary.text} ${LOAD_FAILED}` });
+    }
+    setRegenerating(false);
   }
 
   const { attendees, meetings, lastSync } = stats;
@@ -197,24 +296,7 @@ export default function OrganizerPanel({ strapiUrl, editionSlug, nowIso, themeCo
           </button>
         </div>
 
-        <div role="status" className="empty:hidden">
-          {notice?.kind === "status" && (
-            <p className="mt-4 flex items-start gap-3 rounded-lg bg-surface p-3 font-semibold">
-              <span className="text-primary-ink">
-                <Icon name="check" />
-              </span>
-              {notice.text}
-            </p>
-          )}
-        </div>
-        {notice?.kind === "alert" && (
-          <p role="alert" className="mt-4 flex items-start gap-3 rounded-lg border-2 border-danger bg-white p-3 font-semibold">
-            <span className="text-danger">
-              <Icon name="alert" />
-            </span>
-            {notice.text}
-          </p>
-        )}
+        <FeedbackArea feedback={notice} />
         {lastErrors.length > 0 && (
           <div className="mt-4">
             <h3 className="font-semibold">Erreurs de la dernière synchronisation</h3>
@@ -313,6 +395,22 @@ export default function OrganizerPanel({ strapiUrl, editionSlug, nowIso, themeCo
               )}
             </>
           )}
+          <div className="mt-6 border-t border-surface-alt pt-4">
+            <p className="text-muted">
+              Les créneaux sont calculés à partir des pauses B2B du programme. Régénérez-les après avoir ajouté une pause ou changé ses
+              horaires dans Strapi&nbsp;: un créneau qui porte un rendez-vous n’est jamais supprimé.
+            </p>
+            <button
+              type="button"
+              onClick={regenerate}
+              disabled={regenerating}
+              aria-busy={regenerating}
+              className="mt-3 inline-flex min-h-11 items-center justify-center rounded-lg border-2 border-title bg-white px-5 font-bold text-title hover:bg-surface disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {regenerating ? "Régénération en cours…" : "Régénérer les créneaux"}
+            </button>
+            <FeedbackArea feedback={slotsNotice} />
+          </div>
         </Card>
 
         <Card heading="Exposants les plus sollicités">

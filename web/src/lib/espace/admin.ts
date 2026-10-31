@@ -45,6 +45,19 @@ export const getSyncRuns = (baseUrl: string, editionSlug: string) =>
 /** POST /admin/{edition}/sync : attend la fin et rend le SyncRun clos ; 409 SYNC_RUNNING si une synchronisation est en cours. */
 export const runSync = (baseUrl: string, editionSlug: string) => request<SyncRun>(baseUrl, `/admin/${enc(editionSlug)}/sync`, "POST");
 
+/** Compte rendu de la régénération des créneaux (R-02, 06-api.md) ; `warnings[].code` : MISSING_END, INVALID_TIME, TOO_SHORT, OVERLAP. */
+export type SlotsReport = {
+  created: number;
+  kept: number;
+  removed: number;
+  orphans: { id: string; label: string; activeMeetings: number }[];
+  warnings: { sessionDocumentId: string; title: string; code: string }[];
+};
+
+/** POST /admin/{edition}/slots/regenerate ; 409 EDITION_DATE_MISSING si l'édition publiée n'a pas de date. */
+export const regenerateSlots = (baseUrl: string, editionSlug: string) =>
+  request<SlotsReport>(baseUrl, `/admin/${enc(editionSlug)}/slots/regenerate`, "POST");
+
 /** Un avertissement du serveur, qu'il soit un code seul ou un objet. */
 export const normalizeWarning = (warning: StatsWarning | string): StatsWarning =>
   typeof warning === "string" ? { code: warning } : warning;
