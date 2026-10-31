@@ -1,5 +1,7 @@
+import type { BrowserContext, Locator, Page } from '@playwright/test';
 import {
   capture,
+  EDITION,
   ESPACE,
   expect,
   hydrated,
@@ -12,6 +14,7 @@ import {
   watchConsole,
 } from './espace';
 import { STRAPI_URL } from './fixtures';
+import { editProgram, TEST_PAUSE_PREFIX } from './programme';
 
 /**
  * Recette du soir (lot 16 des phases 2 et 3) : le parcours que Mathieu rejoue à la main sur `strapi_demo_e2e`, joué ici sur le seed de
@@ -22,7 +25,8 @@ import { STRAPI_URL } from './fixtures';
  *   - un participant réserve un créneau libre de la table 2 d'Antoine (R-19, A-29) ; un autre la voit prise (T-25) ;
  *   - Manon envoie une demande puis l'annule (F-52, F-63) ;
  *   - Léa écrit à Mathis, Mathis le reçoit (F-70, F-72, A-37) ;
- *   - l'organisateur ouvre E9 (F-90, R-63), synchronise sur le faux HelloAsso (0, 0, 0) ; un participant reçoit 403 (T-42).
+ *   - l'organisateur ouvre E9 (F-90, R-63), synchronise sur le faux HelloAsso (0, 0, 0), régénère les créneaux (F-94, R-02) ;
+ *     un participant reçoit 403 (T-42).
  *
  * Les tests se suivent (mode `serial`) et partagent la base : chacun a ses personnes, mais certains lisent ce que le précédent a écrit
  * (Léa accepte avant qu'Inès ne vérifie, Léa écrit avant que Mathis ne lise). Le seed a des dates fixes (fenêtre de rendez-vous ouverte
@@ -473,6 +477,209 @@ test('l’organisateur ouvre E9 : indicateurs égaux aux comptes de l’API, auc
   await history.locator('summary').click();
   await expect(history.getByRole('table').locator('tbody tr').first().locator('td')).toHaveText(['0', '0', '0', '0']);
   consoleWatch.expectClean();
+});
+
+/**
+ * E9, bouton « Régénérer les créneaux » (F-94, R-02). Les pauses B2B se changent par le Document Service (programme.ts) : l'admin de
+ * Strapi n'est pas construit dans les tests. Les tests se suivent et chacun part de l'état laissé par le précédent ; `reset` remet le
+ * programme du seed et régénère les créneaux à la fin, pour les tests qui suivent dans ce fichier et dans les autres.
+ */
+test.describe('E9 : régénérer les créneaux (F-94, R-02)', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  const CAFE = `${TEST_PAUSE_PREFIX} Café B2B`;
+  const REGENERATE = /^(Régénérer les créneaux|Régénération en cours…)$/;
+
+  test.afterAll(() => {
+    test.setTimeout(120_000);
+    editProgram({ op: 'reset' });
+  });
+
+  // Strapi limite les liens de connexion à 5 par adresse et par 15 minutes (NF-03) : le premier test ouvre la session de l'organisateur,
+  // les suivants en reprennent le cookie plutôt que de redemander un lien.
+  let session: Awaited<ReturnType<BrowserContext['cookies']>> | undefined;
+
+  /** Ouvre E9 en organisateur et rend la carte « Rendez-vous par pause B2B », son bouton et ses deux zones de message. */
+  async function openCard(page: Page, baseURL: string | undefined) {
+    if (session) {
+      await page.context().addCookies(session);
+    } else {
+      await openSpace(page, ORGANIZER);
+      if (page.url().endsWith('/bienvenue')) {
+        await hydrated(page);
+        await page.getByRole('button', { name: 'Continuer' }).click();
+        await expect(page).toHaveURL(`${baseURL}${ESPACE}/`);
+      }
+      session = await page.context().cookies();
+    }
+    await page.goto(`${ESPACE}/organisateur`);
+    await hydrated(page);
+    const card = page.getByRole('heading', { level: 2, name: 'Rendez-vous par pause B2B' }).locator('xpath=ancestor::section[1]');
+    return {
+      card,
+      button: card.getByRole('button', { name: REGENERATE }),
+      status: card.getByRole('status'),
+      alert: card.getByRole('alert'),
+      groups: card.getByRole('heading', { level: 3 }),
+    };
+  }
+
+  type SlotFill = { sessionTitle: string; label: string; accepted: number; pending: number };
+  const slotsOf = async (page: Page): Promise<SlotFill[]> => (await (await page.request.get(`${STRAPI_URL}/api/espace/admin/${EDITION}/stats`)).json()).slots;
+
+  /** Même accord que `plural` de l'espace : zéro au singulier, espace insécable entre le nombre et le mot. */
+  const plural = (count: number, one: string, many = `${one}s`) => `${count}${NBSP}${count < 2 ? one : many}`;
+  /** Le message d'état tel que le serveur d'E9 l'écrit, espace insécable avant les deux-points comprise. */
+  const regenerated = (created: number, kept: number, removed: number) =>
+    `Créneaux régénérés${NBSP}: ${plural(created, 'créneau créé', 'créneaux créés')}, ${plural(kept, 'conservé')}, ${plural(removed, 'supprimé')}.`;
+  /** Ligne d'une pause écartée : guillemets et deux-points précédés d'une espace insécable. */
+  const discarded = (title: string, reason: string) => `«${NBSP}${title}${NBSP}»${NBSP}: ${reason}, aucun créneau.`;
+  const orphaned = (label: string, meetings: number) =>
+    `Le créneau de ${label} ne correspond plus à aucune pause, mais porte encore ${meetings}${NBSP}rendez-vous accepté${meetings > 1 ? 's' : ''} ou en attente${NBSP}: il est conservé.`;
+  const textOf = (locator: Locator) => () => locator.textContent();
+
+  test('le seed est à jour : « 0 créneau créé, 10 conservés, 0 supprimé », rien ne bouge et le bouton se libère (F-94, R-02)', async ({ page, baseURL }) => {
+    const { button, status, alert, groups } = await openCard(page, baseURL);
+    const titles = ['Pause et B2B, 10h45 (2 créneaux)', 'Cocktail déjeunatoire & B2B, 12h30 (6 créneaux)', 'Pause et B2B, 15h30 (2 créneaux)'];
+    await expect(groups).toHaveText(titles);
+    const before = await slotsOf(page);
+    expect(before).toHaveLength(10);
+    await expect(status).toHaveCount(0);
+
+    await button.click();
+    await expect.poll(textOf(status)).toBe(regenerated(0, 10, 0));
+    await expect(alert).toHaveCount(0);
+    await expect(button).toBeEnabled();
+    await expect(button).toHaveText('Régénérer les créneaux');
+    await expect(groups).toHaveText(titles);
+    expect(await slotsOf(page)).toEqual(before);
+  });
+
+  test('une pause B2B ajoutée dans Strapi : ses créneaux sont créés et la carte les montre sans recharger la page (F-94, R-01, R-02)', async ({ page, baseURL }) => {
+    test.setTimeout(120_000);
+    const { button, status, alert, groups } = await openCard(page, baseURL);
+    const before = (await slotsOf(page)).length;
+    await expect(groups).toHaveCount(3);
+
+    editProgram({ op: 'create-sequence', data: { title: CAFE, start_time: '9h00', end_time: '9h30', kind: 'b2b_break', order: 100 } });
+    await expect(groups).toHaveCount(3);
+
+    await button.click();
+    await expect.poll(textOf(status)).toBe(regenerated(2, before, 0));
+    await expect(alert).toHaveCount(0);
+    await expect(groups).toHaveCount(4);
+    await expect(groups.first()).toHaveText(`${CAFE}, 9h00 (2 créneaux)`);
+    expect(await slotsOf(page)).toHaveLength(before + 2);
+  });
+
+  test('la même pause raccourcie : le créneau en trop est supprimé, les autres sont conservés (F-94, R-02)', async ({ page, baseURL }) => {
+    test.setTimeout(120_000);
+    const { button, status, alert, groups } = await openCard(page, baseURL);
+    const before = (await slotsOf(page)).length;
+    await expect(groups.first()).toHaveText(`${CAFE}, 9h00 (2 créneaux)`);
+
+    editProgram({ op: 'update-sequence', match: { title: CAFE }, data: { end_time: '9h15' } });
+    await button.click();
+    await expect.poll(textOf(status)).toBe(regenerated(0, before - 1, 1));
+    await expect(alert).toHaveCount(0);
+    await expect(groups.first()).toHaveText(`${CAFE}, 9h00 (1 créneau)`);
+    expect(await slotsOf(page)).toHaveLength(before - 1);
+  });
+
+  test('une pause sans heure de fin est écartée : alerte avec son motif, son créneau supprimé (F-94, R-01)', async ({ page, baseURL }) => {
+    test.setTimeout(120_000);
+    const { button, status, alert, groups } = await openCard(page, baseURL);
+    const before = (await slotsOf(page)).length;
+
+    editProgram({ op: 'update-sequence', match: { title: CAFE }, data: { end_time: null } });
+    await button.click();
+    await expect.poll(textOf(alert.locator('p'))).toBe(regenerated(0, before - 1, 1));
+    expect(await alert.locator('li').allTextContents()).toEqual([discarded(CAFE, 'pas d’heure de fin')]);
+    await expect(status).toHaveCount(0);
+    await expect(groups).toHaveCount(3);
+    expect(await slotsOf(page)).toHaveLength(before - 1);
+  });
+
+  test('les autres motifs d’écart : horaires invalides, plus courte qu’un créneau, chevauchement d’une autre pause (F-94, R-01)', async ({ page, baseURL }) => {
+    test.setTimeout(120_000);
+    const { button, status, alert } = await openCard(page, baseURL);
+    const before = (await slotsOf(page)).length;
+    const tooShort = `${TEST_PAUSE_PREFIX} Trop courte`;
+    const unreadable = `${TEST_PAUSE_PREFIX} Heures illisibles`;
+    const overlapping = `${TEST_PAUSE_PREFIX} Chevauchement`;
+
+    editProgram(
+      { op: 'create-sequence', data: { title: tooShort, start_time: '9h00', end_time: '9h10', kind: 'b2b_break' } },
+      { op: 'create-sequence', data: { title: unreadable, start_time: '9:15', end_time: '9:45', kind: 'b2b_break' } },
+      // « Pause et B2B » de 10h45 à 11h15 est antérieure : c'est celle-là qui garde ses créneaux.
+      { op: 'create-sequence', data: { title: overlapping, start_time: '10h50', end_time: '11h10', kind: 'b2b_break' } },
+    );
+    await button.click();
+    await expect.poll(textOf(alert.locator('p'))).toBe(regenerated(0, before, 0));
+    expect((await alert.locator('li').allTextContents()).sort()).toEqual(
+      [
+        discarded(CAFE, 'pas d’heure de fin'),
+        discarded(tooShort, 'plus courte qu’un créneau'),
+        discarded(unreadable, 'horaires invalides'),
+        discarded(overlapping, 'chevauche une autre pause B2B'),
+      ].sort(),
+    );
+    await expect(status).toHaveCount(0);
+    expect(await slotsOf(page)).toHaveLength(before);
+  });
+
+  test('un créneau qui porte un rendez-vous n’est jamais supprimé : alerte « il est conservé », même au second clic (F-94, R-02)', async ({ page, baseURL }) => {
+    test.setTimeout(120_000);
+    const { button, status, alert, groups } = await openCard(page, baseURL);
+    const before = await slotsOf(page);
+    expect(before).toHaveLength(10);
+    // Seed : un rendez-vous en attente à 15h45. Raccourcir la pause de 15h30 (16h00 devient 15h45) laisse ce créneau sans pause.
+    expect(before.find(({ label }) => label === '15h45')?.pending).toBeGreaterThanOrEqual(1);
+
+    editProgram(
+      { op: 'delete-sequences', titlePrefix: TEST_PAUSE_PREFIX },
+      { op: 'update-sequence', match: { title: 'Pause et B2B', start_time: '15h30' }, data: { end_time: '15h45' } },
+    );
+    for (const click of [1, 2]) {
+      await button.click();
+      await expect.poll(textOf(alert.locator('p')), { message: `clic ${click}` }).toBe(regenerated(0, before.length - 1, 0));
+      expect(await alert.locator('li').allTextContents(), `clic ${click}`).toEqual([orphaned('15h45', 1)]);
+      await expect(status).toHaveCount(0);
+      await expect(groups.last()).toHaveText('Pause et B2B, 15h30 (2 créneaux)');
+      expect(await slotsOf(page)).toHaveLength(before.length);
+    }
+  });
+
+  test('l’édition publiée n’a pas de date : le message du serveur (409) s’affiche et le bouton se libère (F-94)', async ({ page, baseURL }) => {
+    test.setTimeout(120_000);
+    const { button, status, alert } = await openCard(page, baseURL);
+    editProgram({ op: 'update-edition', data: { date: null } });
+    try {
+      await button.click();
+      await expect(alert).toHaveText('L’édition publiée n’a pas de date.');
+      await expect(status).toHaveCount(0);
+      await expect(button).toBeEnabled();
+      await expect(button).toHaveText('Régénérer les créneaux');
+    } finally {
+      editProgram({ op: 'update-edition', data: { date: '2026-12-03' } });
+    }
+  });
+
+  test('le serveur ne répond pas : message générique, bouton libéré (F-94)', async ({ page, baseURL }) => {
+    const { button, status, alert } = await openCard(page, baseURL);
+    await page.route('**/api/espace/admin/*/slots/regenerate', (route) => route.abort('failed'));
+    await button.click();
+    await expect(alert).toHaveText('Les créneaux n’ont pas pu être régénérés. Vérifiez votre connexion et réessayez.');
+    await expect(status).toHaveCount(0);
+    await expect(button).toBeEnabled();
+  });
+
+  test('session expirée : le clic renvoie vers la connexion (F-94)', async ({ page, baseURL }) => {
+    const { button } = await openCard(page, baseURL);
+    await page.context().clearCookies();
+    await button.click();
+    await expect(page).toHaveURL(`${baseURL}${ESPACE}/connexion`);
+  });
 });
 
 test('T-42 : un participant sur /organisateur reçoit 403 « Accès réservé » ; l’API des statistiques aussi', async ({ page }) => {
