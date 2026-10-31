@@ -102,7 +102,8 @@ const linkClass = (id: ShellTab) =>
                       </span>
                     ) : null}
                   </span>
-                  <span>{tab.label}</span>
+                  {/* Sous 360 px, une colonne fait moins de 72 px : « Programme » en 14 px déborderait de l'écran. */}
+                  <span class="max-xs:text-xs">{tab.label}</span>
                   {tab.count && tab.countLabel ? <span class="sr-only">, {tab.countLabel(tab.count)}</span> : null}
                 </a>
               </li>

@@ -57,6 +57,8 @@
   --font-heading: "Sora", "Helvetica Neue", system-ui, sans-serif;
   --font-display: "Azonix", "Space Grotesk", "Sora", system-ui, sans-serif;
 
+  /* xs : plus petits téléphones ; sous 360 px, la barre d'onglets de l'espace réduit ses libellés */
+  --breakpoint-xs: 360px;
   --breakpoint-sm: 480px;
   --breakpoint-md: 768px;
   --breakpoint-lg: 1024px;
