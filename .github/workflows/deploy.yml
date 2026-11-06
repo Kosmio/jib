@@ -9,6 +9,7 @@ on:
         type: choice
         options:
           - dev
+          - preprod
           - prod
       version:
         description: 'Version to deploy (e.g., 0.1.0)'
@@ -30,6 +31,8 @@ jobs:
     name: Deploy to ${{ inputs.environment }}
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
+    env:
+      SSH_PORT: ${{ vars.SSH_PORT || '2234' }}
 
     steps:
       - name: Checkout code
@@ -56,10 +59,10 @@ jobs:
         if: ${{ !inputs.dry_run }}
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -H -p 2234 ${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H -p $SSH_PORT ${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts
           cat >> ~/.ssh/config << EOF
           Host ${{ vars.DEPLOY_HOST }}
-            Port 2234
+            Port $SSH_PORT
             ServerAliveInterval 30
             ServerAliveCountMax 10
             TCPKeepAlive yes
@@ -195,5 +198,5 @@ jobs:
         if: ${{ failure() && !inputs.dry_run }}
         run: |
           echo "Deployment failed. Check logs manually on the server with:"
-          echo "  ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} -p 2234"
+          echo "  ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} -p $SSH_PORT"
           echo "  cd ~/jib/infra/deploy && ./scripts/deploy.sh ${{ inputs.environment }} logs"

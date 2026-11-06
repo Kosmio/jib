@@ -1,0 +1,89 @@
+# Pre-production environment overlay
+# Mirrors prod (resource limits, always restart) on its own server
+# Traefik handles TLS termination with Let's Encrypt
+# Single domain: Strapi served under /strapi path, Astro catches everything else
+
+services:
+  traefik:
+    ports:
+      - "80:80"
+      - "443:443"
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  postgres:
+    volumes:
+      - ~/jib/data/postgres:/var/lib/postgresql/data
+    restart: always
+    ports:
+      - "127.0.0.1:5432:5432"
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  mcp:
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.mcp.rule: "Host(`${HOST_NAME}`) && PathPrefix(`/mcp`)"
+      traefik.http.routers.mcp.entrypoints: websecure
+      traefik.http.routers.mcp.tls.certresolver: letsencrypt-resolver
+      traefik.http.routers.mcp.middlewares: strip-mcp
+      traefik.http.routers.mcp-http.rule: "Host(`${HOST_NAME}`) && PathPrefix(`/mcp`)"
+      traefik.http.routers.mcp-http.entrypoints: web
+      traefik.http.routers.mcp-http.middlewares: strip-mcp,redirect-to-https
+      traefik.http.middlewares.strip-mcp.stripprefix.prefixes: "/mcp"
+      traefik.http.services.mcp.loadbalancer.server.port: "3100"
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  strapi:
+    labels:
+      traefik.enable: "true"
+      # HTTPS router
+      traefik.http.routers.strapi.rule: "Host(`${HOST_NAME}`) && PathPrefix(`/strapi`)"
+      traefik.http.routers.strapi.entrypoints: websecure
+      traefik.http.routers.strapi.tls.certresolver: letsencrypt-resolver
+      traefik.http.routers.strapi.middlewares: strip-strapi
+      # HTTP→HTTPS redirect router
+      traefik.http.routers.strapi-http.rule: "Host(`${HOST_NAME}`) && PathPrefix(`/strapi`)"
+      traefik.http.routers.strapi-http.entrypoints: web
+      traefik.http.routers.strapi-http.middlewares: strip-strapi,redirect-to-https
+      # Middlewares
+      traefik.http.middlewares.strip-strapi.stripprefix.prefixes: "/strapi"
+      traefik.http.middlewares.redirect-to-https.redirectscheme.scheme: "https"
+      traefik.http.middlewares.redirect-to-https.redirectscheme.permanent: "true"
+      traefik.http.services.strapi.loadbalancer.server.port: "1337"
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  web:
+    labels:
+      traefik.enable: "true"
+      # HTTPS router
+      traefik.http.routers.web.rule: "Host(`${HOST_NAME}`)"
+      traefik.http.routers.web.entrypoints: websecure
+      traefik.http.routers.web.tls.certresolver: letsencrypt-resolver
+      # HTTP→HTTPS redirect router
+      traefik.http.routers.web-http.rule: "Host(`${HOST_NAME}`)"
+      traefik.http.routers.web-http.entrypoints: web
+      traefik.http.routers.web-http.middlewares: redirect-to-https
+      traefik.http.services.web.loadbalancer.server.port: "80"
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+volumes:
+  traefik-certificates:
+    name: jib-traefik-certificates
