@@ -205,7 +205,7 @@ jobs:
           echo "Starting Strapi on the prod data (it migrates the schema to this version)..."
           ssh $DST "docker start jib-strapi"
           for i in $(seq 1 60); do
-            if ssh $DST "docker exec jib-strapi wget -q -O /dev/null http://localhost:1337/_health" 2>/dev/null; then
+            if ssh $DST "docker exec jib-strapi wget -q -O /dev/null http://127.0.0.1:1337/_health" 2>/dev/null; then
               echo "Strapi is up."
               break
             fi
