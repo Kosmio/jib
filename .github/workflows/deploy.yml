@@ -25,6 +25,11 @@ on:
         required: false
         type: boolean
         default: false
+      copy_prod_data:
+        description: 'Preprod only: replace the database and uploads with a copy of prod (vars.SOURCE_HOST)'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   deploy:
@@ -46,6 +51,11 @@ jobs:
 
           if [[ ! "${{ inputs.version }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$ ]]; then
             echo "Error: Invalid version format. Expected: x.y.z or x.y.z-suffix"
+            exit 1
+          fi
+
+          if [[ "${{ inputs.copy_prod_data }}" == "true" && "${{ inputs.environment }}" != "preprod" ]]; then
+            echo "Error: copy_prod_data only runs on preprod"
             exit 1
           fi
 
@@ -166,6 +176,47 @@ jobs:
             # Cleanup secrets
             rm -f "$SECRETS_FILE" "$ENV_FILE.merged"
           ENDSSH
+
+      - name: Copy prod data
+        if: ${{ !inputs.dry_run && inputs.copy_prod_data && inputs.environment == 'preprod' }}
+        run: |
+          SRC="${{ vars.SOURCE_USER }}@${{ vars.SOURCE_HOST }}"
+          DST="${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}"
+          ssh-keyscan -H -p $SSH_PORT ${{ vars.SOURCE_HOST }} >> ~/.ssh/known_hosts
+          cat >> ~/.ssh/config << EOF
+          Host ${{ vars.SOURCE_HOST }}
+            Port $SSH_PORT
+            ServerAliveInterval 30
+            Compression yes
+          EOF
+
+          echo "Stopping Strapi and MCP on preprod..."
+          ssh $DST "docker stop jib-mcp jib-strapi"
+
+          echo "Replacing the preprod database with a dump of prod..."
+          ssh $DST 'docker exec jib-postgres psql -v ON_ERROR_STOP=1 -U strapi -d strapi -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"'
+          ssh $SRC 'docker exec jib-postgres pg_dump -U strapi -d strapi --no-owner --no-privileges | gzip' | \
+            ssh $DST 'gunzip | docker exec -i jib-postgres psql -q -v ON_ERROR_STOP=1 -U strapi -d strapi'
+
+          echo "Replacing the preprod uploads with those of prod..."
+          ssh $SRC 'docker run --rm -v ~/jib/data/uploads:/u:ro alpine:3.20 tar -C /u -czf - .' | \
+            ssh $DST 'docker run --rm -i -v ~/jib/data/uploads:/u alpine:3.20 sh -c "find /u -mindepth 1 -delete && tar -C /u -xzpf -"'
+
+          echo "Starting Strapi on the prod data (it migrates the schema to this version)..."
+          ssh $DST "docker start jib-strapi"
+          for i in $(seq 1 60); do
+            if ssh $DST "docker exec jib-strapi wget -q -O /dev/null http://localhost:1337/_health" 2>/dev/null; then
+              echo "Strapi is up."
+              break
+            fi
+            if [[ $i == 60 ]]; then
+              ssh $DST "docker logs --tail 100 jib-strapi"
+              echo "Error: Strapi did not come up within 5 minutes"
+              exit 1
+            fi
+            sleep 5
+          done
+          ssh $DST "docker start jib-mcp"
 
       - name: Verify container environment
         if: ${{ !inputs.dry_run }}

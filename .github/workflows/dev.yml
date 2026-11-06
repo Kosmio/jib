@@ -2,6 +2,11 @@ name: Dev
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Image tag, defaults to the VERSION file (e.g. 0.1.0-preprod to keep prod images untouched)'
+        required: false
+        type: string
   push:
     branches:
       - main
@@ -27,7 +32,8 @@ jobs:
 
       - name: Build and push Strapi
         run: |
-          VERSION=$(cat VERSION)
+          VERSION=${{ inputs.version || '' }}
+          VERSION=${VERSION:-$(cat VERSION)}
           docker build --no-cache \
             --build-arg ADMIN_URL=/strapi/admin \
             -f infra/docker/strapi/Dockerfile \
@@ -52,7 +58,8 @@ jobs:
 
       - name: Build and push Web
         run: |
-          VERSION=$(cat VERSION)
+          VERSION=${{ inputs.version || '' }}
+          VERSION=${VERSION:-$(cat VERSION)}
           docker build --no-cache -f infra/docker/website/Dockerfile -t ghcr.io/kosmio/jib-web:${VERSION} .
           docker push ghcr.io/kosmio/jib-web:${VERSION}
 
@@ -74,6 +81,7 @@ jobs:
 
       - name: Build and push MCP
         run: |
-          VERSION=$(cat VERSION)
+          VERSION=${{ inputs.version || '' }}
+          VERSION=${VERSION:-$(cat VERSION)}
           docker build --no-cache -f infra/docker/mcp/Dockerfile -t ghcr.io/kosmio/jib-mcp:${VERSION} .
           docker push ghcr.io/kosmio/jib-mcp:${VERSION}
