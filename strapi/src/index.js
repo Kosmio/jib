@@ -890,6 +890,13 @@ module.exports = {
     } catch (err) {
       strapi.log.error(`[restore] failed: ${err.message}`);
     }
+
+    // One-shot recovery of an admin login (ADMIN_RESET="email:password", unset by default)
+    try {
+      await resetAdminUser(strapi);
+    } catch (err) {
+      strapi.log.error(`[admin-reset] failed: ${err.message}`);
+    }
   },
 };
 
@@ -1201,6 +1208,34 @@ const FRENCH_LABELS = {
     testimonials: 'Témoignages',
   },
 };
+
+/**
+ * ADMIN_RESET="email:password": sets the password of that admin user, or creates it as super admin.
+ * Meant for a temporary recovery: unset the variable once logged in, or the next start resets it again.
+ * The password is never logged. Does nothing when the variable is empty.
+ */
+async function resetAdminUser(strapi) {
+  const raw = process.env.ADMIN_RESET;
+  if (!raw) return;
+  const split = raw.indexOf(':');
+  const email = raw.slice(0, split).trim().toLowerCase();
+  const password = raw.slice(split + 1);
+  if (split < 1 || !email || !password) {
+    strapi.log.error('[admin-reset] ADMIN_RESET must look like "email:password", ignored');
+    return;
+  }
+
+  const users = strapi.service('admin::user');
+  const existing = await users.findOneByEmail(email);
+  if (existing) {
+    await users.updateById(existing.id, { password, isActive: true });
+    strapi.log.warn(`[admin-reset] password reset for ${email}`);
+    return;
+  }
+  const superAdmin = await strapi.service('admin::role').getSuperAdmin();
+  await users.create({ email, firstname: 'Admin', lastname: 'JIB', password, isActive: true, roles: [superAdmin.id] });
+  strapi.log.warn(`[admin-reset] super admin ${email} created`);
+}
 
 async function setFrenchLabels(strapi) {
   const entries = [];
