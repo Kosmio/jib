@@ -13,6 +13,7 @@
 | `09-phases.md` | Découpage en phases, dates, portes de validation | architect |
 | `10-recette.md` | Scénarios de bout en bout et jeu de données de recette | tester |
 | `11-questions-ouvertes.md` | Points non tranchés et hypothèses par défaut | architect |
+| `12-badges.md` | Lot badges (DRAFT, P1, après le 20 novembre) : badge PDF A4 pliable, QR et carte réduite | tous |
 
 ## Maquettes de référence
 
