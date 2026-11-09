@@ -1,8 +1,8 @@
 'use strict';
 
 const { EspaceError } = require('../lib/errors');
-const { ATTENDEE_CARD_POPULATE, EXHIBITOR_CARD_POPULATE, attendeeCard, exhibitorCard, identity } = require('../lib/cards');
-const { searchDirectory, profileVisibility } = require('../lib/directory');
+const { ATTENDEE_CARD_POPULATE, EXHIBITOR_CARD_POPULATE, INTERVENANT_CARD_POPULATE, attendeeCard, exhibitorCard, intervenantCard, identity } = require('../lib/cards');
+const { normalizeText, searchDirectory, profileVisibility } = require('../lib/directory');
 const { hostedTables } = require('../lib/meetings');
 const { suggest } = require('../lib/suggestions');
 const { parseProgramTime } = require('../lib/time');
@@ -13,6 +13,7 @@ const TOPIC = 'api::espace.topic';
 const MEETING = 'api::espace.meeting';
 const CONVERSATION = 'api::espace.conversation';
 const INTERVENTION = 'api::intervention.intervention';
+const SEQUENCE = 'api::sequence.sequence';
 const DEFAULT_TABLES = 20;
 const LIMIT = 1000;
 
@@ -81,9 +82,25 @@ module.exports = ({ strapi }) => {
     return { related, engaged, conversed };
   }
 
+  /** D-06: the intervenants of the published program of the edition, loaded for their card: Map(documentId -> intervenant). */
+  async function programIntervenants(edition) {
+    const sequences = await documents(SEQUENCE).findMany({
+      filters: ofEdition(edition),
+      status: 'published',
+      populate: { interventions: { populate: { intervenants: { populate: INTERVENANT_CARD_POPULATE } } } },
+      limit: LIMIT,
+    });
+    const found = new Map();
+    for (const { interventions = [] } of sequences) {
+      for (const { intervenants = [] } of interventions) for (const intervenant of intervenants) found.set(intervenant.documentId, intervenant);
+    }
+    return found;
+  }
+
   /**
    * The cards of everything the directory may list (F-40, A-26, A-29, A-34): the active attendees who ticked the
-   * directory, the speakers with a dedicated table (public data only when they did not tick it), every exhibitor.
+   * directory, every active speaker (public data only when they did not tick it, D-06), the intervenants of the program without an
+   * account (D-06, once: an attendee linked or named like them stands for them), every exhibitor.
    * Organizers never. Each card carries `sortName` for the sort, removed before it leaves the API.
    */
   async function visibleCards(edition) {
@@ -95,7 +112,7 @@ module.exports = ({ strapi }) => {
           status: 'active',
           role: { $ne: 'organizer' },
           ...(listed.length && { email: { $notIn: listed } }),
-          $or: [{ directoryOptIn: true }, { role: 'speaker', hostedTableNumber: { $notNull: true } }],
+          $or: [{ directoryOptIn: true }, { role: 'speaker' }],
         },
         populate: ATTENDEE_CARD_POPULATE,
         limit: LIMIT,
@@ -105,11 +122,17 @@ module.exports = ({ strapi }) => {
     ]);
 
     const cards = [];
+    const covered = new Set(); // D-06: the intervenants an attendee card already stands for, by link and by name
     for (const attendee of attendees) {
+      if (attendee.speaker?.documentId) covered.add(attendee.speaker.documentId);
+      covered.add(normalizeText(`${attendee.firstName} ${attendee.lastName}`));
       const table = hosted.get(attendee.documentId);
-      if (!attendee.directoryOptIn && table === undefined) continue;
       const card = attendeeCard({ ...attendee, hostedTableNumber: table ?? null }, { publicOnly: !attendee.directoryOptIn });
       cards.push({ ...card, sortName: `${attendee.lastName} ${attendee.firstName}` });
+    }
+    for (const intervenant of (await programIntervenants(edition)).values()) {
+      if (covered.has(intervenant.documentId) || covered.has(normalizeText(intervenant.name))) continue;
+      cards.push(intervenantCard(intervenant));
     }
     for (const exhibitor of exhibitors) if (exhibitor.organisation) cards.push(exhibitorCard(exhibitor));
     return cards;
@@ -175,6 +198,26 @@ module.exports = ({ strapi }) => {
       };
     },
 
+    /** GET /directory/i/:id (D-06): the public page of an intervenant of the program, 404 when the program of the edition does not list them. */
+    async intervenant(session, id) {
+      const { edition } = session;
+      const intervenant = (await programIntervenants(edition)).get(String(id));
+      if (!intervenant) throw notFound();
+      const { jobTitle, company } = identity({ speaker: intervenant });
+      return {
+        ...intervenantCard(intervenant),
+        firstName: null,
+        lastName: null,
+        jobTitle,
+        company,
+        bio: null,
+        sessions: await sessionsOf(intervenant, edition),
+        exhibitor: null,
+        isSelf: false,
+        canMessage: false,
+      };
+    },
+
     /** GET /directory/x/:id: an exhibitor's page with the representatives who ticked the directory. */
     async exhibitor(session, id) {
       const { edition } = session;
@@ -211,7 +254,7 @@ module.exports = ({ strapi }) => {
       return suggest({
         meId: viewer.documentId,
         myTopicIds: viewer.topics.map(({ documentId }) => documentId),
-        candidates: cards,
+        candidates: cards.filter(({ kind }) => kind !== 'intervenant'),
         excludedIds: engaged,
         day: parisDay(now),
       }).map(withoutSortName);

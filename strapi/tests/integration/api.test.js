@@ -112,6 +112,7 @@ describe('Strapi sur la base de test', { timeout: 180_000 }, () => {
       'GET /api/espace/editions/:x/topics',
       'GET /api/espace/directory',
       'GET /api/espace/directory/p/:x',
+      'GET /api/espace/directory/i/:x',
       'GET /api/espace/directory/x/:x',
       'GET /api/espace/suggestions',
       // Lot 14 : programme, messagerie, statistiques.

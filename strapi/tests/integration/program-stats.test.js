@@ -151,14 +151,14 @@ describe('programme et tableau de bord (lot 14)', { timeout: 900_000 }, () => {
       assert.ok(response.json.speakers.every(({ attendeeId }) => attendeeId === null));
     });
 
-    it('A-34, A-29 : avec une session, attendeeId seulement pour une fiche visible (annuaire coché, ou table dédiée)', async () => {
+    it('A-34, A-29 : avec une session, attendeeId pour tout intervenant qui a un compte (D-06 : page publique)', async () => {
       const { edition, p } = await programScene();
       const cookie = await login(edition, p.lea);
       const { speakers } = (await program(edition, cookie)).json;
       const by = Object.fromEntries(speakers.map((speaker) => [speaker.name, speaker]));
       assert.equal(by['Hélène Marquès'].attendeeId, p.helene.documentId, 'annuaire coché');
       assert.equal(by['Antoine Vergnes'].attendeeId, p.antoine.documentId, 'table dédiée : visible au titre du programme');
-      assert.equal(by['Zoé Discrète'].attendeeId, null, 'ni annuaire ni table dédiée : pas de lien');
+      assert.equal(by['Zoé Discrète'].attendeeId, p.zoe.documentId, 'D-06 : tout intervenant a une page publique, sans annuaire coché ni table dédiée');
     });
 
     it('une personne qui a un rendez-vous avec un intervenant sans annuaire peut ouvrir sa fiche (R-41)', async () => {

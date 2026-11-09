@@ -10,6 +10,7 @@ module.exports = {
     { method: 'GET', path: '/espace/editions/:slug/topics', handler: 'directory.topics', config },
     { method: 'GET', path: '/espace/directory', handler: 'directory.list', config },
     { method: 'GET', path: '/espace/directory/p/:id', handler: 'directory.profile', config },
+    { method: 'GET', path: '/espace/directory/i/:id', handler: 'directory.intervenant', config },
     { method: 'GET', path: '/espace/directory/x/:id', handler: 'directory.exhibitor', config },
     { method: 'GET', path: '/espace/suggestions', handler: 'directory.suggestions', config },
   ],

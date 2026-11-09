@@ -23,7 +23,7 @@ import {
 const slug = Astro.params.edition ?? "";
 const type = Astro.params.type;
 const id = Astro.params.id ?? "";
-if (type !== "p" && type !== "x") return Astro.rewrite("/espace/introuvable");
+if (type !== "p" && type !== "x" && type !== "i") return Astro.rewrite("/espace/introuvable");
 
 const cookie = Astro.request.headers.get("cookie");
 const guard = await guardSession(slug, cookie);
@@ -38,12 +38,14 @@ if (!profile.ok && profile.status !== 404) throw new Error(`GET /directory/${typ
 if (!profile.ok) Astro.response.status = 404;
 
 const card = profile.ok ? profile.data : null;
-const person = card && card.kind === "attendee" ? (card as DirectoryPerson) : null;
+const person = card && (card.kind === "attendee" || card.kind === "intervenant") ? (card as DirectoryPerson) : null;
+// D-06 : un intervenant du programme sans compte n'a qu'une page publique, ni créneaux ni message.
+const publicOnly = card?.kind === "intervenant";
 const exhibitor = card && card.kind === "exhibitor" ? (card as DirectoryExhibitor) : null;
 
 // Grille des créneaux : lue ici pour le premier affichage ; en cas d'échec, l'îlot la charge lui-même (avec « Réessayer »).
 const target = card ? targetOf(card) : "";
-const slotsResult = card ? await espaceGet<SlotsResponse>(`/slots?target=${encodeURIComponent(target)}`, cookie) : null;
+const slotsResult = card && !publicOnly ? await espaceGet<SlotsResponse>(`/slots?target=${encodeURIComponent(target)}`, cookie) : null;
 if (slotsResult && !slotsResult.ok && slotsResult.status === 401) return Astro.redirect(`${base}/connexion`);
 const slots = slotsResult?.ok ? slotsResult.data : undefined;
 
@@ -134,6 +136,7 @@ const role = person ? [person.jobTitle, person.company].filter(Boolean) : [];
           <noscript>
             <p class="font-semibold">Cette étape demande JavaScript. Activez-le ou utilisez un autre navigateur.</p>
           </noscript>
+          {!publicOnly && (
           <SlotPicker
             client:load
             strapiUrl={publicStrapiUrl}
@@ -146,6 +149,7 @@ const role = person ? [person.jobTitle, person.company].filter(Boolean) : [];
             standNumber={card.standNumber ?? null}
             tableNumber={card.hostedTableNumber ?? null}
           />
+          )}
 
           {person?.canMessage && (
             <EspaceButton variant="secondary" href={`${base}/messages/nouveau?avec=${encodeURIComponent(target)}`} class="mt-6">

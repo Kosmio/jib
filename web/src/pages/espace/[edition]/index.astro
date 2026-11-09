@@ -10,7 +10,7 @@ import Icon from "../../../components/espace/Icon.astro";
 import ProfileCardView from "../../../react-components/espace/ProfileCardView";
 import { espaceGet, guardSession, publicStrapiUrl } from "../../../lib/espace/api";
 import type { ProfileCard } from "../../../lib/espace/client";
-import type { Meeting, MeetingsResponse } from "../../../lib/espace/meetings";
+import { pathTypeOf, type Meeting, type MeetingsResponse } from "../../../lib/espace/meetings";
 import { bannerColor, countdown, editionLine, initialsOf, photoSrc, timeLabel } from "../../../lib/espace/format";
 
 const slug = Astro.params.edition ?? "";
@@ -52,7 +52,7 @@ const profileHelp = !me.photoUrl && !me.topics.length
 
 const color = bannerColor(edition.themeColor);
 const avatar = photoSrc(publicStrapiUrl, me.photoUrl);
-const targetPath = (card: ProfileCard) => `${base}/annuaire/${card.kind === "exhibitor" ? "x" : "p"}/${encodeURIComponent(card.id)}`;
+const targetPath = (card: ProfileCard) => `${base}/annuaire/${pathTypeOf(card)}/${encodeURIComponent(card.id)}`;
 const headingClass = "font-heading text-lg font-semibold normal-case sm:text-xl";
 ---
 

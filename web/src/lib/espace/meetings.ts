@@ -129,6 +129,9 @@ export const firstName = (card: Pick<ProfileCard, "kind" | "displayName">): stri
 /** Cible d'une carte pour `/slots`, `/meetings` et l'URL de la fiche : `p:{id}` ou `x:{id}`. */
 export const targetOf = (card: Pick<ProfileCard, "kind" | "id">): string => `${card.kind === "exhibitor" ? "x" : "p"}:${card.id}`;
 
+/** Segment d'URL de la fiche d'une carte de l'annuaire : `p` personne, `x` exposant, `i` intervenant du programme sans compte (D-06). */
+export const pathTypeOf = (card: Pick<ProfileCard, "kind">): "p" | "x" | "i" => (card.kind === "exhibitor" ? "x" : card.kind === "intervenant" ? "i" : "p");
+
 export const fetchSlots = (strapiUrl: string, target: string) =>
   request<SlotsResponse>(strapiUrl, `/slots?target=${encodeURIComponent(target)}`, "GET", undefined);
 

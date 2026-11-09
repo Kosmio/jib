@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { EspaceApiError, request, type ProfileCard, type Topic } from "../../lib/espace/client";
 import { plural } from "../../lib/espace/format";
+import { pathTypeOf } from "../../lib/espace/meetings";
 import ProfileCardView from "./ProfileCardView";
 
 // E4 (F-40 à F-44) : recherche temporisée de 250 ms dès 2 caractères, sélecteur de type, puces de sujets, compteur, défilement par 30.
@@ -293,7 +294,7 @@ export default function DirectoryBrowser({ strapiUrl, editionSlug, topics, initi
               <ProfileCardView
                 card={card}
                 strapiUrl={strapiUrl}
-                href={`/espace/${encodeURIComponent(editionSlug)}/annuaire/${card.kind === "exhibitor" ? "x" : "p"}/${encodeURIComponent(card.id)}`}
+                href={`/espace/${encodeURIComponent(editionSlug)}/annuaire/${pathTypeOf(card)}/${encodeURIComponent(card.id)}`}
               />
             </li>
           ))}

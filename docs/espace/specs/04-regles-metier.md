@@ -63,7 +63,7 @@ Trois formes de rendez-vous coexistent : au stand d'un exposant (R-13, R-14, par
 - **R-40** Le consentement est explicite, recueilli à la première connexion (E2), horodaté (`consentAt`), révocable à tout moment (E3). Aucune case précochée.
 - **R-41** `directoryOptIn = false` : absent de l'annuaire, des suggestions et des exports partagés ; sa fiche n'est accessible qu'aux personnes avec qui il a un rendez-vous ou une conversation. Il peut demander des rendez-vous et écrire.
 - **R-42** Données visibles d'un autre participant : prénom, nom, fonction, entreprise, photo, présentation, sujets, type. **Jamais l'e-mail ni le téléphone**, y compris après un rendez-vous accepté (les échanges passent par la messagerie).
-- **R-43** Les intervenants et exposants restent visibles au titre du programme public ; leurs comptes personnels suivent R-41.
+- **R-43** Les intervenants et exposants restent visibles au titre du programme public ; leurs comptes personnels suivent R-41. **D-06 :** tous les intervenants du programme, avec ou sans compte, figurent dans l'annuaire par défaut avec leur page publique (sans sujets) ; le consentement ne sert plus qu'à ouvrir la fiche personnelle.
 - **R-44** Suppression des données (F-33) : le participant est anonymisé (« Participant supprimé »), ses rendez-vous futurs sont annulés avec notification, ses messages restent visibles de l'interlocuteur avec l'auteur anonymisé, son e-mail est remplacé par une empreinte pour empêcher la réimportation. Purge complète de l'édition 12 mois après sa date (tâche planifiée, P1).
 
 ## Suggestions

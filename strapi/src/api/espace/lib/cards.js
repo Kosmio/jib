@@ -5,7 +5,7 @@
  * messages. Pure: the Document Service results go in, the JSON of the API comes out. Whitelisted fields only, so that the
  * e-mail and the HelloAsso identifiers (R-42, NF-11) can never reach a response through a card. Every `id` is a documentId (A-28).
  *
- *   CarteProfil = { kind: 'attendee'|'exhibitor', id, displayName, subtitle, photoUrl, initials,
+ *   CarteProfil = { kind: 'attendee'|'exhibitor'|'intervenant', id, displayName, subtitle, photoUrl, initials,
  *                   tag: 'participant'|'speaker'|'exhibitor_rep'|'exhibitor', topics: [{ id, name }],
  *                   standNumber?, hostedTableNumber? }
  */
@@ -19,6 +19,8 @@ const ATTENDEE_CARD_POPULATE = {
   exhibitor: { fields: ['documentId', 'standNumber'], populate: { organisation: { fields: ['documentId', 'name'] } } },
   speaker: { fields: ['documentId', 'name', 'title'], populate: { photo: true, organisation: { fields: ['documentId', 'name'] } } },
 };
+// An intervenant of the program, listed without any account (D-06).
+const INTERVENANT_CARD_POPULATE = { photo: true, organisation: { fields: ['documentId', 'name'] } };
 const EXHIBITOR_CARD_POPULATE = {
   organisation: { fields: ['documentId', 'name', 'description', 'website'], populate: { logo: true } },
   topics: { fields: ['documentId', 'name'] },
@@ -88,6 +90,24 @@ function attendeeCard(attendee, { publicOnly = false } = {}) {
   };
 }
 
+/**
+ * Card of an intervenant of the program that no attendee account stands for (D-06): public program data only, no topics,
+ * nothing to book or to write to. `kind: 'intervenant'`, `tag: 'speaker'`, the id is the documentId of the intervenant.
+ */
+function intervenantCard(intervenant) {
+  const displayName = clean(intervenant.name);
+  return {
+    kind: 'intervenant',
+    id: intervenant.documentId,
+    displayName,
+    subtitle: joined(', ', intervenant.title, intervenant.organisation?.name),
+    photoUrl: imageUrl(intervenant.photo),
+    initials: initials(displayName),
+    tag: 'speaker',
+    topics: [],
+  };
+}
+
 /** Card of an Exhibitor loaded with EXHIBITOR_CARD_POPULATE: name, logo and short description come from its organisation. */
 function exhibitorCard(exhibitor) {
   const { organisation } = exhibitor;
@@ -107,4 +127,4 @@ function exhibitorCard(exhibitor) {
   };
 }
 
-module.exports = { ATTENDEE_CARD_POPULATE, EXHIBITOR_CARD_POPULATE, initials, identity, attendeeCard, exhibitorCard };
+module.exports = { ATTENDEE_CARD_POPULATE, EXHIBITOR_CARD_POPULATE, INTERVENANT_CARD_POPULATE, initials, identity, attendeeCard, intervenantCard, exhibitorCard };

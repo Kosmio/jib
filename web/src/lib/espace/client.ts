@@ -8,7 +8,7 @@ export type Topic = { id: string; name: string };
 
 /** CarteProfil de l'API : une personne (`attendee`) ou un exposant (`exhibitor`), en liste, en suggestion ou en interlocuteur. */
 export type ProfileCard = {
-  kind: "attendee" | "exhibitor";
+  kind: "attendee" | "exhibitor" | "intervenant";
   id: string;
   displayName: string;
   subtitle: string;

@@ -23,6 +23,11 @@ module.exports = {
     ctx.body = await directory().profile(requireSession(ctx), ctx.params.id);
   },
 
+  // GET /api/espace/directory/i/:id (session): D-06, an intervenant of the program without an account
+  intervenant: async (ctx) => {
+    ctx.body = await directory().intervenant(requireSession(ctx), ctx.params.id);
+  },
+
   // GET /api/espace/directory/x/:id (session)
   exhibitor: async (ctx) => {
     ctx.body = await directory().exhibitor(requireSession(ctx), ctx.params.id);

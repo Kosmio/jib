@@ -70,6 +70,7 @@ describe('annuaire, fiches et suggestions (lot 9)', { timeout: 900_000 }, () => 
       'GET /api/espace/editions/:x/topics',
       'GET /api/espace/directory',
       'GET /api/espace/directory/p/:x',
+      'GET /api/espace/directory/i/:x',
       'GET /api/espace/directory/x/:x',
       'GET /api/espace/suggestions',
     ];
@@ -79,7 +80,7 @@ describe('annuaire, fiches et suggestions (lot 9)', { timeout: 900_000 }, () => 
         .filter((route) => route.path.startsWith('/api/espace'))
         .flatMap((route) => route.methods.filter((method) => method !== 'HEAD').map((method) => `${method} ${route.path.replace(/:[A-Za-z]+/g, ':x')}`));
 
-    it('routes:list montre les six routes du lot 9', () => {
+    it('routes:list montre les sept routes du lot 9', () => {
       for (const route of ROUTES) assert.ok(declared().includes(route), `route absente : ${route}`);
     });
 
@@ -175,10 +176,33 @@ describe('annuaire, fiches et suggestions (lot 9)', { timeout: 900_000 }, () => 
       assert.deepEqual(card.topics, []);
     });
 
-    it('R-41 : un intervenant sans table dédiée ni consentement n’est pas listé', async () => {
+    it('D-06 : un intervenant sans table dédiée ni consentement est listé, avec les données publiques du programme seulement', async () => {
       const { world, p } = await scene();
-      assert.ok(!ids((await search(world, p.lea)).items).includes(p.helene.documentId));
+      const card = (await search(world, p.lea)).items.find((item) => item.id === p.helene.documentId);
+      assert.ok(card, 'tout intervenant doit figurer');
+      assert.equal(card.tag, 'speaker');
+      assert.equal(card.displayName, 'Hélène Marquès');
+      assert.match(card.subtitle, /Directrice scientifique/);
+      assert.deepEqual(card.topics, []);
     });
+
+    it('D-06 : un intervenant du programme sans compte est listé une fois, et pas en double quand un compte le représente', async () => {
+      const { world, p } = await scene();
+      const forest = world.sequences.find((sequence) => sequence.title === 'Forêt et adaptation');
+      const lonely = await W.createSpeaker(app(), world.edition, { name: 'Zoé Sansdompte', title: 'Ingénieure', organisationName: 'Atelier Fictif', sequence: forest });
+      // Même nom qu'un participant inscrit par HelloAsso qui a coché l'annuaire : une seule carte, celle du compte.
+      await W.createSpeaker(app(), world.edition, { name: 'Mathis Lagrange', title: 'Intervenant', sequence: forest });
+      const items = (await search(world, p.lea)).items;
+
+      const card = items.find((item) => item.id === lonely.documentId);
+      assert.ok(card, 'l’intervenant sans compte doit figurer');
+      assert.deepEqual([card.kind, card.tag, card.displayName, card.subtitle], ['intervenant', 'speaker', 'Zoé Sansdompte', 'Ingénieure, Atelier Fictif']);
+      assert.equal(items.filter((item) => item.displayName === 'Mathis Lagrange').length, 1);
+      assert.equal(items.filter((item) => item.displayName === 'Antoine Vergnes').length, 1, 'lié à un compte par `speaker`');
+      assert.equal(items.filter((item) => item.displayName === 'Hélène Marquès').length, 1);
+      assert.ok(!items.some((item) => item.kind === 'intervenant' && item.displayName === 'Mathis Lagrange'));
+    });
+
 
     it('un intervenant à table dédiée qui a aussi coché l’annuaire montre son profil personnel', async () => {
       const { world, p } = await scene();
@@ -262,7 +286,9 @@ describe('annuaire, fiches et suggestions (lot 9)', { timeout: 900_000 }, () => 
       const participants = (await search(world, p.lea, '?type=participant')).items;
       assert.ok(participants.every((card) => ['participant', 'exhibitor_rep'].includes(card.tag)));
       assert.ok(ids(participants).includes(p.ines.documentId) && ids(participants).includes(p.benoit.documentId));
-      assert.deepEqual(ids((await search(world, p.lea, '?type=speaker')).items), [p.antoine.documentId]);
+      const speakers = ids((await search(world, p.lea, '?type=speaker')).items);
+      assert.ok(speakers.includes(p.antoine.documentId) && speakers.includes(p.helene.documentId));
+      assert.ok(!speakers.includes(p.lea.documentId));
       assert.deepEqual(ids((await search(world, p.lea, '?type=exhibitor')).items).sort(), [sylvadour.documentId, resineo.documentId].sort());
     });
 
@@ -438,9 +464,29 @@ describe('annuaire, fiches et suggestions (lot 9)', { timeout: 900_000 }, () => 
       assert.deepEqual(W.leaks(response.text), []);
     });
 
-    it('R-41 : un intervenant sans table dédiée ni consentement reste en 404', async () => {
+    it('D-06 : un intervenant sans table dédiée ni consentement a une fiche publique, sans sujets ni bio', async () => {
       const { world, p } = await scene();
-      expectError(await fiche(world, p.lea, p.helene), 404, 'PROFILE_NOT_FOUND');
+      const response = await fiche(world, p.lea, p.helene);
+      assert.equal(response.status, 200, response.text);
+      assert.equal(response.json.displayName, 'Hélène Marquès');
+      assert.deepEqual(response.json.topics, []);
+      assert.equal(response.json.bio, null);
+      assert.deepEqual(response.json.sessions.map((session) => session.title), ['Forêt et adaptation']);
+      assert.deepEqual(W.leaks(response.text), []);
+    });
+
+    it('D-06 : la fiche d’un intervenant du programme sans compte (`/directory/i/:id`), 404 pour un inconnu', async () => {
+      const { world, p } = await scene();
+      const forest = world.sequences.find((sequence) => sequence.title === 'Forêt et adaptation');
+      const lonely = await W.createSpeaker(app(), world.edition, { name: 'Zoé Sansdompte', title: 'Ingénieure', organisationName: 'Atelier Fictif', sequence: forest });
+      const client = await as(world.edition, p.lea);
+
+      const response = await client.get(`/directory/i/${lonely.documentId}`);
+      assert.equal(response.status, 200, response.text);
+      assert.deepEqual([response.json.kind, response.json.displayName, response.json.jobTitle, response.json.company], ['intervenant', 'Zoé Sansdompte', 'Ingénieure', 'Atelier Fictif']);
+      assert.deepEqual(response.json.sessions.map((session) => session.title), ['Forêt et adaptation']);
+      assert.equal(response.json.canMessage, false);
+      expectError(await client.get('/directory/i/inconnu'), 404, 'PROFILE_NOT_FOUND');
     });
   });
 
@@ -565,7 +611,11 @@ describe('annuaire, fiches et suggestions (lot 9)', { timeout: 900_000 }, () => 
       const { world, sylvadour, resineo, p } = await scene();
       const bare = await person(world.edition, { topics: [] });
       const result = await suggestions(world, bare);
-      assert.deepEqual(ids(result).sort(), [sylvadour.documentId, resineo.documentId, p.antoine.documentId].sort());
+      // Quatre candidats visibles (D-06 : Hélène aussi), trois suggestions au plus.
+      const candidates = [sylvadour.documentId, resineo.documentId, p.antoine.documentId, p.helene.documentId];
+      assert.equal(result.length, 3);
+      assert.ok(ids(result).every((id) => candidates.includes(id)));
+      assert.ok(result.every((card) => card.kind !== 'intervenant'), 'un intervenant sans compte ne se rencontre pas');
       assert.ok(result.every((card) => card.tag === 'speaker' || card.kind === 'exhibitor'));
     });
 

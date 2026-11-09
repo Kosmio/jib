@@ -66,7 +66,7 @@ function searchDirectory({ cards, q, type = 'all', topicIds = [], cursor, pageSi
 }
 
 /**
- * R-41, R-43, A-26, A-34: what a viewer may see of an attendee -> 'full' (personal profile), 'public' (the public data of
+ * R-41, R-43, A-26, A-34, D-06: what a viewer may see of an attendee -> 'full' (personal profile), 'public' (the public data of
  * the program only, A-29) or null (404). `related`: the documentIds of the people the viewer has a meeting (any status) or
  * a conversation with ; `hosted`: the Map of the dedicated tables (hostedTables of lib/meetings.js). An organizer is never visible, except to himself.
  */
@@ -74,6 +74,7 @@ function profileVisibility({ viewerId, attendee, isOrganizer, related, hosted })
   if (attendee.documentId === viewerId) return 'full';
   if (isOrganizer) return null;
   if (attendee.status === 'active' && attendee.directoryOptIn) return 'full';
+  if (attendee.status === 'active' && attendee.role === 'speaker') return 'public'; // D-06: a speaker shares the public page with every participant
   if (hosted.has(attendee.documentId)) return 'public';
   return related.has(attendee.documentId) ? 'full' : null;
 }
