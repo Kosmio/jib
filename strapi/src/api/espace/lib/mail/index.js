@@ -14,6 +14,7 @@
 
 const { createConsoleProvider } = require('./console');
 const { createBrevoProvider } = require('./brevo');
+const { createSmtpProvider } = require('./smtp');
 
 const EMAIL_PATTERN = /^[^\s@<>,;"]+@[^\s@<>,;"]+\.[^\s@<>,;"]+$/;
 
@@ -56,7 +57,7 @@ function normalizeMessage({ to, subject, html, text, attachments = [], headers =
   };
 }
 
-function createMailProvider({ provider, apiKey, from, outboxFile, nodeEnv, logger = console, client } = {}) {
+function createMailProvider({ provider, apiKey, from, outboxFile, smtpHost, smtpPort, nodeEnv, logger = console, client, transport } = {}) {
   const name = provider || (nodeEnv === 'production' ? 'brevo' : 'console');
   const sender = from ? parseAddress(from) : undefined;
   let impl;
@@ -68,8 +69,13 @@ function createMailProvider({ provider, apiKey, from, outboxFile, nodeEnv, logge
     if (!apiKey) throw new Error('The brevo mail provider needs an API key (EMAIL_API_KEY)');
     if (!sender) throw new Error('The brevo mail provider needs a sender (EMAIL_FROM)');
     impl = createBrevoProvider({ apiKey, from: sender, client });
+  } else if (name === 'smtp') {
+    if (nodeEnv === 'test') throw new Error('The smtp mail provider is refused when NODE_ENV=test');
+    if (!smtpHost) throw new Error('The smtp mail provider needs a host (SMTP_HOST)');
+    if (!sender) throw new Error('The smtp mail provider needs a sender (EMAIL_FROM)');
+    impl = createSmtpProvider({ host: smtpHost, port: smtpPort || 1025, from: sender, transport });
   } else {
-    throw new Error(`Unknown mail provider "${name}" (expected "console" or "brevo")`);
+    throw new Error(`Unknown mail provider "${name}" (expected "console", "brevo" or "smtp")`);
   }
 
   return { name, send: async (message) => impl.send(normalizeMessage(message)) };

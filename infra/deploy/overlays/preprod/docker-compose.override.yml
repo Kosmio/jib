@@ -66,6 +66,37 @@ services:
         limits:
           memory: 1G
 
+  # Catch-all SMTP server: Strapi sends here (SMTP_HOST=jib-mailpit), nothing leaves the server.
+  # Web inbox on /mail, behind the basic auth of MAILPIT_AUTH ("user:password", from .env.secrets):
+  # it shows the magic links of the real participants copied from prod.
+  mailpit:
+    image: axllent/mailpit:v1.33.1
+    container_name: jib-mailpit
+    environment:
+      MP_WEBROOT: /mail
+      MP_UI_AUTH: ${MAILPIT_AUTH:?MAILPIT_AUTH is required on preprod}
+      MP_DATABASE: /data/mailpit.db
+      MP_MAX_MESSAGES: 5000
+    volumes:
+      - ~/jib/data/mailpit:/data
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: ${DOCKER_NETWORK}
+      traefik.http.routers.mailpit.rule: "Host(`${HOST_NAME}`) && PathPrefix(`/mail`)"
+      traefik.http.routers.mailpit.entrypoints: websecure
+      traefik.http.routers.mailpit.tls.certresolver: letsencrypt-resolver
+      traefik.http.routers.mailpit-http.rule: "Host(`${HOST_NAME}`) && PathPrefix(`/mail`)"
+      traefik.http.routers.mailpit-http.entrypoints: web
+      traefik.http.routers.mailpit-http.middlewares: redirect-to-https
+      traefik.http.services.mailpit.loadbalancer.server.port: "8025"
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    networks:
+      - net
+
   web:
     labels:
       traefik.enable: "true"

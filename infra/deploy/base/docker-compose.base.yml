@@ -73,6 +73,8 @@ services:
       ALTCHA_HMAC_KEY: ${ALTCHA_HMAC_KEY:-}
       EMAIL_PROVIDER: ${EMAIL_PROVIDER:-}
       EMAIL_FROM: ${EMAIL_FROM:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-1025}
       PUBLIC_URL: ${PUBLIC_URL:-http://localhost:4321}
       ORGANIZER_EMAILS: ${ORGANIZER_EMAILS:-}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:4321}

@@ -119,7 +119,7 @@ Ajoutées par l'espace (Strapi) :
 
 | Variable | Rôle | Depuis |
 |---|---|---|
-| `EMAIL_PROVIDER` | `console` ou `brevo` ; défaut `brevo` si `NODE_ENV=production`, sinon `console` ; `brevo` refusé sous `NODE_ENV=test` | phase 0 |
+| `EMAIL_PROVIDER` | `console`, `brevo` ou `smtp` (serveur de capture type Mailpit, `SMTP_HOST` et `SMTP_PORT`, preprod) ; défaut `brevo` si `NODE_ENV=production`, sinon `console` ; `brevo` et `smtp` refusés sous `NODE_ENV=test` | phase 0 |
 | `EMAIL_FROM` | expéditeur des e-mails de l'espace, « Nom <adresse> » (Q-16) | phase 0 |
 | `EMAIL_OUTBOX_FILE` | fichier JSONL du `ConsoleMailProvider`, défaut `.tmp/mail-outbox.jsonl` | phase 0 |
 | `DEMO_SEED` | `false` empêche le bootstrap de créer les éditions de démonstration sur une base vide | phase 0 |

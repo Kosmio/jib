@@ -28,6 +28,8 @@ module.exports = ({ env }) => ({
     provider: env('EMAIL_PROVIDER'),
     from: env('EMAIL_FROM'),
     outboxFile: env('EMAIL_OUTBOX_FILE', '.tmp/mail-outbox.jsonl'),
+    smtpHost: env('SMTP_HOST', ''),
+    smtpPort: env.int('SMTP_PORT', 1025),
     listId: env('EMAIL_LIST_ID'),
     contact: {
       to: env('EMAIL_CONTACT_TO'),

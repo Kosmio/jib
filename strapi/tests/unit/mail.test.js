@@ -150,7 +150,7 @@ describe('createMailProvider : choix du fournisseur (NF-53)', () => {
   });
 
   it('refuse un fournisseur inconnu et nomme les valeurs admises', () => {
-    assert.throws(() => createMailProvider({ provider: 'sendgrid' }), /Unknown mail provider "sendgrid".*"console" or "brevo"/);
+    assert.throws(() => createMailProvider({ provider: 'sendgrid' }), /Unknown mail provider "sendgrid".*"console", "brevo" or "smtp"/);
   });
 
   it('refuse un expéditeur invalide', () => {
@@ -376,5 +376,43 @@ describe('BrevoMailProvider : correspondance avec l’API (client simulé)', () 
     const client = makeBrevoClient();
     await assert.rejects(brevo(client).send({ ...MESSAGE, to: 'pas-une-adresse' }), /Invalid e-mail address/);
     assert.equal(client.calls.length, 0);
+  });
+});
+
+/** Transport SMTP simulé : enregistre le message passé à nodemailer. */
+const makeTransport = () => {
+  const calls = [];
+  return {
+    calls,
+    sendMail: async (message) => {
+      calls.push(message);
+      return { messageId: '<smtp-123@example.org>' };
+    },
+  };
+};
+
+describe('SmtpMailProvider : serveur SMTP de test (preprod)', () => {
+  const smtp = (transport) => createMailProvider({ provider: 'smtp', smtpHost: 'mailpit', smtpPort: 1025, from: FROM, transport });
+
+  it('passe expéditeur, destinataire, sujet, corps et pièces jointes au transport', async () => {
+    const transport = makeTransport();
+    const result = await smtp(transport).send({
+      ...MESSAGE,
+      to: 'Ana <ana@example.org>',
+      attachments: [{ filename: 'rdv.ics', content: 'BEGIN:VCALENDAR', contentType: 'text/calendar' }],
+    });
+    assert.deepEqual(result, { messageId: '<smtp-123@example.org>' });
+    const [sent] = transport.calls;
+    assert.deepEqual(sent.from, { name: 'Journées de l’Innovation Filière Bois', address: 'espace@example.org' });
+    assert.deepEqual(sent.to, { name: 'Ana', address: 'ana@example.org' });
+    assert.equal(sent.subject, MESSAGE.subject);
+    assert.equal(sent.text, MESSAGE.text);
+    assert.equal(Buffer.from(sent.attachments[0].content, 'base64').toString(), 'BEGIN:VCALENDAR');
+  });
+
+  it('refuse smtp sans hôte, sans expéditeur et sous NODE_ENV=test', () => {
+    assert.throws(() => createMailProvider({ provider: 'smtp', from: FROM }), /needs a host/);
+    assert.throws(() => createMailProvider({ provider: 'smtp', smtpHost: 'mailpit' }), /needs a sender/);
+    assert.throws(() => createMailProvider({ provider: 'smtp', smtpHost: 'mailpit', from: FROM, nodeEnv: 'test' }), /NODE_ENV=test/);
   });
 });
