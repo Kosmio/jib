@@ -3,6 +3,7 @@
 // faits d'ancres : le panneau ciblé par l'adresse (`#intervenants`) s'affiche, Journée sans ancre. La barre d'onglets de l'espace
 // n'apparaît qu'avec une session valable pour l'édition ; sans session, « Prendre RDV » mène à E0. Contenus lus dans Strapi, sans copie.
 import { marked } from "marked";
+import { safeHtml } from "../../../lib/html";
 import AppShell from "../../../components/espace/AppShell.astro";
 import EmptyState from "../../../components/espace/EmptyState.astro";
 import Notice from "../../../components/espace/Notice.astro";
@@ -55,7 +56,7 @@ const notes = program.notes
 const rdvHref = shellMe ? `${base}/annuaire` : `${base}/connexion`;
 const profileHref = (attendeeId: string | null) => (shellMe && attendeeId ? `${base}/annuaire/p/${encodeURIComponent(attendeeId)}` : null);
 const timeOf = ({ start, end }: Session) => start ?? (end ? `Fin ${end}` : "");
-const html = (markdown: string | null) => (markdown ? (marked.parse(markdown, { async: false }) as string) : "");
+const html = (markdown: string | null) => (markdown ? safeHtml(marked.parse(markdown, { async: false }) as string) : "");
 const webUrl = (url: string | null) => (url && /^https?:\/\//i.test(url) ? url : null);
 
 function initialsOfName(name: string): string {
