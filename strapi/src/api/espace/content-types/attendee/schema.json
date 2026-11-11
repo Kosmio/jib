@@ -82,7 +82,7 @@
     },
     "meetingsOptIn": {
       "type": "boolean",
-      "default": false
+      "default": true
     },
     "newsOptIn": {
       "type": "boolean",

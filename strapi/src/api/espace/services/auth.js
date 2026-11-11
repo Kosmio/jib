@@ -42,7 +42,7 @@ module.exports = ({ strapi }) => {
       `attendee:${editionDocumentId}`,
       async () =>
         (await findAttendee(editionDocumentId, email)) ??
-        documents(ATTENDEE).create({ data: { ...ORGANIZER_PROFILE, email, role: 'organizer', edition: { documentId: editionDocumentId } } })
+        documents(ATTENDEE).create({ data: { ...ORGANIZER_PROFILE, email, role: 'organizer', meetingsOptIn: false, edition: { documentId: editionDocumentId } } })
     );
 
   /** Link token found by its hash, with its attendee and the published edition: { link, edition }, empty when unknown. */

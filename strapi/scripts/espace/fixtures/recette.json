@@ -115,7 +115,7 @@
     "clara.dubourdieu@example.org": { "role": "participant", "status": "active", "activated": true, "directoryOptIn": false, "meetingsOptIn": false, "newsOptIn": false, "topics": [] },
     "jules.mazeres@example.org": { "role": "participant", "status": "active", "activated": true, "directoryOptIn": true, "meetingsOptIn": true, "newsOptIn": false, "topics": ["Process, data et IA", "Économie circulaire"] },
     "alice.fourcade@example.org": { "role": "participant", "status": "active", "activated": true, "directoryOptIn": true, "meetingsOptIn": true, "newsOptIn": false, "topics": ["Territoires résilients"] },
-    "tom.laffitte@example.org": { "role": "participant", "status": "active", "activated": false, "directoryOptIn": false, "meetingsOptIn": false, "newsOptIn": false, "topics": [] },
+    "tom.laffitte@example.org": { "role": "participant", "status": "active", "activated": false, "directoryOptIn": false, "meetingsOptIn": true, "newsOptIn": false, "topics": [] },
     "eva.cazaux@example.org": { "role": "participant", "status": "active", "activated": true, "directoryOptIn": true, "meetingsOptIn": true, "newsOptIn": false, "topics": ["Forêt et adaptation", "Économie circulaire"] },
     "lucas.darrigade@example.org": { "role": "participant", "status": "cancelled", "activated": true, "directoryOptIn": true, "meetingsOptIn": true, "newsOptIn": false, "topics": ["Construction bois"] },
     "helene.marques@example.org": { "role": "speaker", "speaker": "test-helene-marques", "status": "active", "activated": true, "directoryOptIn": true, "meetingsOptIn": true, "newsOptIn": false, "topics": ["Forêt et adaptation"] },

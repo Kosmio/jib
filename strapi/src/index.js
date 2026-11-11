@@ -891,6 +891,13 @@ module.exports = {
       strapi.log.error(`[restore] failed: ${err.message}`);
     }
 
+    // Test environments only: an attendee account with a fake address for each intervenant of the program (SPEAKER_TEST_ACCOUNTS)
+    try {
+      await ensureSpeakerTestAccounts(strapi);
+    } catch (err) {
+      strapi.log.error(`[speaker-test-accounts] failed: ${err.message}`);
+    }
+
     // One-shot recovery of an admin login (ADMIN_RESET="email:password", unset by default)
     try {
       await resetAdminUser(strapi);
@@ -1210,6 +1217,68 @@ const FRENCH_LABELS = {
 };
 
 /**
+ * SPEAKER_TEST_ACCOUNTS="slug,slug": for each intervenant of the published program of these editions that no attendee
+ * stands for (linked by `speaker`, or with the same name), creates a speaker account with a fake address
+ * firstname.lastname@example.org, so that the participant space can be tested with speakers who can log in and receive
+ * requests (e-mails stay in the test inbox). Placeholders (« à confirmer ») are skipped. Idempotent ; unset outside test environments.
+ */
+async function ensureSpeakerTestAccounts(strapi) {
+  const slugs = String(process.env.SPEAKER_TEST_ACCOUNTS ?? '').split(',').map((slug) => slug.trim()).filter(Boolean);
+  if (!slugs.length) return;
+  const ATTENDEE = 'api::espace.attendee';
+  const plain = (text) => String(text ?? '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/\s+/g, ' ').trim();
+
+  for (const slug of slugs) {
+    const edition = await strapi.documents('api::edition.edition').findFirst({ filters: { slug }, status: 'published' });
+    if (!edition) {
+      strapi.log.warn(`[speaker-test-accounts] edition ${slug} not found`);
+      continue;
+    }
+    const sequences = await strapi.documents('api::sequence.sequence').findMany({
+      filters: { edition: { documentId: edition.documentId } },
+      status: 'published',
+      populate: { interventions: { populate: { intervenants: { fields: ['documentId', 'name'] } } } },
+      limit: 1000,
+    });
+    const intervenants = new Map();
+    for (const { interventions = [] } of sequences) {
+      for (const { intervenants: people = [] } of interventions) for (const person of people) intervenants.set(person.documentId, person);
+    }
+    const attendees = await strapi.documents(ATTENDEE).findMany({
+      filters: { edition: { documentId: edition.documentId } },
+      fields: ['email', 'firstName', 'lastName'],
+      populate: { speaker: { fields: ['documentId'] } },
+      limit: 5000,
+    });
+    const covered = new Set(attendees.flatMap((a) => [a.speaker?.documentId, plain(`${a.firstName} ${a.lastName}`)]).filter(Boolean));
+    const emails = new Set(attendees.map((a) => a.email.toLowerCase()));
+
+    let created = 0;
+    for (const intervenant of intervenants.values()) {
+      const name = String(intervenant.name ?? '').trim();
+      if (!name || /confirmer/i.test(name) || covered.has(intervenant.documentId) || covered.has(plain(name))) continue;
+      const email = `${plain(name).replace(/[^a-z0-9]+/g, '.').replace(/^\.|\.$/g, '')}@example.org`;
+      if (emails.has(email)) continue;
+      const [firstName, ...rest] = name.split(/\s+/);
+      await strapi.documents(ATTENDEE).create({
+        data: {
+          edition: { documentId: edition.documentId },
+          email,
+          firstName,
+          lastName: rest.join(' ') || firstName,
+          role: 'speaker',
+          speaker: { documentId: intervenant.documentId },
+          status: 'active',
+        },
+      });
+      emails.add(email);
+      created += 1;
+    }
+    if (created) strapi.log.warn(`[speaker-test-accounts] ${created} speaker test account(s) created for ${slug}`);
+  }
+}
+
+/**
  * ADMIN_RESET="email:password": sets the password of that admin user, or creates it as super admin.
  * Meant for a temporary recovery: unset the variable once logged in, or the next start resets it again.
  * The password is never logged. Does nothing when the variable is empty.
@@ -1305,6 +1374,16 @@ async function runDataMigrations(strapi) {
 
   // 2026-05-01: ensure home-page single type has a published entry seeded with defaults
   await ensureHomePage(strapi);
+
+  // 2026-11-11 (D-07): receiving meeting requests and messages is on by default, with an opt-out. Whoever has not recorded
+  // a choice yet (no consentAt) was created with the old default: bring them to the new one. An explicit choice stays.
+  if (await knex.schema.hasTable('espace_attendees')) {
+    const attendees = await knex('espace_attendees')
+      .whereNull('consent_at')
+      .andWhere((where) => where.where({ meetings_opt_in: false }).orWhereNull('meetings_opt_in'))
+      .update({ meetings_opt_in: true });
+    if (attendees > 0) strapi.log.info(`[migration] meetingsOptIn on by default for ${attendees} attendee(s) without recorded consent`);
+  }
 }
 
 /**

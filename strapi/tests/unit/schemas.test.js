@@ -189,7 +189,8 @@ describe('modèle du lot 2 : les 10 types nouveaux (section 3 du plan)', () => {
     assert.deepEqual(attributes.role.enum, ['participant', 'speaker', 'exhibitor_rep', 'organizer']);
     assert.deepEqual(attributes.status.enum, ['active', 'cancelled']);
     assert.equal(attributes.role.default, 'participant');
-    for (const optIn of ['directoryOptIn', 'meetingsOptIn', 'newsOptIn']) assert.equal(attributes[optIn].default, false, `${optIn} décoché par défaut (R-40)`);
+    for (const optIn of ['directoryOptIn', 'newsOptIn']) assert.equal(attributes[optIn].default, false, `${optIn} décoché par défaut (R-40)`);
+    assert.equal(attributes.meetingsOptIn.default, true, 'meetingsOptIn coché par défaut, avec désactivation possible (D-07)');
   });
 
   it('Meeting : statuts du cycle de vie (R-10) et champ tableKey (R-13)', () => {
