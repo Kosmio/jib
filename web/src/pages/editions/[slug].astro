@@ -45,6 +45,8 @@ const dedupedOrganisations = [...new Map(
 ).values()].sort(byName);
 
 const editionPassed = edition.edition_status === "passee";
+
+const siteUrl = Astro.site?.origin || "https://journees-innovation-bois.xylofutur.fr";
 const eventJsonLd: Record<string, unknown> = {
   "@context": "https://schema.org",
   "@type": "Event",
