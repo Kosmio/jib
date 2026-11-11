@@ -58,6 +58,35 @@ export async function getOpenEdition(slug: string): Promise<EspaceEdition | null
   return edition?.participantSpaceEnabled ? edition : null;
 }
 
+const openCache = new Map<string, { at: number; open: boolean }>();
+const OPEN_TTL_MS = 60_000;
+
+/**
+ * L'espace participant de cette édition est-il ouvert ? Pour l'en-tête du site, lu à chaque page : réponse gardée une minute
+ * en mémoire, et en cas d'échec de l'API l'espace est tenu pour fermé (le bouton disparaît, la page reste servie).
+ */
+export async function isEspaceOpen(slug: string): Promise<boolean> {
+  const cached = openCache.get(slug);
+  if (cached && Date.now() - cached.at < OPEN_TTL_MS) return cached.open;
+  const open = await getEdition(slug)
+    .then((edition) => Boolean(edition?.participantSpaceEnabled))
+    .catch(() => false);
+  openCache.set(slug, { at: Date.now(), open });
+  return open;
+}
+
+/**
+ * Origine publique vue par le visiteur (derrière Traefik : en-têtes X-Forwarded-*), repli sur le site déclaré.
+ * Ne sert qu'à écrire une adresse complète dans un QR code.
+ */
+export function publicOrigin(request: Request, url: URL, site?: URL): string {
+  const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0].trim() || request.headers.get("host") || "";
+  const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0].trim();
+  const validProto = !forwardedProto || forwardedProto === "http" || forwardedProto === "https";
+  if (/^[a-z0-9.-]+(:\d+)?$/i.test(forwardedHost) && validProto) return `${forwardedProto ?? url.protocol.replace(":", "")}://${forwardedHost}`;
+  return site?.origin ?? "https://journees-innovation-bois.xylofutur.fr";
+}
+
 /** Profil de la session du navigateur (`Cookie` relayé), ou null sans session valable (401). Avec `counts` (A-36). */
 export async function getMe(cookie: string | null): Promise<Me | null> {
   if (!cookie) return null;

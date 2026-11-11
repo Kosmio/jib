@@ -8,9 +8,11 @@ export interface Props {
   slug: string;
   /** Origine publique du site (https://…), pour que le QR code porte une adresse complète. */
   origin: string;
+  /** Classes du déclencheur. */
+  class?: string;
 }
 
-const { slug, origin } = Astro.props;
+const { slug, origin, class: triggerClass = "" } = Astro.props;
 const path = `/espace/${encodeURIComponent(slug)}/connexion`;
 const url = `${origin}${path}`;
 const svg = await QRCode.toString(url, { type: "svg", margin: 1, errorCorrectionLevel: "M", color: { dark: "#1a1a1a", light: "#ffffff" } });
@@ -20,9 +22,9 @@ const id = `espace-qr-${slug}`;
 <a
   href={path}
   data-espace-connexion={id}
-  class="inline-flex items-center justify-center gap-2 px-6 py-3 md:px-7 md:py-4 bg-white hover:bg-gray-100 text-wood-dark font-semibold text-base md:text-lg rounded-xl transition-all duration-200 shadow-lg"
+  class={`items-center justify-center gap-2 px-4 py-2 bg-primary hover:bg-primary-dark text-white font-semibold text-sm rounded-lg transition-colors ${triggerClass}`}
 >
-  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
   </svg>
   Se connecter

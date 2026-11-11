@@ -4,8 +4,6 @@ import { getEditionBySlug, buildImageUrl } from "../../lib/strapi";
 import { regionLabels } from "../../lib/types";
 import { getTagColor, getTagLabel } from "../../lib/tag-colors";
 import { safeHtml } from "../../lib/html";
-import ConnexionEspace from "../../components/ConnexionEspace.astro";
-import { getEdition } from "../../lib/espace/api";
 
 const { slug } = Astro.params;
 const response = await getEditionBySlug(slug!);
@@ -47,19 +45,6 @@ const dedupedOrganisations = [...new Map(
 ).values()].sort(byName);
 
 const editionPassed = edition.edition_status === "passee";
-
-// Espace participant ouvert pour cette édition : bouton « Se connecter » (QR code sur grand écran). Si l'API ne répond pas, la page reste sans bouton.
-const espaceOpen = await getEdition(slug!).then((e) => Boolean(e?.participantSpaceEnabled)).catch(() => false);
-// Origine publique vue par le visiteur (derrière Traefik : en-têtes X-Forwarded-*), repli sur le site déclaré. Ne sert qu'à écrire le QR code.
-const headers = Astro.request.headers;
-const forwardedHost = headers.get("x-forwarded-host")?.split(",")[0].trim() || headers.get("host") || "";
-const forwardedProto = headers.get("x-forwarded-proto")?.split(",")[0].trim();
-const publicOrigin =
-  /^[a-z0-9.-]+(:\d+)?$/i.test(forwardedHost) && (forwardedProto === "http" || forwardedProto === "https" || !forwardedProto)
-    ? `${forwardedProto ?? Astro.url.protocol.replace(":", "")}://${forwardedHost}`
-    : (Astro.site?.origin ?? "https://journees-innovation-bois.xylofutur.fr");
-
-const siteUrl = Astro.site?.origin || "https://journees-innovation-bois.xylofutur.fr";
 const eventJsonLd: Record<string, unknown> = {
   "@context": "https://schema.org",
   "@type": "Event",
@@ -225,7 +210,6 @@ const eventJsonLd: Record<string, unknown> = {
                 </svg>
               </a>
             )}
-            {espaceOpen && <ConnexionEspace slug={slug!} origin={publicOrigin} />}
             <a
               href="#programme"
               class="inline-flex items-center justify-center gap-2 px-6 py-3 md:px-7 md:py-4 border-2 border-white/25 hover:border-white/40 text-white font-medium text-base md:text-lg rounded-xl transition-all duration-200"

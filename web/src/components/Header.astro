@@ -1,5 +1,7 @@
 ---
 import { getEditions } from "../lib/strapi";
+import { isEspaceOpen, publicOrigin } from "../lib/espace/api";
+import ConnexionEspace from "./ConnexionEspace.astro";
 import { regionLabels, type Edition } from "../lib/types";
 
 const currentPath = Astro.url.pathname;
@@ -41,6 +43,13 @@ const regionEditions = Array.from(editionsByRegion.values()).sort((a, b) => {
   if (aUp && bUp) return new Date(a.date).getTime() - new Date(b.date).getTime();
   return new Date(b.date).getTime() - new Date(a.date).getTime();
 });
+
+// CTA « Se connecter » : l'édition de la page en cours si son espace est ouvert, sinon la prochaine édition dont l'espace est ouvert.
+const openFlags = await Promise.all(regionEditions.map((edition) => isEspaceOpen(edition.slug)));
+const openEditions = regionEditions.filter((_, index) => openFlags[index]);
+const currentSlug = currentPath.match(/^\/editions\/([^/]+)/)?.[1];
+const espaceEdition = openEditions.find((edition) => edition.slug === currentSlug) ?? openEditions[0];
+const origin = publicOrigin(Astro.request, Astro.url, Astro.site);
 
 const fmtDate = (d: string) =>
   new Date(d).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" });
@@ -168,6 +177,12 @@ const isActive = (item: NavItem) => {
       })}
     </ul>
 
+    {espaceEdition && (
+      <div class="hidden md:block">
+        <ConnexionEspace slug={espaceEdition.slug} origin={origin} class="inline-flex" />
+      </div>
+    )}
+
     <button id="mobile-menu-btn" class="md:hidden p-2 text-gray-600" aria-label="Menu">
       <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
@@ -242,6 +257,14 @@ const isActive = (item: NavItem) => {
         );
       })}
     </ul>
+    {espaceEdition && (
+      <a
+        href={`/espace/${encodeURIComponent(espaceEdition.slug)}/connexion`}
+        class="mt-3 flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-white hover:bg-primary-dark"
+      >
+        Se connecter
+      </a>
+    )}
   </div>
 </header>
 
