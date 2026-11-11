@@ -22,6 +22,7 @@
     "altcha": "^2.3.0",
     "astro": "^6.0.7",
     "marked": "^18.0.2",
+    "qrcode": "^1.5.4",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "sanitize-html": "^2.18.1",
@@ -30,6 +31,7 @@
   "packageManager": "pnpm@12.15.0",
   "devDependencies": {
     "@playwright/test": "^1.64.1",
+    "@types/qrcode": "^1.5.6",
     "@types/sanitize-html": "^2.16.2"
   }
 }

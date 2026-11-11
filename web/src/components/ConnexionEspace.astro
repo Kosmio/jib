@@ -1,0 +1,61 @@
+---
+// Bouton « Se connecter » de l'espace participant, pour une édition dont l'espace est ouvert.
+// Sur téléphone (ou sans JavaScript), le lien mène à la page de connexion, qui envoie le lien magique par e-mail.
+// Sur grand écran, un clic ouvre une fenêtre avec un QR code vers cette même page : on le scanne avec son téléphone.
+import QRCode from "qrcode";
+
+export interface Props {
+  slug: string;
+  /** Origine publique du site (https://…), pour que le QR code porte une adresse complète. */
+  origin: string;
+}
+
+const { slug, origin } = Astro.props;
+const path = `/espace/${encodeURIComponent(slug)}/connexion`;
+const url = `${origin}${path}`;
+const svg = await QRCode.toString(url, { type: "svg", margin: 1, errorCorrectionLevel: "M", color: { dark: "#1a1a1a", light: "#ffffff" } });
+const id = `espace-qr-${slug}`;
+---
+
+<a
+  href={path}
+  data-espace-connexion={id}
+  class="inline-flex items-center justify-center gap-2 px-6 py-3 md:px-7 md:py-4 bg-white hover:bg-gray-100 text-wood-dark font-semibold text-base md:text-lg rounded-xl transition-all duration-200 shadow-lg"
+>
+  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+  </svg>
+  Se connecter
+</a>
+
+<dialog id={id} aria-labelledby={`${id}-titre`} class="m-auto w-[min(92vw,24rem)] rounded-2xl bg-white p-6 text-center text-gray-800 shadow-2xl backdrop:bg-black/60">
+  <h2 id={`${id}-titre`} class="font-heading text-xl font-bold normal-case">Se connecter avec votre téléphone</h2>
+  <p class="mt-2 text-sm text-gray-600">
+    Scannez ce code avec l’appareil photo de votre téléphone, puis saisissez votre adresse e-mail : vous recevrez votre lien de connexion.
+  </p>
+  <div class="mx-auto mt-4 aspect-square w-56 [&>svg]:h-full [&>svg]:w-full" role="img" aria-label="QR code vers la page de connexion de l’espace participant" set:html={svg} />
+  <p class="mt-3 break-all text-xs text-gray-500">{url}</p>
+  <div class="mt-5 flex flex-col gap-2">
+    <a href={path} class="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-4 font-semibold text-white hover:bg-primary-dark">Continuer sur cet écran</a>
+    <form method="dialog">
+      <button class="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-gray-300 px-4 font-semibold text-gray-700 hover:bg-gray-50">Fermer</button>
+    </form>
+  </div>
+</dialog>
+
+<script>
+  // Grand écran avec souris : le QR code. Téléphone, tablette, ou fenêtre étroite : le lien reste un simple lien.
+  const wide = window.matchMedia("(min-width: 768px) and (hover: hover) and (pointer: fine)");
+  for (const link of document.querySelectorAll<HTMLAnchorElement>("a[data-espace-connexion]")) {
+    const dialog = document.getElementById(link.dataset.espaceConnexion ?? "") as HTMLDialogElement | null;
+    if (!dialog || typeof dialog.showModal !== "function") continue;
+    link.addEventListener("click", (event) => {
+      if (!wide.matches) return;
+      event.preventDefault();
+      dialog.showModal();
+    });
+    dialog.addEventListener("click", (event) => {
+      if (event.target === dialog) dialog.close();
+    });
+  }
+</script>
