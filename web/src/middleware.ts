@@ -31,14 +31,65 @@ const isEspace = (pathname: string) => pathname === "/espace" || pathname.starts
 const referrerPolicy = (pathname: string) =>
   /^\/espace\/verifier\/?$/.test(pathname) ? "strict-origin" : "strict-origin-when-cross-origin";
 
-export const onRequest = defineMiddleware(async (context, next) => {
-  if (!isEspace(context.url.pathname)) return next();
+// F-107, NF-50 : un délai ou une erreur réseau vers Strapi donne 503, toute autre exception 500. Les erreurs de `fetch` (Node) portent
+// le code réseau dans `cause` ; api.ts signale un délai par `AbortSignal.timeout` (TimeoutError) et un échec de Strapi par « : 502 ».
+const NETWORK_CODES = /^(ECONNREFUSED|ECONNRESET|ENOTFOUND|EAI_AGAIN|ETIMEDOUT|EHOSTUNREACH|UND_ERR_.*)$/;
+function isUnavailable(error: unknown): boolean {
+  const e = error as { name?: string; message?: string; code?: string; cause?: { code?: string } } | null;
+  if (!e) return false;
+  if (e.name === "TimeoutError" || e.name === "AbortError") return true;
+  if (e.name === "TypeError" && /fetch failed/i.test(e.message ?? "")) return true;
+  if (NETWORK_CODES.test(e.code ?? "") || NETWORK_CODES.test(e.cause?.code ?? "")) return true;
+  return /: (502|503|504)$/.test(e.message ?? "");
+}
 
-  const response = await next();
-  response.headers.set("Content-Security-Policy", contentSecurityPolicy(context.url));
+// L'édition est lue dans l'URL, sans appel réseau ; les trois pages sans édition ne comptent pas.
+function editionOf(pathname: string): string | null {
+  const slug = pathname.split("/")[2];
+  if (!slug || ["verifier", "introuvable", "erreur"].includes(slug)) return null;
+  try {
+    return decodeURIComponent(slug);
+  } catch {
+    return null;
+  }
+}
+
+function secure(response: Response, url: URL): Response {
+  response.headers.set("Content-Security-Policy", contentSecurityPolicy(url));
   response.headers.set("X-Content-Type-Options", "nosniff");
-  response.headers.set("Referrer-Policy", referrerPolicy(context.url.pathname));
+  response.headers.set("Referrer-Policy", referrerPolicy(url.pathname));
   // Pages propres à la session de la personne : jamais mises en cache, ni par le navigateur ni par un relais.
   response.headers.set("Cache-Control", "private, no-store");
   return response;
+}
+
+export const onRequest = defineMiddleware(async (context, next) => {
+  if (!isEspace(context.url.pathname)) return next();
+
+  // Une réécriture (introuvable, erreur) fait perdre `Astro.params` : l'édition de l'URL d'origine voyage par `locals`.
+  const edition = editionOf(context.url.pathname);
+  Object.assign(context.locals, { espaceEdition: edition });
+
+  let response: Response;
+  try {
+    response = await next();
+  } catch (error) {
+    const requestId = crypto.randomUUID().slice(0, 8);
+    const status = isUnavailable(error) ? 503 : 500;
+    const err = error as Error | null;
+    console.error(
+      JSON.stringify({ level: "error", requestId, status, method: context.request.method, path: context.url.pathname, error: err?.message ?? String(error), stack: err?.stack }),
+    );
+    try {
+      Object.assign(context.locals, { espaceError: { status, requestId, edition } });
+      response = await context.rewrite("/espace/erreur");
+    } catch {
+      // La page d'erreur elle-même a échoué : réponse minimale, sans trace.
+      response = new Response("Un incident empêche d’afficher cette page. Identifiant : " + requestId, {
+        status,
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
+      });
+    }
+  }
+  return secure(response, context.url);
 });

@@ -1,0 +1,44 @@
+---
+// Page d'erreur de l'espace (F-107, NF-50) : le middleware y réécrit toute exception levée pendant le rendu d'une page de /espace/,
+// en posant `Astro.locals.espaceError` (statut 503 ou 500, identifiant de requête, édition lue dans l'URL). Aucun appel à Strapi :
+// il peut être à l'arrêt. La barre d'onglets est donc posée sans profil réel (AppShell ne lit que les noms et la photo).
+import AppShell from "../../components/espace/AppShell.astro";
+import EditionBanner from "../../components/espace/EditionBanner.astro";
+import EspaceCard from "../../components/espace/EspaceCard.astro";
+import EspaceButton from "../../components/espace/EspaceButton.astro";
+import type { Me } from "../../lib/espace/client";
+
+const info = (Astro.locals as { espaceError?: { status: 500 | 503; requestId: string; edition: string | null } }).espaceError;
+Astro.response.status = info?.status ?? 500;
+
+const edition = info?.edition ?? null;
+const title = "Un incident empêche d’afficher cette page";
+// Les pages d'accès n'ont pas de barre d'onglets : le visiteur n'y est pas encore connecté.
+const withTabs = edition !== null && !/\/espace\/[^/]+\/(connexion|bienvenue)\/?$/.test(Astro.url.pathname);
+const shellMe = withTabs
+  ? ({ firstName: "", lastName: "", photoUrl: null, isOrganizer: false, edition: { slug: edition, title: "" } } as unknown as Me)
+  : null;
+---
+
+---
+
+<!-- `active="organizer"` : onglet réservé aux organisateurs, jamais rendu ici (isOrganizer faux), donc aucun onglet n'est marqué actif. -->
+<AppShell title="Incident" active="organizer" editionSlug={edition ?? ""} me={shellMe}>
+  <EditionBanner title={title} subtitle="Votre espace est momentanément indisponible." />
+  <EspaceCard>
+    <p class="text-lg">
+      La page n’a pas pu s’afficher. Vos données ne sont pas perdues : réessayez dans un instant.
+    </p>
+    <p class="mt-3 text-muted">
+      Vos e-mails de confirmation de rendez-vous indiquent l’heure et la table : vous pouvez vous y fier en attendant.
+    </p>
+    <div class="mt-6 flex flex-col gap-3">
+      <EspaceButton type="button" class="js-retry">Réessayer</EspaceButton>
+      {edition && <EspaceButton variant="secondary" href={`/espace/${encodeURIComponent(edition)}/`}>Retour à l’accueil de l’espace</EspaceButton>}
+    </div>
+    {info?.requestId && <p class="mt-6 text-sm text-muted">Identifiant de l’incident : {info.requestId}</p>}
+  </EspaceCard>
+  <script>
+    document.querySelector(".js-retry")?.addEventListener("click", () => location.reload());
+  </script>
+</AppShell>

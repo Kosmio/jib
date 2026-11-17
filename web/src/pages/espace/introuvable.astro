@@ -7,11 +7,17 @@ import EspaceCard from "../../components/espace/EspaceCard.astro";
 import EspaceButton from "../../components/espace/EspaceButton.astro";
 
 Astro.response.status = 404;
+
+// F-108 : l'édition n'est connue que si l'URL la porte (rewrite depuis une page de l'édition).
+const edition = (Astro.locals as { espaceEdition?: string | null }).espaceEdition ?? null;
 ---
 
 <EspaceLayout title="Page introuvable">
   <EditionBanner title="Page introuvable" subtitle="Cette page n’existe pas, ou l’espace participant n’est pas ouvert." />
   <EspaceCard>
-    <EspaceButton variant="secondary" href="/">Retour au site des Journées</EspaceButton>
+    <div class="flex flex-col gap-3">
+      {edition && <EspaceButton href={`/espace/${encodeURIComponent(edition)}/`}>Retour à l’accueil de l’espace</EspaceButton>}
+      <EspaceButton variant="secondary" href="/">Retour au site des Journées</EspaceButton>
+    </div>
   </EspaceCard>
 </EspaceLayout>
