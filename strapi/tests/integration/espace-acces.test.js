@@ -33,7 +33,8 @@ const [ORGANIZER, ORGANIZER_2, ORGANIZER_3, ORGANIZER_4] = ORGANIZERS;
 const ME_KEYS = ['company', 'consent', 'edition', 'firstName', 'id', 'isOrganizer', 'jobTitle', 'lastName', 'role'];
 // Phase 2 (A-36) : `GET /me` ajoute le profil complet et les compteurs ; `counts` ne figure que dans `GET /me`. Le détail est dans profile.test.js.
 const ME_PHASE_2_KEYS = ['bio', 'emailPrefs', 'exhibitor', 'hostedTableNumber', 'linkedinUrl', 'photoUrl', 'profileCompletion', 'topics', 'unavailableSessions'];
-const ME_FULL_KEYS = [...ME_KEYS, ...ME_PHASE_2_KEYS, 'counts'].sort();
+const ME_V5_D_KEYS = ['lookingFor', 'offering', 'phone'];
+const ME_FULL_KEYS = [...ME_KEYS, ...ME_PHASE_2_KEYS, ...ME_V5_D_KEYS, 'counts'].sort();
 
 describe('accès à l’espace (lot 5)', { timeout: 300_000 }, () => {
   // LINK_RATE_IP_MAX=5 : les tests de limite par IP ci-dessous gardent leurs six demandes (le défaut passe à 60 en V1-B, NF-61).
@@ -908,14 +909,17 @@ describe('accès à l’espace (lot 5)', { timeout: 300_000 }, () => {
   describe('NF-01 sur /me : accès croisés entre A, B (même édition) et C (autre édition), section 7 du plan', () => {
     it('A ne voit que lui-même sur GET /me ; B et C voient le leur', async () => {
       const { a, c } = await world();
-      const A = await person(a, { firstName: 'Anna', lastName: 'Alpha' });
-      const B = await person(a, { firstName: 'Basile', lastName: 'Bravo' });
-      const C = await person(c, { firstName: 'Camille', lastName: 'Charlie' });
+      const A = await person(a, { firstName: 'Anna', lastName: 'Alpha', phone: '0600000001', lookingFor: 'cherche A', offering: 'propose A' });
+      const B = await person(a, { firstName: 'Basile', lastName: 'Bravo', phone: '0600000002', lookingFor: 'cherche B', offering: 'propose B' });
+      const C = await person(c, { firstName: 'Camille', lastName: 'Charlie', phone: '0600000003', lookingFor: 'cherche C', offering: 'propose C' });
       const [ra, rb, rc] = await Promise.all([me(A.cookie), me(B.cookie), me(C.cookie)]);
       assert.deepEqual([ra.json.id, rb.json.id, rc.json.id], [A.attendee.documentId, B.attendee.documentId, C.attendee.documentId]);
       assert.equal(ra.json.lastName, 'Alpha');
       assert.equal(rc.json.edition.slug, 'edition-c');
       assert.deepEqual(Object.keys(ra.json).sort(), ME_FULL_KEYS);
+      assert.deepEqual([ra.json.phone, ra.json.lookingFor, ra.json.offering], ['0600000001', 'cherche A', 'propose A']);
+      assert.deepEqual([rb.json.phone, rb.json.lookingFor, rb.json.offering], ['0600000002', 'cherche B', 'propose B']);
+      assert.doesNotMatch(ra.text, /0600000002|0600000003|cherche [BC]|propose [BC]/);
     });
 
     it('un paramètre ou un en-tête désignant B ne change pas la personne servie', async () => {
