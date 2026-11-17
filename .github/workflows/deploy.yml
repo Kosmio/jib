@@ -12,7 +12,7 @@ on:
           - preprod
           - prod
       version:
-        description: 'Version to deploy (e.g., 0.1.0)'
+        description: 'Version to deploy (e.g., 0.2.0)'
         required: true
         type: string
       dry_run:
@@ -21,7 +21,7 @@ on:
         type: boolean
         default: false
       reset_db:
-        description: 'Reset database before deploy (DROP + re-seed)'
+        description: 'Reset database before deploy (DROP + re-seed). Refused on prod'
         required: false
         type: boolean
         default: false
@@ -43,6 +43,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # NF-58 : la prod ne se réinitialise jamais par ce workflow. L'étape échoue avant toute connexion SSH.
+      - name: Refuse reset on prod
+        if: ${{ inputs.environment == 'prod' && inputs.reset_db }}
+        run: |
+          echo "::error::reset_db is refused on prod: it would DROP the production database. Uncheck reset_db."
+          exit 1
+
       - name: Validate inputs
         run: |
           echo "Environment: ${{ inputs.environment }}"
@@ -58,6 +65,29 @@ jobs:
             echo "Error: copy_prod_data only runs on preprod"
             exit 1
           fi
+
+      # NF-60 : en prod, un expéditeur ou une liste d'organisateurs vide rendrait l'espace muet ou sans pilotage.
+      # L'étape tourne aussi en dry run, et avant le transfert.
+      - name: Check prod variables
+        if: ${{ inputs.environment == 'prod' }}
+        env:
+          EMAIL_FROM_VAR: ${{ vars.EMAIL_FROM }}
+          ORGANIZER_EMAILS_VAR: ${{ vars.ORGANIZER_EMAILS }}
+        run: |
+          missing=0
+          if [[ -z "${EMAIL_FROM_VAR//[[:space:]]/}" ]]; then
+            echo "::error::GitHub variable EMAIL_FROM is empty in the prod environment (sender of the participant e-mails)."
+            missing=1
+          fi
+          if [[ -z "${ORGANIZER_EMAILS_VAR//[[:space:]]/}" ]]; then
+            echo "::error::GitHub variable ORGANIZER_EMAILS is empty in the prod environment (nobody could reach the organizer panel)."
+            missing=1
+          fi
+          if [[ $missing == 1 ]]; then
+            echo "Set them with: gh variable set <NAME> --env prod --body '<value>' (see docs/espace/exploitation.md)"
+            exit 1
+          fi
+          echo "EMAIL_FROM and ORGANIZER_EMAILS are set."
 
       - name: Setup SSH
         if: ${{ !inputs.dry_run }}
@@ -91,6 +121,9 @@ jobs:
           ALTCHA_HMAC_KEY=${{ secrets.SECRET_ALTCHA_HMAC_KEY }}
           EMAIL_API_KEY=${{ secrets.SECRET_EMAIL_API_KEY }}
           EMAIL_LIST_ID=${{ vars.EMAIL_LIST_ID }}
+          EMAIL_FROM=${{ vars.EMAIL_FROM }}
+          ORGANIZER_EMAILS=${{ vars.ORGANIZER_EMAILS }}
+          LINK_RATE_IP_MAX=${{ vars.LINK_RATE_IP_MAX }}
           EMAIL_CONTACT_TEMPLATE_ID=${{ secrets.SECRET_EMAIL_CONTACT_TEMPLATE_ID }}
           PUBLIC_MATOMO_URL=${{ secrets.SECRET_PUBLIC_MATOMO_URL }}
           PUBLIC_MATOMO_SITE_ID=${{ secrets.SECRET_PUBLIC_MATOMO_SITE_ID }}
@@ -98,6 +131,10 @@ jobs:
           MAILPIT_AUTH=${{ secrets.SECRET_MAILPIT_AUTH }}
           ADMIN_RESET=${{ secrets.SECRET_ADMIN_RESET }}
           EOF
+
+          # Une variable GitHub non renseignée ne doit pas écraser la valeur du fichier d'overlay (ni le défaut du compose).
+          grep -v -E '^(EMAIL_FROM|ORGANIZER_EMAILS|LINK_RATE_IP_MAX)=[[:space:]]*$' /tmp/.env.secrets > /tmp/.env.secrets.filtered
+          mv /tmp/.env.secrets.filtered /tmp/.env.secrets
 
       - name: Copy infrastructure files to server
         if: ${{ !inputs.dry_run }}
@@ -116,6 +153,18 @@ jobs:
           echo "Copying secrets..."
           cat /tmp/.env.secrets | ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} \
             "cat > ~/jib/infra/deploy/overlays/${{ inputs.environment }}/.env.secrets"
+
+      # NF-59 : sauvegarde de la base et des téléversements avant tout changement en prod. Un échec arrête le déploiement.
+      # La planification quotidienne à 3h00 est (ré)installée au passage, sans doublon.
+      - name: Backup prod
+        if: ${{ !inputs.dry_run && inputs.environment == 'prod' }}
+        run: |
+          ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} bash << 'EOF'
+            set -e
+            cd ~/jib/infra/deploy
+            bash scripts/backup.sh prod
+            bash scripts/backup.sh prod install-cron
+          EOF
 
       # Chaque build sous une même étiquette laisse l'ancienne image sans étiquette sur le serveur : sans ce ménage, le disque se remplit
       # et le déploiement s'arrête sur « no space left on device ». Seules les images sans étiquette et sans conteneur sont supprimées.

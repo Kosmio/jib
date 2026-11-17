@@ -79,6 +79,7 @@ services:
       SMTP_PORT: ${SMTP_PORT:-1025}
       PUBLIC_URL: ${PUBLIC_URL:-http://localhost:4321}
       ORGANIZER_EMAILS: ${ORGANIZER_EMAILS:-}
+      LINK_RATE_IP_MAX: ${LINK_RATE_IP_MAX:-60}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:4321}
       IS_PROXIED: ${IS_PROXIED:-false}
       CRON_ENABLED: ${CRON_ENABLED:-false}
