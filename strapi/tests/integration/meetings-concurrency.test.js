@@ -13,6 +13,7 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
 const { useEspace } = require('../helpers/espace');
+const { UID } = require('../helpers/espace-data');
 const W = require('../helpers/meetings-world');
 
 const codeOf = (response) => (response.status < 400 ? 'OK' : response.json?.error?.code ?? `HTTP ${response.status}`);
@@ -112,6 +113,55 @@ describe('rendez-vous : concurrence (lot 8)', { timeout: 900_000 }, () => {
       noServerError(responses);
       assert.deepEqual(tally(responses), { OK: 1, NO_TABLE_LEFT: 16 });
       assert.equal(responses.find((response) => response.status === 200).json.location, 'Table 2');
+    });
+  });
+
+  describe('R-90 : table 2 bloquée sur 12h30, 20 demandes simultanées', () => {
+    const block = (world, label, data) => app().documents(UID.slot).update({ documentId: world.slots[label].documentId, data });
+
+    it('20 acceptations simultanées à 12h30 : 2 acceptées aux tables 1 et 3, jamais la 2, aucune erreur serveur', async () => {
+      const world = await newEdition();
+      await block(world, '12h30', { blockedTables: [2], closed: false });
+      const pairs = await pendingPairs(world, 20, '12h30');
+      const responses = await Promise.all(pairs.map(({ client, meeting }) => client.post(`/meetings/${meeting.documentId}/accept`)));
+      noServerError(responses);
+      assert.deepEqual(tally(responses), { OK: 2, NO_TABLE_LEFT: 18 });
+      assert.deepEqual(responses.filter((response) => response.status === 200).map((response) => response.json.location).sort(), ['Table 1', 'Table 3']);
+      const rows = await W.meetingsAt(app(), world.edition, { status: 'accepted' });
+      assert.deepEqual(rows.map((row) => row.tableNumber).sort(), [1, 3]);
+      assert.equal(rows.some((row) => row.tableKey === `${world.slots['12h30'].documentId}:2`), false);
+    });
+
+    it('le blocage ne vaut que pour 12h30 : à 10h45, 20 acceptations donnent les trois tables, la 2 comprise', async () => {
+      const world = await newEdition();
+      await block(world, '12h30', { blockedTables: [2], closed: false });
+      const pairs = await pendingPairs(world, 20, '10h45');
+      const responses = await Promise.all(pairs.map(({ client, meeting }) => client.post(`/meetings/${meeting.documentId}/accept`)));
+      noServerError(responses);
+      assert.deepEqual(tally(responses), { OK: 3, NO_TABLE_LEFT: 17 });
+      assert.deepEqual((await W.meetingsAt(app(), world.edition, { status: 'accepted' })).map((row) => row.tableNumber).sort(), [1, 2, 3]);
+    });
+
+    it('table 2 dédiée et bloquée à 12h30 : six réservations simultanées reçoivent toutes TARGET_BUSY, aucun rendez-vous créé', async () => {
+      const world = await newEdition();
+      const host = await person(world.edition, { role: 'speaker', hostedTableNumber: 2, meetingsOptIn: false, directoryOptIn: false });
+      await block(world, '12h30', { blockedTables: [2], closed: false });
+      const clients = [];
+      for (let index = 0; index < 6; index += 1) clients.push(await as(world.edition, await person(world.edition)));
+      const responses = await Promise.all(clients.map((client) => client.post('/meetings', { slotId: world.slots['12h30'].documentId, target: `p:${host.documentId}` })));
+      noServerError(responses);
+      assert.deepEqual(tally(responses), { TARGET_BUSY: 6 });
+      assert.equal((await W.meetingsAt(app(), world.edition)).length, 0);
+    });
+
+    it('créneau fermé : 20 acceptations simultanées répondent toutes SLOT_CLOSED, aucune table prise', async () => {
+      const world = await newEdition();
+      const pairs = await pendingPairs(world, 20, '12h30');
+      await block(world, '12h30', { blockedTables: [], closed: true });
+      const responses = await Promise.all(pairs.map(({ client, meeting }) => client.post(`/meetings/${meeting.documentId}/accept`)));
+      noServerError(responses);
+      assert.deepEqual(tally(responses), { SLOT_CLOSED: 20 });
+      assert.equal((await W.meetingsAt(app(), world.edition, { status: 'accepted' })).length, 0);
     });
   });
 

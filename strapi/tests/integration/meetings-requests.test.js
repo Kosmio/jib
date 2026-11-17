@@ -399,32 +399,30 @@ describe('rendez-vous : demandes et consultation (lot 8)', { timeout: 600_000 },
         assert.ok(mail.text.includes('10h45'), 'le créneau est indiqué');
       });
 
-      it('le bouton « Accepter » porte son propre lien d’action de 72 heures vers l’agenda, avec la demande en évidence (I-21, A-33)', async () => {
+      it('le bouton « Répondre à la demande » porte un lien d’action de 72 heures vers l’agenda, avec la demande en évidence ; plus de lien « Accepter » ni « Voir la demande » (I-21, A-33, F-127)', async () => {
         const world = await newEdition();
         const [lea, ines] = [await person(world.edition), await person(world.edition)];
         const { json } = await ask(world, lea, ines);
         await W.waitForEmailLogs(app(), ines, 'meeting-request');
-        const accept = linkAfter(mailTo(ines).text, 'Accepter');
-        const view = linkAfter(mailTo(ines).text, 'Voir la demande');
-        assert.ok(accept && view, 'liens « Accepter » et « Voir la demande » absents du texte');
-        assert.notEqual(accept, view, 'chaque bouton a son propre lien');
-        for (const url of [accept, view]) {
-          const parsed = new URL(url);
-          assert.equal(parsed.pathname, '/espace/verifier');
-          assert.equal(parsed.searchParams.get('next'), `/espace/${world.edition.slug}/agenda?demande=${json.id}`);
-        }
+        const reply = linkAfter(mailTo(ines).text, 'Répondre à la demande');
+        assert.ok(reply, 'lien « Répondre à la demande » absent du texte');
+        assert.equal(linkAfter(mailTo(ines).text, 'Accepter'), undefined, 'le lien « Accepter » a disparu');
+        assert.equal(linkAfter(mailTo(ines).text, 'Voir la demande'), undefined, 'le lien « Voir la demande » a disparu');
+        const parsed = new URL(reply);
+        assert.equal(parsed.pathname, '/espace/verifier');
+        assert.equal(parsed.searchParams.get('next'), `/espace/${world.edition.slug}/agenda?demande=${json.id}`);
         const tokens = (await app().db.query(UID.magicToken).findMany({ where: { attendee: { documentId: ines.documentId }, kind: 'link' } })).filter(
           (row) => Math.abs(new Date(row.expiresAt).getTime() - (Date.now() + 72 * 3_600_000)) < 10 * 60_000
         );
-        assert.ok(tokens.length >= 2, `${tokens.length} lien(s) de 72 heures pour ${ines.email}`);
+        assert.ok(tokens.length >= 1, `${tokens.length} lien(s) de 72 heures pour ${ines.email}`);
       });
 
-      it('Q-13 : ouvrir le lien « Accepter » ne modifie pas la demande (aucune action par GET)', async () => {
+      it('Q-13 : ouvrir le lien « Répondre à la demande » ne modifie pas la demande (aucune action par GET)', async () => {
         const world = await newEdition();
         const [lea, ines] = [await person(world.edition), await person(world.edition)];
         const { json } = await ask(world, lea, ines);
         await W.waitForEmailLogs(app(), ines, 'meeting-request');
-        const token = new URL(linkAfter(mailTo(ines).text, 'Accepter')).searchParams.get('token');
+        const token = new URL(linkAfter(mailTo(ines).text, 'Répondre à la demande')).searchParams.get('token');
         const state = await espace().request(`/api/espace/auth/link?token=${token}`);
         assert.equal(state.json.valid, true);
         const [row] = await meetingsOf(world.edition);
