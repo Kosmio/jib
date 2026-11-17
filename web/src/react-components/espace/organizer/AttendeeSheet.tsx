@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { EspaceApiError, request } from "../../../lib/espace/client";
 import { plural } from "../../../lib/espace/format";
+import { downloadPdf, fileSlug } from "./BadgesCard";
 import { FeedbackArea, Icon, type Feedback } from "./shared";
 
 // F-135, F-137, F-138 : fiche d'un inscrit du pilotage. Les appels sont définis ici (contrat : 14-lots-finalisation.md, V3-E).
@@ -199,6 +200,7 @@ export default function AttendeeSheet({ edition, strapiUrl, attendeeId, onClose 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
   const [notice, setNotice] = useState<Feedback | null>(null);
 
   const show = (next: AttendeeSheetData) => {
@@ -227,6 +229,7 @@ export default function AttendeeSheet({ edition, strapiUrl, attendeeId, onClose 
       if (text) setNotice({ kind: "alert", text });
     }
     setConfirming(false);
+    setRegenerating(false);
     setBusy(false);
   }
 
@@ -246,6 +249,19 @@ export default function AttendeeSheet({ edition, strapiUrl, attendeeId, onClose 
       if (result.status === "failed") throw new EspaceApiError(502, "MAIL_FAILED", result.error ? `Le lien n’est pas parti : ${result.error}` : "Le lien n’est pas parti.");
       return `Lien envoyé à ${sheet?.email}. ${plural(result.remaining, "envoi restant", "envois restants")} cette heure.`;
     }, "Le lien n’a pas pu être envoyé. Réessayez.");
+
+  const badge = () =>
+    act(async () => {
+      await downloadPdf(`${strapiUrl}/api/espace${base(edition)}/${enc(attendeeId)}/badge`, `badge-${fileSlug(`${sheet?.firstName ?? ""} ${sheet?.lastName ?? ""}`) || "inscrit"}.pdf`);
+      return "Le badge est téléchargé.";
+    }, "Le badge n’a pas pu être généré. Réessayez.");
+
+  const regenerate = () =>
+    act(async () => {
+      await request<{ regeneratedAt: string }>(strapiUrl, `${base(edition)}/${enc(attendeeId)}/card-token/regenerate`, "POST");
+      setRegenerating(false);
+      return "Jeton régénéré. L’ancien badge ne fonctionne plus : téléchargez le nouveau et réimprimez-le.";
+    }, "Le jeton n’a pas pu être régénéré. Réessayez.");
 
   const cancel = () =>
     act(async () => {
@@ -330,6 +346,12 @@ export default function AttendeeSheet({ edition, strapiUrl, attendeeId, onClose 
         <button type="button" onClick={sendLink} disabled={busy || cancelled} className={buttonClass}>
           Renvoyer un lien de connexion
         </button>
+        <button type="button" onClick={badge} disabled={busy || cancelled} className={buttonClass}>
+          Badge à l’unité
+        </button>
+        <button type="button" onClick={() => setRegenerating(true)} disabled={busy || cancelled} className={buttonClass}>
+          Régénérer le jeton
+        </button>
         {cancelled ? (
           <button type="button" onClick={restore} disabled={busy} className={buttonClass}>
             Réinscrire
@@ -341,6 +363,21 @@ export default function AttendeeSheet({ edition, strapiUrl, attendeeId, onClose 
         )}
       </div>
 
+      {regenerating && (
+        <div role="alertdialog" aria-labelledby="jeton-confirm" className="mt-4 rounded-lg border-2 border-danger bg-white p-4">
+          <p id="jeton-confirm" className="font-semibold">
+            L’ancien badge ne fonctionnera plus, il faudra le réimprimer.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <button type="button" onClick={regenerate} disabled={busy} aria-busy={busy} className={dangerClass}>
+              Confirmer la régénération
+            </button>
+            <button type="button" onClick={() => setRegenerating(false)} disabled={busy} className={buttonClass}>
+              Annuler
+            </button>
+          </div>
+        </div>
+      )}
       {confirming && (
         <div role="alertdialog" aria-labelledby="desinscrire-confirm" className="mt-4 rounded-lg border-2 border-danger bg-white p-4">
           <p id="desinscrire-confirm" className="font-semibold">

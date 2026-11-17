@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { getStats, getSyncRuns, type Stats, type SyncRun } from "../../lib/espace/admin";
 import AttendeesCard from "./organizer/AttendeesCard";
+import BadgesCard from "./organizer/BadgesCard";
 import ExhibitorsCard from "./organizer/ExhibitorsCard";
 import ExportsCard from "./organizer/ExportsCard";
 import MeetingsCard from "./organizer/MeetingsCard";
@@ -52,6 +53,7 @@ export default function OrganizerPanel({ strapiUrl, editionSlug, nowIso, themeCo
         <ExhibitorsCard {...card} stats={stats} />
       </div>
       <ExportsCard {...card} />
+      <BadgesCard {...card} />
       <RemindersCard {...card} />
       <AttendeesCard {...card} />
       <MeetingsCard {...card} />
