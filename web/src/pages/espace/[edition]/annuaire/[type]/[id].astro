@@ -42,7 +42,10 @@ if (!profile.ok && profile.status !== 404) throw new Error(`GET /directory/${typ
 if (!profile.ok) Astro.response.status = 404;
 
 const card = profile.ok ? profile.data : null;
-const person = card && (card.kind === "attendee" || card.kind === "intervenant") ? (card as DirectoryPerson) : null;
+// V5-D (R-42) : « Je cherche » et « Je propose » suivent la visibilité du profil ; le téléphone n'est rendu par l'API qu'à l'interlocuteur d'un rendez-vous confirmé.
+type B2bFields = { lookingFor?: string | null; offering?: string | null; phone?: string | null };
+const person = card && (card.kind === "attendee" || card.kind === "intervenant") ? (card as DirectoryPerson & B2bFields) : null;
+const phone = person?.phone?.trim() || null;
 // D-06 : un intervenant du programme sans compte n'a qu'une page publique, ni créneaux ni message.
 const publicOnly = card?.kind === "intervenant";
 const exhibitor = card && card.kind === "exhibitor" ? (card as DirectoryExhibitor) : null;
@@ -117,6 +120,25 @@ const role = person ? [person.jobTitle, person.company].filter(Boolean) : [];
               </p>
             )}
             {person?.bio && <p class="mt-4 text-lg text-ink">{person.bio}</p>}
+            {person?.lookingFor && (
+              <p class="mt-4 text-lg text-ink">
+                <span class="font-bold text-title">Je cherche : </span>
+                {person.lookingFor}
+              </p>
+            )}
+            {person?.offering && (
+              <p class="mt-2 text-lg text-ink">
+                <span class="font-bold text-title">Je propose : </span>
+                {person.offering}
+              </p>
+            )}
+            {phone && (
+              <p class="mt-3 text-lg text-ink">
+                <span class="font-bold text-title">Téléphone : </span>
+                <a href={`tel:${phone.replace(/[^+\d]/g, "")}`} class="inline-flex min-h-11 items-center font-semibold text-title underline">{phone}</a>
+                <span class="block text-sm text-muted">Visible seulement des personnes avec qui vous avez un rendez-vous confirmé.</span>
+              </p>
+            )}
             {person?.linkedinUrl && /^https:\/\/([a-z0-9-]+\.)*linkedin\.com\//.test(person.linkedinUrl) && (
               <p class="mt-3">
                 <a href={person.linkedinUrl} rel="noopener noreferrer" target="_blank" class="inline-flex min-h-11 items-center font-semibold text-title underline">

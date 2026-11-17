@@ -24,6 +24,10 @@ type Props = {
     Consent & {
       bio: string;
       linkedinUrl: string;
+      /** V5-D : absents, le formulaire les lit lui-même (GET /me) avant d'ouvrir ces trois champs. */
+      lookingFor?: string;
+      offering?: string;
+      phone?: string;
       unavailableSessions: string[];
       photoUrl: string | null;
       topics: string[];
@@ -67,22 +71,27 @@ const EMAIL_CHOICES = [
 ] as const;
 
 const BIO_MAX = 280;
+const B2B_MAX = 300;
+const PHONE_MAX = 30;
 const TOPICS_MAX = 3;
 const PHOTO_MAX_BYTES = 5 * 1024 * 1024;
 const PHOTO_SIDE = 256;
 const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
+type B2b = { lookingFor: string; offering: string; phone: string };
+
 type FormValues = {
   profile: Profile;
   bio: string;
   linkedinUrl: string;
+  b2b: B2b;
   awayIds: string[];
   topicIds: string[];
   consent: Consent;
   emailPrefs: EmailPrefs;
 };
 
-type FieldName = (typeof FIELDS)[number]["name"] | "bio" | "linkedinUrl" | "unavailableSessions" | "topics" | "emailPrefs";
+type FieldName = (typeof FIELDS)[number]["name"] | "bio" | "linkedinUrl" | "lookingFor" | "offering" | "phone" | "unavailableSessions" | "topics" | "emailPrefs";
 type FieldErrors = Partial<Record<FieldName, string>>;
 
 function Icon({ name }: { name: "alert" | "check" | "info" }) {
@@ -144,6 +153,13 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b
   });
   const [bio, setBio] = useState(initial.bio);
   const [linkedinUrl, setLinkedinUrl] = useState(initial.linkedinUrl);
+  // V5-D : « Je cherche », « Je propose » et le téléphone ; lus au serveur quand la page ne les a pas fournis (jamais envoyés à vide par erreur).
+  const given: B2b | null =
+    initial.lookingFor !== undefined || initial.offering !== undefined || initial.phone !== undefined
+      ? { lookingFor: initial.lookingFor ?? "", offering: initial.offering ?? "", phone: initial.phone ?? "" }
+      : null;
+  const [b2b, setB2b] = useState<B2b>(given ?? { lookingFor: "", offering: "", phone: "" });
+  const [b2bReady, setB2bReady] = useState(given !== null);
   const [awayIds, setAwayIds] = useState<string[]>(initial.unavailableSessions);
   const [topicIds, setTopicIds] = useState<string[]>(initial.topics);
   const [consent, setConsent] = useState<Consent>({
@@ -158,6 +174,7 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b
     profile: { firstName: initial.firstName, lastName: initial.lastName, jobTitle: initial.jobTitle, company: initial.company },
     bio: initial.bio,
     linkedinUrl: initial.linkedinUrl,
+    b2b: given ?? { lookingFor: "", offering: "", phone: "" },
     awayIds: initial.unavailableSessions,
     topicIds: initial.topics,
     consent: { directoryOptIn: initial.directoryOptIn, meetingsOptIn: initial.meetingsOptIn, newsOptIn: initial.newsOptIn },
@@ -177,7 +194,24 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b
   const loginUrl = `/espace/${encodeURIComponent(editionSlug)}/connexion`;
   const photo = photoSrc(strapiUrl, photoUrl);
   const atTopicLimit = topicIds.length >= TOPICS_MAX;
-  const dirty = JSON.stringify({ profile, bio, linkedinUrl, awayIds, topicIds, consent, emailPrefs }) !== JSON.stringify(baseline);
+  const dirty = JSON.stringify({ profile, bio, linkedinUrl, b2b, awayIds, topicIds, consent, emailPrefs }) !== JSON.stringify(baseline);
+
+  useEffect(() => {
+    if (b2bReady) return;
+    let alive = true;
+    request<{ lookingFor: string | null; offering: string | null; phone: string | null }>(strapiUrl, "/me", "GET")
+      .then((me) => {
+        if (!alive) return;
+        const loaded = { lookingFor: me.lookingFor ?? "", offering: me.offering ?? "", phone: me.phone ?? "" };
+        setB2b(loaded);
+        setBaseline((current) => ({ ...current, b2b: loaded }));
+        setB2bReady(true);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // F-146 : alerte du navigateur en quittant la page avec des modifications non enregistrées (changement d'onglet, lien, fermeture).
   useEffect(() => {
@@ -221,6 +255,7 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b
     setProfile(baseline.profile);
     setBio(baseline.bio);
     setLinkedinUrl(baseline.linkedinUrl);
+    setB2b(baseline.b2b);
     setAwayIds(baseline.awayIds);
     setTopicIds(baseline.topicIds);
     setConsent(baseline.consent);
@@ -298,6 +333,7 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b
         ...profile,
         bio,
         linkedinUrl,
+        ...(b2bReady && b2b),
         // Seules les plages encore au programme partent : une plage retirée depuis ne bloque pas l'enregistrement.
         unavailableSessions: awayIds.filter((id) => b2bRanges.some((range) => range.id === id)),
         topics: topicIds,
@@ -307,7 +343,7 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b
         await saveConsent(strapiUrl, consent);
         setSavedConsent(consent);
       }
-      setBaseline({ profile, bio, linkedinUrl, awayIds, topicIds, consent, emailPrefs });
+      setBaseline({ profile, bio, linkedinUrl, b2b, awayIds, topicIds, consent, emailPrefs });
       setSaved(true);
       setSaving(false);
     } catch (error) {
@@ -316,12 +352,12 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b
         window.location.assign(loginUrl);
         return;
       }
-      const names: FieldName[] = [...FIELDS.map(({ name }) => name), "linkedinUrl", "bio", "topics", "unavailableSessions", "emailPrefs"];
+      const names: FieldName[] = [...FIELDS.map(({ name }) => name), "linkedinUrl", "bio", "lookingFor", "offering", "phone", "topics", "unavailableSessions", "emailPrefs"];
       const flagged = names.filter((name) => error instanceof EspaceApiError && name in error.fields);
       if (flagged.length) {
         const sent = (error as EspaceApiError).fields;
         const fallback = (name: FieldName) =>
-          FIELDS.find((field) => field.name === name)?.fallback ?? (name === "bio" ? `${BIO_MAX} caractères au plus.` : "Valeur non valable.");
+          FIELDS.find((field) => field.name === name)?.fallback ?? (name === "bio" ? `${BIO_MAX} caractères au plus.` : name === "lookingFor" || name === "offering" ? `${B2B_MAX} caractères au plus.` : name === "phone" ? `${PHONE_MAX} caractères au plus.` : "Valeur non valable.");
         setErrors(Object.fromEntries(flagged.map((name) => [name, sent[name] || fallback(name)])));
         setFormError("Corrigez les champs signalés pour enregistrer.");
         setFocusField(flagged[0] === "topics" ? "sujet-0" : flagged[0] === "emailPrefs" ? "emailPrefs-0" : flagged[0] === "unavailableSessions" ? "plage-0" : flagged[0]);
@@ -515,6 +551,65 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b
             {bio.length}&nbsp;/&nbsp;{BIO_MAX}&nbsp;caractères
           </p>
           {errors.bio && <FieldError id="bio-erreur">{errors.bio}</FieldError>}
+        </div>
+
+        {(
+          [
+            { name: "lookingFor", label: "Je cherche (facultatif)", help: "Par exemple : un partenaire pour tester un procédé, un financement." },
+            { name: "offering", label: "Je propose (facultatif)", help: "Par exemple : un savoir-faire, un équipement, un réseau." },
+          ] as const
+        ).map(({ name, label, help }) => (
+          <div key={name} className="mt-4">
+            <label htmlFor={name} className="block font-semibold">
+              {label}
+            </label>
+            <textarea
+              id={name}
+              name={name}
+              rows={3}
+              maxLength={B2B_MAX}
+              disabled={!b2bReady}
+              value={b2b[name]}
+              onChange={(event) => {
+                touch();
+                setB2b({ ...b2b, [name]: event.target.value });
+              }}
+              aria-invalid={errors[name] ? "true" : undefined}
+              aria-describedby={`${name}-aide${errors[name] ? ` ${name}-erreur` : ""}`}
+              className={`${inputClass(name)} py-3 disabled:opacity-60`}
+            />
+            <p id={`${name}-aide`} className="mt-1 text-sm text-muted">
+              {help} Visible des participants qui peuvent voir votre profil. {b2b[name].length}&nbsp;/&nbsp;{B2B_MAX}&nbsp;caractères.
+            </p>
+            {errors[name] && <FieldError id={`${name}-erreur`}>{errors[name]}</FieldError>}
+          </div>
+        ))}
+
+        <div className="mt-4">
+          <label htmlFor="phone" className="block font-semibold">
+            Téléphone (facultatif)
+          </label>
+          <input
+            id="phone"
+            name="phone"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            maxLength={PHONE_MAX}
+            disabled={!b2bReady}
+            value={b2b.phone}
+            onChange={(event) => {
+              touch();
+              setB2b({ ...b2b, phone: event.target.value });
+            }}
+            aria-invalid={errors.phone ? "true" : undefined}
+            aria-describedby={`phone-aide${errors.phone ? " phone-erreur" : ""}`}
+            className={`${inputClass("phone")} min-h-12 disabled:opacity-60`}
+          />
+          <p id="phone-aide" className="mt-1 text-sm text-muted">
+            Visible seulement des personnes avec qui vous avez un rendez-vous confirmé.
+          </p>
+          {errors.phone && <FieldError id="phone-erreur">{errors.phone}</FieldError>}
         </div>
       </section>
 

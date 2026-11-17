@@ -14,6 +14,9 @@ const PROFILE_FIELDS = ['firstName', 'lastName', 'jobTitle', 'company'];
 const REQUIRED = { firstName: 'Indiquez votre prénom.', lastName: 'Indiquez votre nom.', company: 'Indiquez votre entreprise.' };
 const MAX_LENGTH = 100;
 const BIO_MAX_LENGTH = 280;
+// V5-D, R-42: « Je cherche » and « Je propose » (300 characters), the phone (30 characters, free format, never shown outside an accepted meeting).
+const B2B_MAX_LENGTH = 300;
+const PHONE_MAX_LENGTH = 30;
 const MAX_TOPICS = 3;
 const CONSENTS = ['directoryOptIn', 'meetingsOptIn', 'newsOptIn'];
 const EMAIL_PREFS = ['meetingRequests', 'messages', 'reminders'];
@@ -70,6 +73,9 @@ module.exports = ({ strapi }) => {
   const toFullMe = ({ attendee, edition, isOrganizer, hostedTableNumber, counts }) => ({
     ...toMe({ attendee, edition, isOrganizer }),
     bio: attendee.bio ?? null,
+    lookingFor: attendee.lookingFor ?? null,
+    offering: attendee.offering ?? null,
+    phone: attendee.phone ?? null,
     linkedinUrl: attendee.linkedinUrl ?? null,
     // D-10: the B2B ranges (b2b_break sessions) the attendee unticked ; empty = available on all of them.
     unavailableSessions: Array.isArray(attendee.unavailableSessions) ? attendee.unavailableSessions : [],
@@ -151,7 +157,7 @@ module.exports = ({ strapi }) => {
      * PATCH /me (F-30, F-31, R-31): firstName, lastName, jobTitle and company as in phase 1, then bio, topics and emailPrefs,
      * whatever else the body carries. A field that is not sent is left as it is.
      * The resulting profile needs a first name, a last name and a company ; 100 characters at most per imported field,
-     * 280 for the presentation, 0 to 3 distinct topics of the edition (400 VALIDATION + fields).
+     * 280 for the presentation, 300 for lookingFor and offering (V5-D), 30 for the phone, 0 to 3 distinct topics of the edition (400 VALIDATION + fields).
      * A field of the four whose value changes is added to editedFields, so that the HelloAsso synchronisation no longer overwrites it.
      */
     async update(session, body) {
@@ -173,6 +179,21 @@ module.exports = ({ strapi }) => {
         if (bio === null) fields.bio = 'Valeur non valable.';
         else if (bio.length > BIO_MAX_LENGTH) fields.bio = `${BIO_MAX_LENGTH} caractères au plus.`;
         else data.bio = bio || null;
+      }
+
+      for (const name of ['lookingFor', 'offering']) {
+        if (given[name] === undefined) continue;
+        const text = given[name] === null ? '' : typeof given[name] === 'string' ? plainText(given[name]) : null;
+        if (text === null) fields[name] = 'Valeur non valable.';
+        else if (text.length > B2B_MAX_LENGTH) fields[name] = `${B2B_MAX_LENGTH} caractères au plus.`;
+        else data[name] = text || null;
+      }
+
+      if (given.phone !== undefined) {
+        const phone = given.phone === null ? '' : typeof given.phone === 'string' ? given.phone.replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim() : null;
+        if (phone === null) fields.phone = 'Valeur non valable.';
+        else if (phone.length > PHONE_MAX_LENGTH) fields.phone = `${PHONE_MAX_LENGTH} caractères au plus.`;
+        else data.phone = phone || null;
       }
 
       if (given.topics !== undefined) {

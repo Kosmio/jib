@@ -59,7 +59,7 @@ function searchDirectory({ cards, q, type = 'all', topicIds = [], cursor, pageSi
   const start = Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
   const end = start + pageSize;
   return {
-    items: found.slice(start, end).map(({ sortName, ...card }) => card),
+    items: found.slice(start, end).map(({ sortName, b2b, ...card }) => card),
     nextCursor: end < found.length ? String(end) : null,
     total: found.length,
   };

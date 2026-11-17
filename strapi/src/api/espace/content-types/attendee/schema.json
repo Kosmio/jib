@@ -74,6 +74,19 @@
       "type": "text",
       "maxLength": 280
     },
+    "lookingFor": {
+      "type": "text",
+      "maxLength": 300
+    },
+    "offering": {
+      "type": "text",
+      "maxLength": 300
+    },
+    "phone": {
+      "type": "string",
+      "maxLength": 30,
+      "private": true
+    },
     "topics": {
       "type": "relation",
       "relation": "manyToMany",

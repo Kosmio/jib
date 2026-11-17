@@ -1,5 +1,5 @@
 import React, { useEffect, useId, useRef, useState } from "react";
-import { EspaceApiError } from "../../lib/espace/client";
+import { EspaceApiError, request } from "../../lib/espace/client";
 import {
   acceptMeeting,
   cancelMeeting,
@@ -54,6 +54,36 @@ const allMeetings = (data: MeetingsResponse): Meeting[] => [
 
 /** « 15h30, pause et B2B » : heure du créneau puis intitulé de la pause. */
 const slotLine = (meeting: Meeting): string => [hourLabel(meeting.slot.startsAt), meeting.slot.sessionTitle].filter(Boolean).join(", ");
+
+/**
+ * V5-D (R-42) : téléphone des interlocuteurs d'un rendez-vous confirmé. Lu sur leur fiche (GET /directory/p/:id), où l'API ne le rend
+ * qu'à l'interlocuteur d'un rendez-vous accepté ; un rendez-vous annulé repasse à `accepted` faux et le numéro disparaît à la relecture.
+ */
+function usePhones(strapiUrl: string, meetings: Meeting[]): Record<string, string> {
+  const [phones, setPhones] = useState<Record<string, string>>({});
+  const key = meetings
+    .filter(({ status, counterpart }) => status === "accepted" && counterpart.kind === "attendee")
+    .map(({ counterpart }) => counterpart.id)
+    .sort()
+    .join(",");
+  useEffect(() => {
+    const ids = key ? key.split(",") : [];
+    let alive = true;
+    Promise.all(
+      ids.map((id) =>
+        request<{ phone?: string | null }>(strapiUrl, `/directory/p/${encodeURIComponent(id)}`, "GET")
+          .then((card) => [id, card.phone?.trim() ?? ""] as const)
+          .catch(() => [id, ""] as const),
+      ),
+    ).then((entries) => {
+      if (alive) setPhones(Object.fromEntries(entries.filter(([, phone]) => phone)));
+    });
+    return () => {
+      alive = false;
+    };
+  }, [key, strapiUrl]);
+  return phones;
+}
 
 /** F-112 : fiche de l'interlocuteur et, pour une personne, conversation (créée à l'envoi du premier message, comme depuis la fiche). */
 function Links({ meeting, base }: { meeting: Meeting; base: string }) {
@@ -246,6 +276,7 @@ export default function AgendaBoard({ strapiUrl, editionSlug, themeColor, dayLab
 
   const { received, sent, agenda, closed } = data;
   // « Mes rendez-vous uniquement » : les rendez-vous confirmés, par heure ; les séquences du programme restent sur l'écran Programme.
+  const phones = usePhones(strapiUrl, agenda.flatMap((item) => (item.type === "meeting" ? [item.meeting] : [])));
   const myMeetings = agenda.flatMap((item) => (item.type === "meeting" && item.meeting.status === "accepted" ? [item.meeting] : []));
   const now = Date.now();
   const isEmpty = !received.length && !sent.length && !closed.length && !myMeetings.length;
@@ -378,6 +409,14 @@ export default function AgendaBoard({ strapiUrl, editionSlug, themeColor, dayLab
                           <p className="text-lg leading-snug font-bold text-ink">{meeting.counterpart.displayName}</p>
                           {meeting.counterpart.subtitle && <p className="leading-snug text-muted">{meeting.counterpart.subtitle}</p>}
                           {meeting.location && <p className="mt-1 text-lg font-bold text-ink">{meeting.location}</p>}
+                          {meeting.status === "accepted" && phones[meeting.counterpart.id] && (
+                            <p className="mt-1 text-ink">
+                              Téléphone :{" "}
+                              <a href={`tel:${phones[meeting.counterpart.id].replace(/[^+\d]/g, "")}`} className="inline-flex min-h-11 items-center font-semibold text-title underline">
+                                {phones[meeting.counterpart.id]}
+                              </a>
+                            </p>
+                          )}
                           {viaLine(meeting) && <p className="text-sm text-muted">{viaLine(meeting)}</p>}
                           {meeting.answeredByName && meeting.counterpart.kind === "exhibitor" && (
                             <p className="text-sm text-muted">Confirmé par {meeting.answeredByName}</p>

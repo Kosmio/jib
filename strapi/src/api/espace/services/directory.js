@@ -18,7 +18,7 @@ const DEFAULT_TABLES = 20;
 const LIMIT = 1000;
 
 const notFound = () => new EspaceError(404, 'PROFILE_NOT_FOUND', 'Ce profil est introuvable.');
-const withoutSortName = ({ sortName, ...card }) => card;
+const withoutSortName = ({ sortName, b2b, ...card }) => card;
 const byFullName = (a, b) => `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`, 'fr', { sensitivity: 'base' });
 const timeText = (text) => (parseProgramTime(text) ? text : null);
 
@@ -67,10 +67,16 @@ module.exports = ({ strapi }) => {
     ]);
 
     const related = new Set();
+    const phoneVisible = new Set(); // V5-D, R-42: the interlocutors of an accepted meeting, whose phone the viewer may read
     const engaged = new Set(exhibitorId ? [exhibitorId] : []);
     for (const meeting of meetings) {
       const people = [meeting.requester, meeting.targetAttendee, meeting.answeredBy].filter(Boolean).map(({ documentId }) => documentId);
       for (const id of people) related.add(id);
+      if (meeting.status === 'accepted') {
+        if (people.includes(meId)) for (const id of people) phoneVisible.add(id);
+        // A representative of the exhibitor targeted who did not answer still meets the requester.
+        else if (exhibitorId && meeting.targetExhibitor?.documentId === exhibitorId && meeting.requester) phoneVisible.add(meeting.requester.documentId);
+      }
       if (['pending', 'accepted'].includes(meeting.status)) {
         for (const id of [...people, meeting.targetExhibitor?.documentId]) if (id) engaged.add(id);
       }
@@ -79,7 +85,8 @@ module.exports = ({ strapi }) => {
     for (const id of conversed) related.add(id);
     related.delete(meId);
     conversed.delete(meId);
-    return { related, engaged, conversed };
+    phoneVisible.delete(meId);
+    return { related, engaged, conversed, phoneVisible };
   }
 
   /** D-06: the intervenants of the published program of the edition, loaded for their card: Map(documentId -> intervenant). */
@@ -128,7 +135,9 @@ module.exports = ({ strapi }) => {
       covered.add(normalizeText(`${attendee.firstName} ${attendee.lastName}`));
       const table = hosted.get(attendee.documentId);
       const card = attendeeCard({ ...attendee, hostedTableNumber: table ?? null }, { publicOnly: !attendee.directoryOptIn });
-      cards.push({ ...card, sortName: `${attendee.lastName} ${attendee.firstName}` });
+      // V5-D: « Je cherche / Je propose » feed the suggestions only (internal key, removed before the card leaves the API).
+      const b2b = attendee.directoryOptIn ? { lookingFor: attendee.lookingFor ?? '', offering: attendee.offering ?? '' } : null;
+      cards.push({ ...card, ...(b2b && { b2b }), sortName: `${attendee.lastName} ${attendee.firstName}` });
     }
     for (const intervenant of (await programIntervenants(edition)).values()) {
       if (covered.has(intervenant.documentId) || covered.has(normalizeText(intervenant.name))) continue;
@@ -173,7 +182,7 @@ module.exports = ({ strapi }) => {
       if (!attendee || attendee.edition?.documentId !== edition.documentId) throw notFound();
 
       const viewer = await strapi.service('api::espace.me').loadAttendee(session);
-      const [hosted, { related, conversed }] = await Promise.all([hostedOwners(edition), relations({ attendee: viewer, edition })]);
+      const [hosted, { related, conversed, phoneVisible }] = await Promise.all([hostedOwners(edition), relations({ attendee: viewer, edition })]);
       const visibility = profileVisibility({ viewerId: viewer.documentId, attendee, isOrganizer: isOrganizer(attendee), related, hosted });
       if (!visibility) throw notFound();
 
@@ -193,6 +202,10 @@ module.exports = ({ strapi }) => {
         company: program ? (speaker.organisation?.name ?? null) : company,
         bio: full ? (attendee.bio ?? null) : null,
         linkedinUrl: full ? (attendee.linkedinUrl ?? null) : null,
+        // V5-D, R-42: « Je cherche / Je propose » follow the visibility of the profile ; the phone key exists only for the interlocutors
+        // of an accepted meeting with a number (and the person themselves), so that it appears in no other answer.
+        ...(full && { lookingFor: attendee.lookingFor ?? null, offering: attendee.offering ?? null }),
+        ...(full && (isSelf || phoneVisible.has(attendee.documentId)) && attendee.phone && { phone: attendee.phone }),
         sessions: speaker ? await sessionsOf(speaker, edition) : [],
         exhibitor: full && represented ? { id: represented.documentId, name: represented.organisation.name, standNumber: represented.standNumber ?? null } : null,
         isSelf,
@@ -256,6 +269,8 @@ module.exports = ({ strapi }) => {
       return suggest({
         meId: viewer.documentId,
         myTopicIds: viewer.topics.map(({ documentId }) => documentId),
+        myLookingFor: viewer.lookingFor ?? '',
+        myOffering: viewer.offering ?? '',
         candidates: cards.filter(({ kind }) => kind !== 'intervenant'),
         excludedIds: engaged,
         day: parisDay(now),
