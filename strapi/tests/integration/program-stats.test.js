@@ -15,6 +15,7 @@ const assert = require('node:assert/strict');
 const { useEspace } = require('../helpers/espace');
 const { link } = require('../helpers/espace-data');
 const W = require('../helpers/meetings-world');
+const { zonedToUtc } = require('../../src/api/espace/lib/time');
 
 const STATS_KEYS = ['activated', 'attendees', 'consented', 'directoryOptIn', 'lastSync', 'meetings', 'messages', 'profilesComplete', 'slots', 'topExhibitors', 'warnings'];
 const parisClock = (iso) => new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(iso));
@@ -32,7 +33,7 @@ describe('programme et tableau de bord (lot 14)', { timeout: 900_000 }, () => {
     assert.equal(response.status, status, `${response.status} ${response.text}`);
     if (code) assert.equal(response.json?.error?.code, code, response.text);
   };
-  const program = (edition, cookie) => espace().request(`/api/espace/editions/${edition.slug}/program`, { cookie });
+  const program = (edition, cookie, now) => espace().request(`/api/espace/editions/${edition.slug}/program${now ? `?now=${encodeURIComponent(now)}` : ''}`, { cookie });
 
   describe('GET /editions/:slug/program : le programme public (F-80, F-81)', () => {
     // Séquences données dans le désordre, avec deux séquences sans heure lisible.
@@ -64,11 +65,11 @@ describe('programme et tableau de bord (lot 14)', { timeout: 900_000 }, () => {
       return { world, edition, p };
     }
 
-    it('public : 200 sans session, avec les quatre clés { notes, sessions, speakers, venues }', async () => {
+    it('public : 200 sans session, avec les clés { flyer, liveDay, notes, now, sessions, speakers, venues } (F-150 ajoute now et liveDay)', async () => {
       const { edition } = await programScene();
       const response = await program(edition);
       assert.equal(response.status, 200, response.text);
-      assert.deepEqual(Object.keys(response.json).sort(), ['flyer', 'notes', 'sessions', 'speakers', 'venues']);
+      assert.deepEqual(Object.keys(response.json).sort(), ['flyer', 'liveDay', 'notes', 'now', 'sessions', 'speakers', 'venues']);
     });
 
     it('les séquences sont triées sur l’heure de début, quel que soit l’ordre de saisie', async () => {
@@ -77,10 +78,14 @@ describe('programme et tableau de bord (lot 14)', { timeout: 900_000 }, () => {
       assert.deepEqual(sessions.map(({ title }) => title), ['Matin', 'Pause et B2B', 'Sans fin', 'Après-midi']);
     });
 
-    it('forme d’une séance : id, title, description, start, end, startsAt, kind, topics, speakers', async () => {
+    it('forme d’une séance : id, title, description, start, end, startsAt, until, state, kind, topics, speakers ; `meetings` seulement sur une pause B2B (F-150, F-151)', async () => {
       const { edition } = await programScene();
       const { sessions } = (await program(edition)).json;
-      for (const session of sessions) assert.deepEqual(Object.keys(session).sort(), ['description', 'end', 'id', 'kind', 'speakers', 'start', 'startsAt', 'subtitle', 'theme', 'title', 'topics']);
+      for (const session of sessions) {
+        const expected = ['description', 'end', 'id', 'kind', 'speakers', 'start', 'startsAt', 'state', 'subtitle', 'theme', 'title', 'topics', 'until'];
+        if (session.kind === 'b2b_break') expected.push('meetings');
+        assert.deepEqual(Object.keys(session).sort(), expected.sort());
+      }
       const afternoon = sessions.find(({ title }) => title === 'Après-midi');
       assert.equal(afternoon.description, 'Ateliers de l’après-midi.');
       assert.equal(afternoon.start, '14h00');
@@ -97,6 +102,70 @@ describe('programme et tableau de bord (lot 14)', { timeout: 900_000 }, () => {
       assert.equal(parisClock(sessions.find(({ title }) => title === 'Après-midi').startsAt), '14:00');
       assert.match(sessions[0].startsAt, /Z$/);
       assert.equal(new Date(sessions[0].startsAt).toISOString().slice(0, 10), edition.date);
+    });
+
+    describe('heure simulée `?now=` (F-150)', () => {
+      const at = (edition, hours, minutes) => zonedToUtc(edition.date, { hours, minutes }).toISOString();
+      const states = async (edition, now) => {
+        const { json } = await program(edition, undefined, now);
+        return { json, byTitle: Object.fromEntries(json.sessions.map(({ title, state }) => [title, state])) };
+      };
+
+      it('le jour de l’édition à 10h00 : « Matin » en cours, la pause B2B à suivre, le reste sans repère', async () => {
+        const { edition } = await programScene();
+        const { json, byTitle } = await states(edition, at(edition, 10, 0));
+        assert.equal(json.liveDay, true);
+        assert.equal(json.now, at(edition, 10, 0));
+        assert.deepEqual(byTitle, { Matin: 'current', 'Pause et B2B': 'next', 'Sans fin': null, 'Après-midi': null });
+      });
+
+      it('entre deux séquences, aucune n’est en cours : la prochaine est à suivre', async () => {
+        const { edition } = await programScene();
+        const { byTitle } = await states(edition, at(edition, 11, 30));
+        assert.deepEqual(byTitle, { Matin: null, 'Pause et B2B': null, 'Sans fin': 'next', 'Après-midi': null });
+      });
+
+      it('une séance sans heure de fin dure jusqu’au début de la suivante (`until`)', async () => {
+        const { edition } = await programScene();
+        const { json, byTitle } = await states(edition, at(edition, 13, 0));
+        assert.equal(json.sessions.find(({ title }) => title === 'Sans fin').until, at(edition, 14, 0));
+        assert.equal(byTitle['Sans fin'], 'current');
+      });
+
+      it('un autre jour : liveDay faux et aucun état', async () => {
+        const { edition } = await programScene();
+        const { json, byTitle } = await states(edition, '2020-01-01T10:00:00Z');
+        assert.equal(json.liveDay, false);
+        assert.ok(Object.values(byTitle).every((state) => state === null), JSON.stringify(byTitle));
+      });
+
+      it('une valeur illisible est ignorée : l’heure du serveur sert', async () => {
+        const { edition } = await programScene();
+        const { json } = await states(edition, 'pas-une-date');
+        assert.ok(Math.abs(Date.parse(json.now) - Date.now()) < 60_000, json.now);
+      });
+
+      it('sous NODE_ENV=production, `?now=` est ignoré', async () => {
+        const { edition } = await programScene();
+        const previous = process.env.NODE_ENV;
+        process.env.NODE_ENV = 'production';
+        try {
+          const simulated = at(edition, 10, 0);
+          const ctx = { params: { slug: edition.slug }, query: { now: simulated }, state: {} };
+          await require('../../src/api/espace/controllers/program').show(ctx);
+          assert.notEqual(ctx.body.now, simulated);
+          assert.ok(Math.abs(Date.parse(ctx.body.now) - Date.now()) < 60_000, ctx.body.now);
+        } finally {
+          process.env.NODE_ENV = previous;
+        }
+      });
+
+      it('visiteur sans session : aucune pause ne porte `meetings` (F-151)', async () => {
+        const { edition } = await programScene();
+        const { json } = await states(edition, at(edition, 10, 0));
+        assert.ok(json.sessions.every((session) => !('meetings' in session) || session.kind === 'b2b_break'));
+        assert.deepEqual(json.sessions.find(({ kind }) => kind === 'b2b_break').meetings, []);
+      });
     });
 
     it('une séance sans heure de fin : end est null', async () => {
