@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { EspaceApiError, type ProfileCard } from "../../lib/espace/client";
+import { EspaceApiError, request, type ProfileCard } from "../../lib/espace/client";
 import { timeLabel } from "../../lib/espace/format";
 import {
   MESSAGE_COUNTER_FROM,
@@ -34,6 +34,9 @@ type Props = {
 };
 
 const SEND_FAILED = "Le message n’a pas pu être envoyé. Vérifiez votre connexion et réessayez.";
+const REPORT_FAILED = "Le signalement n’a pas pu être envoyé. Vérifiez votre connexion et réessayez.";
+const REPORT_REASON_MAX = 500;
+const REPORT_SENT = "Signalement transmis à l’organisation";
 
 /** Le bas de la page est visible, à quelques lignes près : un nouveau message fait alors défiler le fil. */
 const isNearBottom = () => window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 160;
@@ -92,6 +95,12 @@ export default function ChatThread({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [offline, setOffline] = useState(false);
+  // F-75 : message en cours de signalement, motif saisi, messages déjà signalés (par cette personne, dans cette session ou avant : 409).
+  const [reporting, setReporting] = useState<string | null>(null);
+  const [reason, setReason] = useState("");
+  const [reportSending, setReportSending] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [reported, setReported] = useState<ReadonlySet<string>>(new Set());
   const inFlight = useRef(false);
   const stickToBottom = useRef(true);
   const field = useRef<HTMLTextAreaElement>(null);
@@ -194,6 +203,28 @@ export default function ChatThread({
     }
   }
 
+  async function sendReport(event: React.FormEvent, messageId: string) {
+    event.preventDefault();
+    const text = reason.trim();
+    if (!conversationId || !text || reportSending) return;
+    setReportSending(true);
+    setReportError(null);
+    const done = () => {
+      setReported((current) => new Set(current).add(messageId));
+      setReporting(null);
+      setReason("");
+    };
+    try {
+      await request(strapiUrl, `/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/report`, "POST", { reason: text });
+      done();
+    } catch (failure) {
+      if (failure instanceof EspaceApiError && failure.status === 409) done();
+      else setReportError((failure instanceof EspaceApiError && failure.status !== 0 && (failure.fields.reason || failure.message)) || REPORT_FAILED);
+    } finally {
+      setReportSending(false);
+    }
+  }
+
   const length = draft.length;
   const canSend = draft.trim().length > 0 && !sending;
 
@@ -278,9 +309,76 @@ export default function ChatThread({
                         </>
                       )
                     ) : (
-                      <time dateTime={message.at}>{timeLabel(message.at)}</time>
+                      <>
+                        <time dateTime={message.at}>{timeLabel(message.at)}</time>
+                        {conversationId && !reported.has(message.id) && reporting !== message.id && (
+                          <>
+                            {" · "}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setReporting(message.id);
+                                setReason("");
+                                setReportError(null);
+                              }}
+                              className="inline-flex min-h-11 items-center font-semibold text-title underline"
+                            >
+                              Signaler<span className="sr-only"> ce message</span>
+                            </button>
+                          </>
+                        )}
+                      </>
                     )}
                   </p>
+                  {!message.mine && reported.has(message.id) && (
+                    <p role="status" className="mt-1 text-sm font-semibold text-primary-ink">
+                      {REPORT_SENT}
+                    </p>
+                  )}
+                  {!message.mine && reporting === message.id && (
+                    <form noValidate onSubmit={(event) => sendReport(event, message.id)} className="mt-2 w-full max-w-4/5 rounded-xl bg-surface p-3">
+                      <label htmlFor={`signalement-${message.id}`} className="block font-semibold">
+                        Motif du signalement
+                      </label>
+                      <textarea
+                        id={`signalement-${message.id}`}
+                        rows={3}
+                        maxLength={REPORT_REASON_MAX}
+                        value={reason}
+                        onChange={(event) => setReason(event.target.value)}
+                        aria-describedby={`signalement-aide-${message.id}`}
+                        className="mt-1 block w-full rounded-lg border-2 border-muted bg-white px-3 py-2 text-lg text-ink"
+                      />
+                      <p id={`signalement-aide-${message.id}`} className="mt-1 text-sm text-muted">
+                        L’organisation lira ce motif et ce message, rien d’autre de votre conversation. {reason.length} / {REPORT_REASON_MAX}&nbsp;caractères
+                      </p>
+                      {reportError && (
+                        <p role="alert" className="mt-2 flex items-start gap-3 rounded-lg border-2 border-danger bg-white p-3 font-semibold">
+                          <span className="text-danger">
+                            <Icon name="alert" />
+                          </span>
+                          {reportError}
+                        </p>
+                      )}
+                      <div className="mt-3 flex flex-wrap gap-3">
+                        <button
+                          type="submit"
+                          disabled={!reason.trim() || reportSending}
+                          aria-busy={reportSending}
+                          className="inline-flex min-h-11 items-center justify-center rounded-lg bg-gold px-5 font-bold text-gold-ink hover:bg-gold-light disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Confirmer le signalement
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setReporting(null)}
+                          className="inline-flex min-h-11 items-center justify-center rounded-lg border-2 border-title bg-white px-4 font-bold text-title hover:bg-surface"
+                        >
+                          Annuler
+                        </button>
+                      </div>
+                    </form>
+                  )}
                 </li>
               </React.Fragment>
             );

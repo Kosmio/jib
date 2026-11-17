@@ -1,0 +1,50 @@
+{
+  "kind": "collectionType",
+  "collectionName": "espace_message_reports",
+  "info": {
+    "singularName": "message-report",
+    "pluralName": "message-reports",
+    "displayName": "Signalement de message (espace participant)",
+    "description": "Message signalé par son destinataire à l’organisation. Seul le texte du message signalé est lu par l’organisation."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {
+    "content-manager": { "visible": false },
+    "content-type-builder": { "visible": false }
+  },
+  "attributes": {
+    "edition": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::edition.edition",
+      "required": true
+    },
+    "message": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::espace.message"
+    },
+    "author": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::espace.attendee",
+      "required": true
+    },
+    "reason": {
+      "type": "text",
+      "required": true,
+      "maxLength": 500
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": ["open", "handled"],
+      "default": "open",
+      "required": true
+    },
+    "handledAt": {
+      "type": "datetime"
+    }
+  }
+}

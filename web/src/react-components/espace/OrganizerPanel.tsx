@@ -5,6 +5,7 @@ import BadgesCard from "./organizer/BadgesCard";
 import ExhibitorsCard from "./organizer/ExhibitorsCard";
 import ExportsCard from "./organizer/ExportsCard";
 import MeetingsCard from "./organizer/MeetingsCard";
+import ReportsCard from "./organizer/ReportsCard";
 import RemindersCard from "./organizer/RemindersCard";
 import ServiceCard from "./organizer/ServiceCard";
 import SlotsCard from "./organizer/SlotsCard";
@@ -57,6 +58,7 @@ export default function OrganizerPanel({ strapiUrl, editionSlug, nowIso, themeCo
       <RemindersCard {...card} />
       <AttendeesCard {...card} />
       <MeetingsCard {...card} />
+      <ReportsCard {...card} />
       <WarningsCard {...card} stats={stats} />
       <SyncHistory {...card} runs={runs} />
     </div>
