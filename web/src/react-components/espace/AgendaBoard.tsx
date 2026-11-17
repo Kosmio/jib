@@ -16,6 +16,7 @@ import {
   type Meeting,
   type MeetingsResponse,
 } from "../../lib/espace/meetings";
+import CalendarFeed from "./CalendarFeed";
 import MeetingStatus, { Icon } from "./MeetingStatus";
 import { Avatar } from "./ProfileCardView";
 import SlotPicker from "./SlotPicker";
@@ -488,6 +489,8 @@ export default function AgendaBoard({ strapiUrl, editionSlug, themeColor, dayLab
           </ul>
         </details>
       )}
+
+      <CalendarFeed strapiUrl={strapiUrl} />
 
       <ConfirmDialog confirm={confirm} onConfirm={confirmed} onClose={() => setConfirm(null)} />
     </div>

@@ -24,20 +24,30 @@ module.exports = ({ strapi }) => {
       return strapi.documents(SYNC_RUN).create({ data: { edition: { documentId: editionDocumentId }, startedAt: now } });
     });
 
-  /** Fetches the tickets, applies the plan, then starts the `welcome` e-mails of the newcomers (R-85). Fills `result`. */
-  async function synchronize(edition, now, result) {
+  /** The HelloAsso client of the instance, or null when the API is not configured. */
+  function helloAsso() {
     const { apiBase, clientId, clientSecret } = strapi.config.get('server.helloasso');
-    if (!(apiBase && clientId && clientSecret && edition.helloassoOrgSlug && edition.helloassoFormSlug)) {
+    if (!(apiBase && clientId && clientSecret)) return null;
+    client ??= createHelloAssoClient({ apiBase, clientId, clientSecret });
+    return client;
+  }
+
+  /** Fetches the tickets of the whole form, then applies them. Fills `result`. */
+  async function synchronize(edition, now, result) {
+    if (!(helloAsso() && edition.helloassoOrgSlug && edition.helloassoFormSlug)) {
       result.errors.push({ code: 'HELLOASSO_NOT_CONFIGURED' });
       return;
     }
-    client ??= createHelloAssoClient({ apiBase, clientId, clientSecret });
     const items = await client.listFormItems({
       organizationSlug: edition.helloassoOrgSlug,
       formType: edition.helloassoFormType ?? 'Event',
       formSlug: edition.helloassoFormSlug,
     });
+    await applyItems(edition, items, now, result);
+  }
 
+  /** Applies the plan of the tickets given, then starts the `welcome` e-mails of the newcomers (R-85). Shared by the synchronization and by the webhook (I-13). */
+  async function applyItems(edition, items, now, result) {
     const ofEdition = { edition: { documentId: edition.documentId } };
     const attendees = await strapi.documents(ATTENDEE).findMany({ filters: ofEdition, limit: 10000 });
     const byId = new Map(attendees.map((attendee) => [attendee.documentId, attendee]));
@@ -122,8 +132,33 @@ module.exports = ({ strapi }) => {
     return strapi.documents(SYNC_RUN).update({ documentId: syncRun.documentId, data: { ...result, endedAt: new Date() } });
   }
 
+  /**
+   * I-13: imports one HelloAsso order, read again from the API (the notification is never trusted), by the same path as the synchronization.
+   * Only the editions of the published ones whose HelloAsso form is the order's are concerned ; none: nothing happens.
+   * -> { editions: [slug], created, updated, cancelled, errors } ; a HelloAsso failure is thrown (HelloAssoError).
+   */
+  async function importOrder(orderId, { now = new Date() } = {}) {
+    const result = { editions: [], created: 0, updated: 0, cancelled: 0, errors: [] };
+    if (!helloAsso()) return result;
+    const order = await client.getOrder(orderId);
+    const editions = (await strapi.documents(EDITION).findMany({ status: 'published', limit: 1000 })).filter(
+      (edition) =>
+        edition.helloassoOrgSlug === order.organizationSlug &&
+        edition.helloassoFormSlug === order.formSlug &&
+        (edition.helloassoFormType ?? 'Event') === order.formType
+    );
+    // The items of an order may lack the order and the payer that the tickets of a form carry.
+    const items = (order.items ?? []).map((item) => ({ ...item, order: item.order ?? { id: order.id }, payer: item.payer ?? order.payer }));
+    for (const edition of editions) {
+      await applyItems(edition, items, now, result);
+      result.editions.push(edition.slug);
+    }
+    return result;
+  }
+
   return {
     run,
+    importOrder,
 
     /** A-17, cron: every published edition that has a HelloAsso form, whether its space is open or not. */
     async runAll({ now = new Date() } = {}) {
