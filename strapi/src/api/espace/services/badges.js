@@ -4,10 +4,12 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const { EspaceError } = require('../lib/errors');
 const { normalizeText } = require('../lib/directory');
+const { parseProgramTime } = require('../lib/time');
 const { buildBadgesPdf, cardUrl, deriveCardToken, hashCardToken, isoOf, isReduced, parseTypes, sortAttendees, typeOf } = require('../lib/badges');
 
 const ATTENDEE = 'api::espace.attendee';
 const SETTING = 'api::espace.badge-setting';
+const SEQUENCE = 'api::sequence.sequence';
 const LIMIT = 1000;
 const IMAGE_TYPES = new Set(['image/png', 'image/jpeg']);
 
@@ -53,14 +55,39 @@ module.exports = ({ strapi }) => {
     return fs.readFile(path.join(strapi.dirs.static.public, file.url)).catch(() => null);
   }
 
+  /**
+   * Published sequences of the edition, read from the Document Service without the guard of the participant space: badges are printed
+   * before it opens. Same ordering as the program service (parsed start time) ; a sequence without a readable time goes to `notes`.
+   */
+  async function programOf(edition) {
+    const sequences = await documents(SEQUENCE).findMany({
+      filters: { edition: { documentId: edition.documentId } },
+      status: 'published',
+      populate: { interventions: { populate: { intervenants: { fields: ['name'] } } } },
+      limit: LIMIT,
+    });
+    const minutesOf = (time) => time.hours * 60 + time.minutes;
+    const sessions = [];
+    const notes = [];
+    for (const sequence of sequences) {
+      const start = parseProgramTime(sequence.start_time);
+      if (!start) {
+        if (sequence.title?.trim()) notes.push({ order: sequence.order ?? 0, title: sequence.title.trim() });
+        continue;
+      }
+      const end = parseProgramTime(sequence.end_time);
+      const people = new Map();
+      for (const { intervenants = [] } of sequence.interventions ?? []) for (const person of intervenants) people.set(person.documentId, { name: person.name });
+      sessions.push({ key: [minutesOf(start), end ? minutesOf(end) : 0, sequence.order ?? 0, sequence.id], value: { start: sequence.start_time, title: sequence.title, speakers: [...people.values()] } });
+    }
+    sessions.sort((a, b) => a.key.reduce((diff, part, index) => diff || part - b.key[index], 0));
+    return { sessions: sessions.map(({ value }) => value), notes: notes.sort((a, b) => a.order - b.order).map(({ title }) => title) };
+  }
+
   /** What the PDF needs about an edition: its text, its program (as E8), the plan and the accent of the band. */
   async function context(edition) {
     const setting = await documents(SETTING).findFirst({ filters: { edition: { documentId: edition.documentId } }, populate: { plan: true } });
-    // A closed space has no public program (NF-52): the verso then carries only the mention that points to the application.
-    const program = await strapi.service('api::espace.program').show(edition.slug).catch((error) => {
-      if (error instanceof EspaceError) return null;
-      throw error;
-    });
+    const program = await programOf(edition);
     return {
       edition: { title: edition.title, date: edition.date, city: edition.city },
       program,

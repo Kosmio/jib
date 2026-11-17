@@ -1347,7 +1347,10 @@ async function resetAdminUser(strapi) {
 const READ_ONLY_ATTENDEE_FIELDS = [
   'editedFields', 'emailPrefs', 'unavailableSessions', 'consentAt', 'activatedAt', 'lastSeenAt',
   'directoryOptIn', 'meetingsOptIn', 'newsOptIn', 'helloassoItemId', 'helloassoOrderId',
+  'cardTokenHash', 'cardTokenCreatedAt',
 ];
+// F-95, NF-55: card token fields (badges) are hidden from the admin form as well
+const HIDDEN_ATTENDEE_FIELDS = ['cardTokenHash', 'cardTokenCreatedAt'];
 
 async function lockAttendeeFields(strapi) {
   const key = 'plugin_content_manager_configuration_content_types::api::espace.attendee';
@@ -1359,6 +1362,13 @@ async function lockAttendeeFields(strapi) {
     const edit = config.metadatas?.[field]?.edit;
     if (edit && edit.editable !== false) {
       edit.editable = false;
+      changed = true;
+    }
+  }
+  for (const field of HIDDEN_ATTENDEE_FIELDS) {
+    const edit = config.metadatas?.[field]?.edit;
+    if (edit && edit.visible !== false) {
+      edit.visible = false;
       changed = true;
     }
   }
@@ -1455,6 +1465,15 @@ const ADMIN_CONFIG = {
     list: ['lastName', 'firstName', 'company', 'email', 'role', 'status'],
     labels: {
       lastName: ['Nom'], firstName: ['Prénom'], company: ['Entreprise'], email: ['E-mail'], role: ['Rôle'], status: ['Statut'],
+    },
+  },
+  'api::espace.badge-setting': {
+    mainField: 'accent',
+    list: ['edition', 'plan', 'accent'],
+    labels: {
+      edition: ['Édition', 'Édition dont ce réglage s’applique aux badges. Une seule entrée par édition.'],
+      plan: ['Plan du lieu (verso du badge, facultatif)', 'Image PNG ou JPEG imprimée à droite du programme. Sans plan, le programme occupe tout le verso.'],
+      accent: ['Couleur d’accent (facultatif, sinon couleur de l’édition)', 'Couleur du bandeau de type, au format #rrggbb. Une couleur trop claire pour du texte blanc est remplacée par le bleu des titres.'],
     },
   },
   'api::espace.exhibitor': {

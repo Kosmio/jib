@@ -29,7 +29,7 @@ const isEspace = (pathname: string) => pathname === "/espace" || pathname.starts
 // `strict-origin-when-cross-origin` enverrait l'URL complète en Referer, que Traefik journalise : `strict-origin` n'envoie que l'origine.
 // Jamais `no-referrer` : le navigateur enverrait `Origin: null` avec le POST du formulaire, et Strapi le refuserait (ORIGIN_REFUSED).
 const referrerPolicy = (pathname: string) =>
-  /^\/espace\/verifier\/?$/.test(pathname) ? "strict-origin" : "strict-origin-when-cross-origin";
+  /^\/espace\/verifier\/?$/.test(pathname) || /^\/espace\/[^/]+\/carte\/[^/]+\/?$/.test(pathname) ? "strict-origin" : "strict-origin-when-cross-origin";
 
 // F-107, NF-50 : un délai ou une erreur réseau vers Strapi donne 503, toute autre exception 500. Les erreurs de `fetch` (Node) portent
 // le code réseau dans `cause` ; api.ts signale un délai par `AbortSignal.timeout` (TimeoutError) et un échec de Strapi par « : 502 ».
