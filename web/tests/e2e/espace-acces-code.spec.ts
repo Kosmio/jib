@@ -68,7 +68,7 @@ test.describe('F-142 : le champ « Code reçu par e-mail » de l’état « Lien
     await expect(code).toBeVisible();
     await expect(code).toHaveAttribute('inputmode', 'numeric');
     await expect(code).toHaveAttribute('autocomplete', 'one-time-code');
-    await expect(code).toHaveAttribute('pattern', '[0-9]{6}');
+    await expect(code).toHaveAttribute('pattern', '[0-9 -]{6,11}');
     await expect(code).toHaveAttribute('required', '');
     await expect(page.locator('#code-form')).toBeVisible();
     await expect(page.locator('#code')).toHaveCount(1);
@@ -131,9 +131,6 @@ test.describe('critère 1 : le code ouvre la session dans un autre navigateur (V
   });
 
   test('un code saisi avec un espace au milieu est accepté (copié depuis l’e-mail « 1 2 3 4 5 6 »)', async ({ page, baseURL }) => {
-    // Défaut constaté : `pattern="[0-9]{6}"` de #code fait refuser « 123 456 » par le navigateur avant tout envoi, alors que Strapi accepte
-    // espaces et tirets. Le test décrit le comportement attendu et passe au vert quand le champ laisse partir le code tel que copié.
-    test.fail(true, 'pattern="[0-9]{6}" bloque les espaces que l’API accepte (connexion.astro, champ #code)');
     const { code } = await receive(page, PIERRE);
     await submitCode(page, `${code.slice(0, 3)} ${code.slice(3)}`);
     await expect(page).toHaveURL(`${baseURL}${ESPACE}/`, { timeout: 3000 });
