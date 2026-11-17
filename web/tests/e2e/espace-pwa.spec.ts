@@ -10,7 +10,7 @@ import { ESPACE, expect, test } from './espace';
 
 test.use({ serviceWorkers: 'allow' });
 
-const OFFLINE_CACHE = 'jib-espace-hors-connexion-v1';
+const STATIC_CACHE = 'jib-espace-v2-statique';
 
 async function cachedPaths(page: import('@playwright/test').Page) {
   return page.evaluate(async () => {
@@ -82,10 +82,14 @@ test('service worker de /espace/ : portée, aucun cache de page ni d’API, page
   expect(worker.scope).toBe(`${baseURL}/espace/`);
   expect(worker.script).toBe(`${baseURL}/espace/sw.js`);
 
-  // Visiter des pages ne remplit aucun cache : seule la page hors connexion est gardée.
+  // Visiter des pages hors des quatre pages gardées (connexion, vérification) ne remplit aucun cache de page ni d'API : seul le cache
+  // statique existe (page hors connexion, feuilles, polices, icônes), et aucun cache d'édition.
   await page.goto(`${ESPACE}/connexion?erreur=email`);
   await page.goto('/espace/verifier?token=jeton-inconnu');
-  expect(await cachedPaths(page)).toEqual({ [OFFLINE_CACHE]: ['/espace/hors-ligne.html'] });
+  const cached = await cachedPaths(page);
+  expect(Object.keys(cached)).toEqual([STATIC_CACHE]);
+  expect(cached[STATIC_CACHE]).toContain('/espace/hors-ligne.html');
+  for (const path of cached[STATIC_CACHE]) expect(path, 'entrée du cache statique').toMatch(/^(\/espace\/hors-ligne\.html|\/_astro\/|\/fonts\/|\/assets\/favicon-192\.png|\/favicon\.png|\/espace\/icon-)/);
 
   // Le site public n'est pas dans la portée.
   expect((await page.request.get('/espace/sw.js')).headers()['content-type']).toMatch(/javascript/);
