@@ -7,7 +7,9 @@
 
 const DEFAULT_ZONE = 'Europe/Paris';
 const DAY_MS = 24 * 3600 * 1000;
-const PROGRAM_TIME = /^(\d{1,2})h(\d{2})?$/;
+// "10h45", "10H45", "10 h 45", "10:45", "9h" (R-86). Spaces include the no-break ones (U+00A0, U+202F), which \s covers.
+const PROGRAM_TIME = /^(\d{1,2})(?:\s*[hH]\s*(\d{2})?|\s*:\s*(\d{2}))$/;
+const PROGRAM_TIME_EXAMPLE = '10h45';
 
 const formatters = new Map();
 
@@ -37,13 +39,27 @@ function offsetMs(instant, timeZone) {
   return Date.UTC(year, month - 1, day, hour, minute, second) - Math.floor(instant / 1000) * 1000;
 }
 
-/** "9h15", "10h45" or "9h" -> { hours, minutes }; anything else ("--", "", "9:15", "25h00") -> null. */
+/**
+ * The one reader of program times (R-86): "9h15", "10h45", "10H45", "10 h 45", "10:45", "9h" -> { hours, minutes };
+ * anything else ("--", "", "10.45", "25h00") -> null.
+ */
 function parseProgramTime(text) {
-  const match = typeof text === 'string' ? PROGRAM_TIME.exec(text) : null;
+  const match = typeof text === 'string' ? PROGRAM_TIME.exec(text.trim()) : null;
   if (!match) return null;
   const hours = Number(match[1]);
-  const minutes = match[2] === undefined ? 0 : Number(match[2]);
+  const minutes = Number(match[2] ?? match[3] ?? 0);
   return hours < 24 && minutes < 60 ? { hours, minutes } : null;
+}
+
+/**
+ * Refusal message (French) for a sequence about to be saved, or null (R-86). Only a b2b_break session is checked, and only
+ * the times that are filled in: an empty end time is reported later as MISSING_END by the slot generation.
+ */
+function programTimeRefusal({ kind, start_time: start, end_time: end }) {
+  if (kind !== 'b2b_break') return null;
+  const unreadable = [['l’heure de début', start], ['l’heure de fin', end]].filter(([, value]) => typeof value === 'string' && value.trim() !== '' && !parseProgramTime(value));
+  if (!unreadable.length) return null;
+  return `Pause de rendez-vous B2B : ${unreadable.map(([name]) => name).join(' et ')} à corriger, elle n’est pas lisible. Écrivez-la comme ${PROGRAM_TIME_EXAMPLE} (ou 10:45).`;
 }
 
 /**
@@ -66,4 +82,4 @@ function formatTimeLabel(date, timeZone = DEFAULT_ZONE) {
   return `${hour}h${String(minute).padStart(2, '0')}`;
 }
 
-module.exports = { parseProgramTime, zonedToUtc, formatTimeLabel };
+module.exports = { parseProgramTime, programTimeRefusal, zonedToUtc, formatTimeLabel };

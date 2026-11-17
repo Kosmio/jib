@@ -832,10 +832,35 @@ Cette politique de confidentialité peut être mise à jour à tout moment. Date
 // BOOTSTRAP
 // =============================================================================
 
+// @strapi/utils is not a direct dependency (pnpm): resolved from @strapi/strapi, as in api::espace.admin-guards.
+const { ApplicationError } = require(require.resolve('@strapi/utils', { paths: [require.resolve('@strapi/strapi')] })).errors;
+const { programTimeRefusal } = require('./api/espace/lib/time');
+
+/** R-86: a b2b_break sequence is saved only with readable times ("10h45"). An update that omits a field reads it from the stored draft. */
+async function checkSequenceTimes(strapi, { uid, action, params }) {
+  if (uid !== 'api::sequence.sequence' || (action !== 'create' && action !== 'update') || !params?.data) return;
+  const { kind, start_time: start, end_time: end } = params.data;
+  let current = {};
+  if (action === 'update' && params.documentId && (kind === undefined || start === undefined || end === undefined)) {
+    current = (await strapi.db.query(uid).findOne({ where: { documentId: params.documentId, publishedAt: null } })) || {};
+  }
+  const message = programTimeRefusal({
+    kind: kind ?? current.kind ?? 'talk',
+    start_time: start ?? current.start_time,
+    end_time: end ?? current.end_time,
+  });
+  if (message) throw new ApplicationError(message);
+}
+
 module.exports = {
   register({ strapi }) {
     // NF-63 to NF-65: admin guards, the decision lives in api::espace.admin-guards (resolved at call time)
-    strapi.documents.use((context, next) => strapi.service('api::espace.admin-guards').check(context).then(next));
+    // R-86: the same middleware refuses an unreadable time on a b2b_break sequence
+    strapi.documents.use(async (context, next) => {
+      await strapi.service('api::espace.admin-guards').check(context);
+      await checkSequenceTimes(strapi, context);
+      return next();
+    });
   },
 
   async bootstrap({ strapi }) {
@@ -872,6 +897,7 @@ module.exports = {
     // Set French labels on content types
     await setFrenchLabels(strapi);
     await lockAttendeeFields(strapi);
+    await applyAdminConfig(strapi);
 
     // Apply data migrations (must run before any content-type validation)
     try {
@@ -1379,6 +1405,125 @@ async function setFrenchLabels(strapi) {
         data: { value: JSON.stringify(config) },
       });
       strapi.log.info(`Labels français appliqués pour ${uid}`);
+    }
+  }
+}
+
+// =============================================================================
+// ADMIN CONFIGURATION OF THE PARTICIPANT SPACE (NF-68, NF-69)
+// =============================================================================
+
+// Per content type: labels and help texts ([label, help]), main field, list columns, default sort, and the fields
+// gathered at the end of the edit form (rows, in order of use). An attribute the schema does not have yet
+// (welcomeStartedAt, readOnlyAt, badge settings...) is skipped, so a later lot adds its line without a failing start.
+const ADMIN_CONFIG = {
+  'api::edition.edition': {
+    labels: {
+      participantSpaceEnabled: ['Espace participant ouvert', 'Active l’espace participant de cette édition. Publier pour appliquer. Les inscrits ne peuvent se connecter que si cette case est cochée.'],
+      helloassoOrgSlug: ['Identifiant HelloAsso de l’association', 'Le texte qui suit /associations/ dans l’adresse de la page HelloAsso. Utilisé pour importer les inscrits.'],
+      helloassoFormType: ['Type de formulaire HelloAsso', 'Le plus souvent « Event » (billetterie). À ne changer que si le formulaire HelloAsso est d’un autre type.'],
+      helloassoFormSlug: ['Identifiant du formulaire HelloAsso', 'Le texte qui suit /evenements/ dans l’adresse du formulaire. Sans lui, aucune inscription n’est importée.'],
+      helloassoFieldMap: ['Correspondance des champs HelloAsso', 'Réglage technique (JSON) : à ne pas modifier sans l’équipe Kosmio. Une erreur casse l’import des inscrits.'],
+      slotDurationMinutes: ['Durée d’un créneau de rendez-vous (minutes)', 'Par défaut 15. Ne peut plus changer dès qu’un rendez-vous existe. Après un changement, utiliser « Régénérer les créneaux » dans le pilotage.'],
+      tablesCount: ['Nombre de tables', 'Nombre de tables disponibles pour les rendez-vous B2B, par créneau. Ne pas descendre sous le numéro d’une table déjà attribuée.'],
+      meetingRequestsOpenAt: ['Ouverture des demandes de rendez-vous', 'Date et heure (Paris) à partir desquelles on peut demander un rendez-vous. Vide : ouvert dès l’ouverture de l’espace.'],
+      meetingRequestsCloseAt: ['Fermeture des demandes de rendez-vous', 'Date et heure (Paris). Vide : fermeture la veille à 18h00.'],
+      welcomeStartedAt: ['Envoi des e-mails de bienvenue lancé le', 'Rempli automatiquement quand l’envoi des welcome part depuis le pilotage. À ne pas modifier à la main.'],
+    },
+    tail: [
+      ['participantSpaceEnabled'],
+      ['helloassoOrgSlug', 'helloassoFormType'],
+      ['helloassoFormSlug'],
+      ['helloassoFieldMap'],
+      ['slotDurationMinutes', 'tablesCount'],
+      ['meetingRequestsOpenAt', 'meetingRequestsCloseAt'],
+      ['welcomeStartedAt'],
+    ],
+  },
+  'api::sequence.sequence': {
+    labels: {
+      kind: ['Nature de la séquence', '« Pause rendez-vous B2B » génère les créneaux de rendez-vous entre ses heures de début et de fin. Publier pour appliquer.'],
+      theme: ['Thème', 'Thème affiché sur la séquence dans le programme. Facultatif.'],
+      subtitle: ['Sous-titre', 'Ligne affichée sous le titre dans le programme. Facultatif.'],
+      start_time: ['Heure de début', 'Écrire 10h45 (le format 10:45 est aussi compris). Pas de point : 10.45 est refusé sur une pause B2B.'],
+      end_time: ['Heure de fin', 'Écrire 11h15. Obligatoire sur une pause B2B, sinon aucun créneau n’est généré.'],
+    },
+  },
+  'api::espace.attendee': {
+    mainField: 'lastName',
+    sort: ['lastName', 'ASC'],
+    list: ['lastName', 'firstName', 'company', 'email', 'role', 'status'],
+    labels: {
+      lastName: ['Nom'], firstName: ['Prénom'], company: ['Entreprise'], email: ['E-mail'], role: ['Rôle'], status: ['Statut'],
+    },
+  },
+  'api::espace.exhibitor': {
+    mainField: 'standNumber',
+    list: ['organisation', 'standNumber'],
+    labels: { organisation: ['Organisation'], standNumber: ['Stand'] },
+  },
+  'api::espace.meeting': {
+    mainField: 'status',
+    sort: ['createdAt', 'DESC'],
+    list: ['status', 'slot', 'requester', 'targetAttendee', 'tableNumber'],
+    labels: { status: ['Statut'], slot: ['Créneau'], requester: ['Demandeur'], targetAttendee: ['Participant sollicité'], tableNumber: ['Table'] },
+  },
+  'api::espace.slot': {
+    mainField: 'label',
+    sort: ['startsAt', 'ASC'],
+    list: ['label', 'startsAt', 'endsAt'],
+    labels: { label: ['Créneau'], startsAt: ['Début'], endsAt: ['Fin'] },
+  },
+  'api::espace.email-log': {
+    mainField: 'template',
+    sort: ['sentAt', 'DESC'],
+    list: ['template', 'status', 'sentAt', 'scenarioKey'],
+    labels: { template: ['Gabarit'], status: ['Statut'], sentAt: ['Envoyé le'], scenarioKey: ['Motif'] },
+  },
+};
+
+/**
+ * Applies ADMIN_CONFIG to the Content Manager configuration stored by Strapi. Idempotent, runs at every start, so an empty
+ * database (Strapi has just created the configurations) and an existing one end up the same. A type or an attribute that is
+ * missing is skipped.
+ */
+async function applyAdminConfig(strapi) {
+  for (const [uid, spec] of Object.entries(ADMIN_CONFIG)) {
+    const key = `plugin_content_manager_configuration_content_types::${uid}`;
+    const entry = await strapi.db.query('strapi::core-store').findOne({ where: { key } });
+    if (!entry) continue;
+    const config = typeof entry.value === 'string' ? JSON.parse(entry.value) : entry.value;
+    const before = JSON.stringify(config);
+    config.metadatas = config.metadatas || {};
+    config.settings = config.settings || {};
+    config.layouts = config.layouts || {};
+    const known = (field) => Boolean(config.metadatas[field]);
+
+    for (const [field, [label, help]] of Object.entries(spec.labels || {})) {
+      if (!known(field)) continue;
+      const { edit, list } = config.metadatas[field];
+      if (edit) {
+        edit.label = label;
+        if (help) edit.description = help;
+      }
+      if (list) list.label = label;
+    }
+    if (spec.mainField && known(spec.mainField)) config.settings.mainField = spec.mainField;
+    if (spec.sort && known(spec.sort[0])) [config.settings.defaultSortBy, config.settings.defaultSortOrder] = spec.sort;
+    if (spec.list) {
+      const columns = spec.list.filter((field) => known(field));
+      if (columns.length) config.layouts.list = columns;
+    }
+    if (spec.tail && Array.isArray(config.layouts.edit)) {
+      const tail = spec.tail.map((row) => row.filter(known)).filter((row) => row.length);
+      const tailFields = new Set(tail.flat());
+      const head = config.layouts.edit.map((row) => row.filter(({ name }) => !tailFields.has(name))).filter((row) => row.length);
+      config.layouts.edit = [...head, ...tail.map((row) => row.map((name) => ({ name, size: name === 'helloassoFieldMap' ? 12 : 6 })))];
+    }
+
+    if (JSON.stringify(config) !== before) {
+      await strapi.db.query('strapi::core-store').update({ where: { id: entry.id }, data: { value: JSON.stringify(config) } });
+      strapi.log.info(`Configuration d’administration appliquée pour ${uid}`);
     }
   }
 }
