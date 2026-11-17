@@ -17,9 +17,11 @@ export interface Props {
   active: ShellTab;
   editionSlug: string;
   me: Me | null;
+  /** F-130 : couleur de l'édition, déjà lue par la page (`edition.themeColor`), relayée à EspaceLayout pour la balise theme-color. */
+  themeColor?: string | null;
 }
 
-const { title, active, editionSlug, me } = Astro.props;
+const { title, active, editionSlug, me, themeColor = null } = Astro.props;
 const base = `/espace/${encodeURIComponent(editionSlug)}`;
 
 // Icônes en trait (stroke 2 px) en SVG en ligne, décoratives : le libellé voisin porte le sens.
@@ -54,6 +56,9 @@ const tabs: { id: ShellTab; label: string; href: string; count?: number; countLa
   { id: "program", label: "Programme", href: `${base}/programme` },
 ];
 
+// F-119 : l'organisateur a une sixième entrée dans la barre basse (sous 1024 px) ; à partir de 1024 px, « Organisation » reste dans la colonne latérale.
+const organizerInBar = Boolean(me?.isOrganizer);
+
 const photo = me ? photoSrc(publicStrapiUrl, me.photoUrl) : null;
 const linkBase =
   "relative flex min-h-16 flex-col items-center justify-center gap-1 border-t-4 px-0.5 text-sm font-semibold lg:min-h-12 lg:flex-row lg:justify-start lg:gap-3 lg:rounded-lg lg:border-t-0 lg:border-l-4 lg:px-3 lg:text-base";
@@ -61,7 +66,7 @@ const linkClass = (id: ShellTab) =>
   `${linkBase} ${id === active ? "border-primary text-primary-ink lg:bg-surface" : "border-transparent text-muted hover:text-title lg:hover:bg-surface"}`;
 ---
 
-<EspaceLayout title={title} shell={me !== null}>
+<EspaceLayout title={title} shell={me !== null} themeColor={themeColor}>
   {
     me && (
       <nav
@@ -77,7 +82,7 @@ const linkClass = (id: ShellTab) =>
             height="160"
             class="hidden h-12 w-auto self-start lg:block"
           />
-          <ul class="grid grid-cols-5 lg:flex lg:flex-col lg:gap-1">
+          <ul class={`grid ${organizerInBar ? "grid-cols-6" : "grid-cols-5"} lg:flex lg:flex-col lg:gap-1`}>
             {tabs.map((tab) => (
               <li>
                 <a href={tab.href} class={linkClass(tab.id)} aria-current={tab.id === active ? "page" : undefined}>
@@ -103,11 +108,33 @@ const linkClass = (id: ShellTab) =>
                     ) : null}
                   </span>
                   {/* Sous 360 px, une colonne fait moins de 72 px : « Programme » en 14 px déborderait de l'écran. */}
-                  <span class="max-xs:text-xs">{tab.label}</span>
+                  <span class={organizerInBar ? "max-lg:text-xs" : "max-xs:text-xs"}>{tab.label}</span>
                   {tab.count && tab.countLabel ? <span class="sr-only">, {tab.countLabel(tab.count)}</span> : null}
                 </a>
               </li>
             ))}
+            {organizerInBar && (
+              <li class="lg:hidden">
+                <a
+                  href={`${base}/organisateur`}
+                  class={linkClass("organizer")}
+                  aria-current={active === "organizer" ? "page" : undefined}
+                >
+                  <svg
+                    aria-hidden="true"
+                    class="size-6"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    set:html={ICONS.organizer}
+                  />
+                  <span class="max-lg:text-xs">Pilotage</span>
+                </a>
+              </li>
+            )}
           </ul>
         </div>
         <ul class="hidden lg:flex lg:flex-col lg:gap-1">

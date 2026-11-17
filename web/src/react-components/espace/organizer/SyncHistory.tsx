@@ -1,6 +1,7 @@
 import React from "react";
 import type { SyncRun } from "../../../lib/espace/admin";
 import { timeLabel } from "../../../lib/espace/format";
+import { isInfoError } from "./SyncCard";
 import type { CardProps } from "./shared";
 
 // Les dix dernières synchronisations HelloAsso.
@@ -48,7 +49,7 @@ export default function SyncHistory({ runs }: CardProps & { runs: SyncRun[] }) {
                   <td className="py-2 pr-4 text-right">{run.created}</td>
                   <td className="py-2 pr-4 text-right">{run.updated}</td>
                   <td className="py-2 pr-4 text-right">{run.cancelled}</td>
-                  <td className="py-2 text-right">{run.endedAt ? run.errors.length : "en cours"}</td>
+                  <td className="py-2 text-right">{run.endedAt ? run.errors.filter((error) => !isInfoError(error)).length : "en cours"}</td>
                 </tr>
               ))}
             </tbody>

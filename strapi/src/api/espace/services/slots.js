@@ -9,9 +9,10 @@ module.exports = ({ strapi }) => ({
   /**
    * Regenerates the slots of a published edition from its b2b_break sequences (R-01), under a lock (A-16).
    * Idempotent (R-02): a slot that still has pending or accepted meetings is never removed, it is reported in `orphans`.
+   * F-122: with `dryRun`, nothing is written: the report says what a real run would do (`dryRun: true` in the answer).
    * -> { created, kept, removed, orphans: [{ id, label, activeMeetings }], warnings }
    */
-  regenerate: (editionDocumentId) =>
+  regenerate: (editionDocumentId, { dryRun = false } = {}) =>
     strapi.service('api::espace.locks').withLock(`slots:${editionDocumentId}`, async () => {
       const edition = await strapi.documents('api::edition.edition').findOne({ documentId: editionDocumentId, status: 'published' });
       if (!edition?.date) throw new EspaceError(409, 'EDITION_DATE_MISSING', 'L’édition publiée n’a pas de date.');
@@ -45,14 +46,17 @@ module.exports = ({ strapi }) => ({
         })),
       });
 
-      for (const { documentId } of plan.remove) await strapi.documents(SLOT).delete({ documentId });
-      for (const { sessionDocumentId, startsAt, endsAt, label } of plan.create) {
-        await strapi.documents(SLOT).create({
-          data: { startsAt, endsAt, label, edition: { documentId: editionDocumentId }, session: { documentId: sessionDocumentId } },
-        });
+      if (!dryRun) {
+        for (const { documentId } of plan.remove) await strapi.documents(SLOT).delete({ documentId });
+        for (const { sessionDocumentId, startsAt, endsAt, label } of plan.create) {
+          await strapi.documents(SLOT).create({
+            data: { startsAt, endsAt, label, edition: { documentId: editionDocumentId }, session: { documentId: sessionDocumentId } },
+          });
+        }
       }
 
       return {
+        ...(dryRun && { dryRun: true }),
         created: plan.create.length,
         kept: plan.keep.length,
         removed: plan.remove.length,

@@ -15,6 +15,9 @@ export type EspaceEdition = {
   city: string | null;
   themeColor: string | null;
   participantSpaceEnabled: boolean;
+  /** Fenêtre de prise de rendez-vous (instants ISO) ; null : pas de borne. */
+  meetingRequestsOpenAt: string | null;
+  meetingRequestsCloseAt: string | null;
 };
 
 /** A-18 : état d'un lien de connexion, sans le consommer. L'adresse n'est renvoyée que pour un lien connu mais inutilisable. */
@@ -126,7 +129,8 @@ export async function guardSession(slug: string, cookie: string | null, { consen
   if (me?.edition.slug !== slug) return edition.participantSpaceEnabled || pilotage ? { redirect: `${base}/connexion` } : { notFound: true };
   // F-103 : espace fermé, seul l'organisateur a une session ; il n'a accès qu'au pilotage (`pilotage: true`), les autres écrans le lui renvoient.
   if (!edition.participantSpaceEnabled) return pilotage ? { edition, me } : { redirect: `${base}/organisateur` };
-  if (consent && !me.consent.consentAt) return { redirect: `${base}/bienvenue` };
+  // F-124 : l'organisateur qui n'a jamais passé l'écran de bienvenue entre directement au pilotage.
+  if (consent && !me.consent.consentAt && !(pilotage && me.isOrganizer)) return { redirect: `${base}/bienvenue` };
   return { edition, me };
 }
 

@@ -46,6 +46,17 @@ function hostedTableWarnings(attendees, tablesCount) {
   });
 }
 
+/** F-121: the errors that hold an address say who already uses it (`holderName`), as `GET /sync-runs` does. */
+function withHolders(errors, attendees) {
+  const byEmail = new Map(attendees.map((attendee) => [String(attendee.email).toLowerCase(), attendee]));
+  const byId = new Map(attendees.map((attendee) => [attendee.documentId, attendee]));
+  return errors.map((error) => {
+    const holder = byId.get(error.attendeeDocumentId) ?? byEmail.get(String(error.email ?? '').toLowerCase());
+    const holderName = fullName(holder ?? {});
+    return holderName ? { ...error, holderName } : error;
+  });
+}
+
 module.exports = ({ strapi }) => {
   const documents = (uid) => strapi.documents(uid);
 
@@ -53,13 +64,13 @@ module.exports = ({ strapi }) => {
     /**
      * GET /admin/:edition/stats (F-90, A-29): the indicators of E9, computed on the fly. Counts only, never a text (R-63).
      * The organizers are not registrants: they are left out of every count. Each count is taken over the active registrants,
-     * except `attendees` which also gives the cancelled ones. A meeting counts in the slot it is booked on, whoever its target.
+     * except `attendees.total` and `attendees.cancelled`, which also give the cancelled ones (`byRole` leaves them out, F-125). A meeting counts in the slot it is booked on, whoever its target.
      */
     async compute(edition) {
       const ofEdition = { edition: { documentId: edition.documentId } };
       const tablesCount = edition.tablesCount ?? DEFAULT_TABLES;
 
-      const [everyone, meetings, slots, exhibitors, messageCount, [lastRun]] = await Promise.all([
+      const [everyone, allMeetings, slots, exhibitors, messageCount, [lastRun]] = await Promise.all([
         documents(ATTENDEE).findMany({
           filters: ofEdition,
           populate: { photo: { fields: ['documentId'] }, topics: { fields: ['documentId'] } },
@@ -77,11 +88,13 @@ module.exports = ({ strapi }) => {
         documents(SYNC_RUN).findMany({ filters: ofEdition, sort: 'startedAt:desc', limit: 1 }),
       ]);
 
+      // F-125, T-40: the exports list the meetings booked on a slot, so the indicators count those and no others.
+      const meetings = allMeetings.filter(({ slot }) => slot);
       const people = everyone.filter(({ role }) => role !== 'organizer');
       const active = people.filter(({ status }) => status === 'active');
 
       const byRole = Object.fromEntries(ROLES.map((role) => [role, 0]));
-      for (const { role } of people) byRole[role] = (byRole[role] ?? 0) + 1;
+      for (const { role } of active) byRole[role] = (byRole[role] ?? 0) + 1;
 
       const byStatus = Object.fromEntries(STATUSES.map((status) => [status, 0]));
       for (const { status } of meetings) byStatus[status] += 1;
@@ -127,7 +140,7 @@ module.exports = ({ strapi }) => {
               created: lastRun.created,
               updated: lastRun.updated,
               cancelled: lastRun.cancelled,
-              errors: lastRun.errors ?? [],
+              errors: withHolders(lastRun.errors ?? [], everyone),
             }
           : null,
       };

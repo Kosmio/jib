@@ -23,6 +23,8 @@ const fullName = (person) => [person?.firstName, person?.lastName].filter(Boolea
 const byText = (a, b) => a.localeCompare(b, 'fr', { sensitivity: 'base' });
 const hourFormat = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
 const dateFormat = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+/** "2026-12-03", the day at Paris (F-123, name of the files). */
+const parisDate = (date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
 /** "13h00", at Paris. */
 const hour = (date) => (date ? hourFormat.format(new Date(date)).replace(':', 'h') : '');
 const dateTime = (date) => (date ? dateFormat.format(new Date(date)) : '');
@@ -89,8 +91,10 @@ module.exports = ({ strapi }) => {
       if (requester) add(person?.documentId ?? meeting.answeredBy?.documentId, line(fullName(requester), companyOf(requester)));
     }
 
-    const headers = ['Nom', 'Prénom', 'E-mail', 'Fonction', 'Entreprise', 'Rôle', 'Exposant représenté', 'Stand', 'Table dédiée', 'Page LinkedIn', 'Inscription', 'Espace activé', 'Dans l’annuaire', 'Reçoit des demandes', 'Profil complété (%)', 'Sujets', 'Nombre de rendez-vous confirmés', 'Rendez-vous confirmés'];
-    const rows = data.people.map((person) => {
+    const headers = ['Nom', 'Prénom', 'E-mail', 'Fonction', 'Entreprise', 'Rôle', 'Exposant représenté', 'Stand', 'Table dédiée', 'Page LinkedIn', 'Statut', 'Espace activé', 'Activé le', 'Dernière connexion', 'Dans l’annuaire', 'Reçoit des demandes', 'Actualités des prochaines éditions', 'Profil complété (%)', 'Sujets', 'Nombre de rendez-vous confirmés', 'Rendez-vous confirmés'];
+    // F-123: the cancelled registrations close the file, each group in alphabetical order.
+    const ordered = [...data.people.filter(({ status }) => status !== 'cancelled'), ...data.people.filter(({ status }) => status === 'cancelled')];
+    const rows = ordered.map((person) => {
       const mine = confirmed.get(person.documentId) ?? [];
       const { jobTitle, company } = identity(person);
       return [
@@ -104,10 +108,13 @@ module.exports = ({ strapi }) => {
         person.exhibitor?.standNumber,
         person.role === 'speaker' ? person.hostedTableNumber : null,
         person.linkedinUrl,
-        person.status === 'active' ? 'active' : 'annulée',
+        person.status === 'cancelled' ? 'Annulé' : 'Actif',
         yesNo(person.activatedAt),
+        dateTime(person.activatedAt),
+        dateTime(person.lastSeenAt),
         yesNo(person.directoryOptIn),
         yesNo(person.meetingsOptIn),
+        yesNo(person.newsOptIn),
         profileCompletion(person),
         (person.topics ?? []).map(({ name }) => name).sort(byText).join(', '),
         mine.length,
@@ -187,14 +194,14 @@ module.exports = ({ strapi }) => {
     names: [...Object.keys(FILES), 'stats'],
 
     /**
-     * GET /admin/:edition/export/:name.csv (F-91) -> { filename, body }, or null when the name is not one of the four files.
+     * GET /admin/:edition/export/:name.csv (F-91) -> { filename: `<name>-<slug>-YYYY-MM-DD.csv`, body }, or null when the name is not one of the four files.
      * Personal data for the organizer only (e-mail included, it is the registration list). Never the text of a request nor of a message (R-63).
      */
-    async build(edition, name) {
+    async build(edition, name, now = new Date()) {
       if (name !== 'stats' && !FILES[name]) return null;
       const body = name === 'stats' ? await stats(edition) : FILES[name](await load(edition));
       const french = { participants: 'participants', meetings: 'rendez-vous', exhibitors: 'exposants', stats: 'statistiques' }[name];
-      return { filename: `${edition.slug}-${french}.csv`, body };
+      return { filename: `${french}-${edition.slug}-${parisDate(now)}.csv`, body };
     },
   };
 };

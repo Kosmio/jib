@@ -32,7 +32,7 @@ if (stats && !stats.ok && stats.status === 403) Astro.response.status = 403;
 const refused = forbidden || (stats !== null && !stats.ok && stats.status === 403);
 ---
 
-<AppShell title={refused ? "Accès réservé" : "Pilotage"} active={refused ? "home" : "organizer"} editionSlug={slug} me={me}>
+<AppShell title={refused ? "Accès réservé" : "Pilotage"} active={refused ? "home" : "organizer"} editionSlug={slug} me={me} themeColor={edition.themeColor}>
   {
     refused ? (
       <div class="mx-auto max-w-180 px-4 pt-8">

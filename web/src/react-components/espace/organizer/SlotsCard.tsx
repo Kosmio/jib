@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { groupSlots, percent, regenerateSlots, type SlotFill, type SlotsReport } from "../../../lib/espace/admin";
-import { EspaceApiError } from "../../../lib/espace/client";
+import { EspaceApiError, request } from "../../../lib/espace/client";
 import { plural } from "../../../lib/espace/format";
+import { STATS_EVENT } from "./StatsCards";
 import { Card, FeedbackArea, LOAD_FAILED, type CardProps, type Feedback } from "./shared";
 
 // Remplissage par pause B2B et régénération des créneaux (R-02, F-94).
@@ -21,6 +22,10 @@ const SLOT_WARNING_LABELS: Record<string, string> = {
   TOO_SHORT: "plus courte qu’un créneau",
   OVERLAP: "chevauche une autre pause B2B",
 };
+
+/** F-122 : simulation côté serveur, la route de régénération avec `dryRun` ne modifie aucun créneau. */
+const simulateSlots = (baseUrl: string, editionSlug: string) =>
+  request<SlotsReport>(baseUrl, `/admin/${encodeURIComponent(editionSlug)}/slots/regenerate?dryRun=true`, "POST");
 
 const SLOTS_FAILED = "Les créneaux n’ont pas pu être régénérés. Vérifiez votre connexion et réessayez.";
 
@@ -46,24 +51,61 @@ function slotsSummary(report: SlotsReport): Feedback {
   return { kind: lines.length ? "alert" : "status", text: `Créneaux régénérés : ${counts}.`, lines };
 }
 
-export default function SlotsCard({ edition: editionSlug, strapiUrl, slots, themeColor, onRefresh }: Props) {
+export default function SlotsCard({ edition: editionSlug, strapiUrl, slots: initialSlots, themeColor, onRefresh }: Props) {
   const [regenerating, setRegenerating] = useState(false);
   const [slotsNotice, setSlotsNotice] = useState<Feedback | null>(null);
+  const [plan, setPlan] = useState<SlotsReport | null>(null);
+  const [slots, setSlots] = useState(initialSlots);
 
-  async function regenerate() {
+  // F-125 : les chiffres se rechargent toutes les 60 s (StatsCards) ; cette carte reçoit les créneaux frais par l'évènement.
+  useEffect(() => setSlots(initialSlots), [initialSlots]);
+  useEffect(() => {
+    const onStats = (event: Event) => setSlots((event as CustomEvent<{ slots: SlotFill[] }>).detail.slots);
+    window.addEventListener(STATS_EVENT, onStats);
+    return () => window.removeEventListener(STATS_EVENT, onStats);
+  }, []);
+
+  /** Étape 1 (F-122) : simulation, puis confirmation avec les nombres. Rien à créer ni à supprimer : la régénération part sans confirmation. */
+  async function simulate() {
     if (regenerating) return;
     setRegenerating(true);
     setSlotsNotice(null);
     let report: SlotsReport;
     try {
+      report = await simulateSlots(strapiUrl, editionSlug);
+    } catch (failure) {
+      fail(failure);
+      return;
+    }
+    if (report.created + report.removed === 0) {
+      await run();
+      return;
+    }
+    setPlan(report);
+    setRegenerating(false);
+  }
+
+  function fail(failure: unknown) {
+    setRegenerating(false);
+    setPlan(null);
+    if (failure instanceof EspaceApiError && failure.status === 401) {
+      window.location.assign(`/espace/${encodeURIComponent(editionSlug)}/connexion`);
+      return;
+    }
+    setSlotsNotice({ kind: "alert", text: (failure instanceof EspaceApiError && failure.status !== 0 && failure.message) || SLOTS_FAILED });
+  }
+
+  const regenerate = () => (regenerating ? Promise.resolve() : run());
+
+  async function run() {
+    setRegenerating(true);
+    setPlan(null);
+    setSlotsNotice(null);
+    let report: SlotsReport;
+    try {
       report = await regenerateSlots(strapiUrl, editionSlug);
     } catch (failure) {
-      setRegenerating(false);
-      if (failure instanceof EspaceApiError && failure.status === 401) {
-        window.location.assign(`/espace/${encodeURIComponent(editionSlug)}/connexion`);
-        return;
-      }
-      setSlotsNotice({ kind: "alert", text: (failure instanceof EspaceApiError && failure.status !== 0 && failure.message) || SLOTS_FAILED });
+      fail(failure);
       return;
     }
     const summary = slotsSummary(report);
@@ -133,15 +175,42 @@ export default function SlotsCard({ edition: editionSlug, strapiUrl, slots, them
             Les créneaux sont calculés à partir des pauses B2B du programme. Régénérez-les après avoir ajouté une pause ou changé ses
             horaires dans Strapi&nbsp;: un créneau qui porte un rendez-vous n’est jamais supprimé.
           </p>
-          <button
-            type="button"
-            onClick={regenerate}
-            disabled={regenerating}
-            aria-busy={regenerating}
-            className="mt-3 inline-flex min-h-11 items-center justify-center rounded-lg border-2 border-title bg-white px-5 font-bold text-title hover:bg-surface disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {regenerating ? "Régénération en cours…" : "Régénérer les créneaux"}
-          </button>
+          {plan ? (
+            <div role="alertdialog" aria-labelledby="slots-confirm" className="mt-3 rounded-lg border-2 border-title bg-white p-4">
+              <p id="slots-confirm" className="font-semibold">
+                {`Cette régénération va créer ${plural(plan.created, "créneau", "créneaux")} et supprimer ${plural(plan.removed, "créneau", "créneaux")} (${plural(plan.kept, "conservé")}). Confirmer\u00a0?`}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={regenerate}
+                  disabled={regenerating}
+                  aria-busy={regenerating}
+                  className="inline-flex min-h-11 items-center justify-center rounded-lg bg-gold px-5 font-bold text-gold-ink hover:bg-gold-light disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {regenerating ? "Régénération en cours…" : "Confirmer la régénération"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPlan(null)}
+                  disabled={regenerating}
+                  className="inline-flex min-h-11 items-center justify-center rounded-lg border-2 border-title bg-white px-5 font-bold text-title hover:bg-surface disabled:opacity-60"
+                >
+                  Annuler
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={simulate}
+              disabled={regenerating}
+              aria-busy={regenerating}
+              className="mt-3 inline-flex min-h-11 items-center justify-center rounded-lg border-2 border-title bg-white px-5 font-bold text-title hover:bg-surface disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {regenerating ? "Régénération en cours…" : "Régénérer les créneaux"}
+            </button>
+          )}
           <FeedbackArea feedback={slotsNotice} />
         </div>
       </Card>

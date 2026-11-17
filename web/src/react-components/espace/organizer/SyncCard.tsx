@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { agoLabel, runSync, type SyncRun } from "../../../lib/espace/admin";
+import { agoLabel, getServiceStatus, getSyncRuns, runSync, type SyncError, type SyncRun } from "../../../lib/espace/admin";
 import { EspaceApiError } from "../../../lib/espace/client";
 import { plural } from "../../../lib/espace/format";
 import { FeedbackArea, Icon, LOAD_FAILED, type CardProps, type Feedback } from "./shared";
@@ -14,18 +14,52 @@ type Props = CardProps & {
   onRefresh: () => Promise<void>;
 };
 
-/** Libellés des codes de `SyncRun.errors` (06-api.md), au singulier et au pluriel : « 2 billets sans adresse e-mail valable ». */
-const SYNC_ERROR_LABELS: Record<string, [string, string]> = {
-  DUPLICATE_EMAIL: ["adresse e-mail déjà utilisée par un autre inscrit", "adresses e-mail déjà utilisées par d’autres inscrits"],
-  EMAIL_TAKEN: ["adresse e-mail déjà utilisée par un autre inscrit", "adresses e-mail déjà utilisées par d’autres inscrits"],
-  INVALID_EMAIL: ["billet sans adresse e-mail valable", "billets sans adresse e-mail valable"],
+/** F-121 : cas attendus, une information repliée ; tout autre code (doublon, lecture, erreur interne…) est une erreur, en rouge. */
+const INFO_CODES = ["WAITING", "UNKNOWN"];
+export const isInfoError = ({ code }: SyncError) => INFO_CODES.includes(code);
+
+/** F-120 : une exécution est en échec quand elle n'a rien pu lire ou n'a pas pu s'exécuter, pas quand quelques billets sont refusés. */
+const FAILURE_CODES = ["FETCH_FAILED", "INTERNAL", "HELLOASSO_NOT_CONFIGURED"];
+const isFailure = (run: SyncRun) => run.errors.some(({ code }) => FAILURE_CODES.includes(code));
+
+const HOUR_MS = 3_600_000;
+
+/** Erreur de `SyncRun.errors` (06-api.md) avec le nom de l'inscrit qui tient déjà l'adresse, ajouté par le serveur (F-121). */
+type SyncErrorRow = SyncError & { holderName?: string };
+
+/** Libellés des codes de `SyncRun.errors` (06-api.md), au singulier et au pluriel, pour les informations : « 2 billets en attente, ignorés ». */
+const INFO_LABELS: Record<string, [string, string]> = {
   WAITING: ["billet en attente, ignoré", "billets en attente, ignorés"],
   UNKNOWN: ["billet à l’état inconnu, ignoré", "billets à l’état inconnu, ignorés"],
-  APPLY_FAILED: ["billet dont l’enregistrement a échoué", "billets dont l’enregistrement a échoué"],
-  FETCH_FAILED: ["échec de la lecture de HelloAsso", "échecs de la lecture de HelloAsso"],
-  HELLOASSO_NOT_CONFIGURED: ["configuration HelloAsso absente pour cette édition", "configurations HelloAsso absentes pour cette édition"],
-  INTERNAL: ["erreur inattendue", "erreurs inattendues"],
 };
+
+/** Motif en français et action attendue d'une erreur, par code. */
+function describeError(error: SyncErrorRow): { reason: string; action: string } {
+  const holder = error.holderName ? ` par ${error.holderName}` : " par un autre inscrit";
+  switch (error.code) {
+    case "DUPLICATE_EMAIL":
+    case "EMAIL_TAKEN":
+      return {
+        reason: `Adresse e-mail déjà utilisée${holder}.`,
+        action: "Faites corriger l’adresse sur HelloAsso s’il s’agit d’une autre personne, sinon ignorez ce billet en doublon.",
+      };
+    case "INVALID_EMAIL":
+      return { reason: "Billet sans adresse e-mail valable.", action: "Complétez l’adresse e-mail du billet sur HelloAsso, puis synchronisez de nouveau." };
+    case "APPLY_FAILED":
+      return { reason: "L’enregistrement du billet a échoué.", action: "Synchronisez de nouveau. Si l’erreur revient, contactez Kosmio." };
+    case "FETCH_FAILED":
+      return {
+        reason: `La lecture de HelloAsso a échoué${error.status ? ` (code ${error.status})` : ""}.`,
+        action: "Synchronisez de nouveau dans quelques minutes. Si l’erreur revient, vérifiez les accès HelloAsso de l’édition.",
+      };
+    case "HELLOASSO_NOT_CONFIGURED":
+      return { reason: "La configuration HelloAsso est absente pour cette édition.", action: "Renseignez le formulaire HelloAsso de l’édition dans Strapi." };
+    case "INTERNAL":
+      return { reason: "Erreur inattendue pendant la synchronisation.", action: "Synchronisez de nouveau. Si l’erreur revient, contactez Kosmio." };
+    default:
+      return { reason: `Erreur ${error.code}.`, action: "Contactez Kosmio." };
+  }
+}
 
 const SYNC_FAILED = "La synchronisation a échoué. Vérifiez votre connexion et réessayez.";
 
@@ -34,18 +68,20 @@ function syncSummary(run: SyncRun): { kind: "alert" | "status"; text: string } {
     return { kind: "alert", text: "HelloAsso n’est pas configuré pour cette édition. Renseignez son formulaire HelloAsso dans Strapi." };
   }
   const counts = `${plural(run.created, "inscrit créé", "inscrits créés")}, ${run.updated} mis à jour, ${plural(run.cancelled, "annulé")}`;
-  return run.errors.length
-    ? { kind: "alert", text: `Synchronisation terminée avec ${plural(run.errors.length, "erreur")}\u00a0: ${counts}.` }
+  const problems = run.errors.filter((error) => !isInfoError(error)).length;
+  return problems
+    ? { kind: "alert", text: `Synchronisation terminée avec ${plural(problems, "erreur")}\u00a0: ${counts}.` }
     : { kind: "status", text: `Synchronisation terminée\u00a0: ${counts}.` };
 }
 
-/** Erreurs d'un SyncRun regroupées par code : « 2 billets sans adresse e-mail valable ». */
-function errorLines(run: SyncRun): string[] {
-  const counts = new Map<string, number>();
-  for (const { code } of run.errors) counts.set(code, (counts.get(code) ?? 0) + 1);
-  return [...counts].map(([code, count]) => {
-    const [one, many] = SYNC_ERROR_LABELS[code] ?? [code, code];
-    return plural(count, one, many);
+/** Informations (cas attendus) regroupées par code, avec les numéros de billet : « 2 billets en attente, ignorés (n° 12, 15) ». */
+function infoLines(errors: SyncError[]): string[] {
+  const groups = new Map<string, string[]>();
+  for (const { code, itemId } of errors.filter(isInfoError)) groups.set(code, [...(groups.get(code) ?? []), ...(itemId ? [itemId] : [])]);
+  return [...groups].map(([code, ids]) => {
+    const [one, many] = INFO_LABELS[code];
+    const count = errors.filter((error) => error.code === code).length;
+    return `${plural(count, one, many)}${ids.length ? ` (n°\u00a0${ids.join(", ")})` : ""}`;
   });
 }
 
@@ -53,6 +89,20 @@ export default function SyncCard({ edition: editionSlug, strapiUrl, lastSync, no
   const [syncing, setSyncing] = useState(false);
   const [notice, setNotice] = useState<Feedback | null>(null);
   const [now, setNow] = useState(() => new Date(nowIso));
+  // F-120 : dernière réussite (parmi les dix dernières exécutions) et état des tâches planifiées ; null tant que non lus.
+  const [recent, setRecent] = useState<SyncRun[] | null>(null);
+  const [cronEnabled, setCronEnabled] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    getServiceStatus(strapiUrl, editionSlug).then(
+      ({ cron }) => setCronEnabled(cron.enabled),
+      () => setCronEnabled(null),
+    );
+  }, [strapiUrl, editionSlug]);
+
+  useEffect(() => {
+    getSyncRuns(strapiUrl, editionSlug).then(setRecent, () => setRecent(null));
+  }, [strapiUrl, editionSlug, lastSync?.id, lastSync?.endedAt]);
 
   useEffect(() => {
     setNow(new Date());
@@ -85,19 +135,30 @@ export default function SyncCard({ edition: editionSlug, strapiUrl, lastSync, no
     setSyncing(false);
   }
 
-  const lastErrors = lastSync ? errorLines(lastSync) : [];
+  const failed = Boolean(lastSync?.endedAt && isFailure(lastSync));
+  const problems = (lastSync?.errors ?? []).filter((error) => !isInfoError(error)) as SyncErrorRow[];
+  const infos = infoLines(lastSync?.errors ?? []);
+
+  // F-120 : tâches planifiées actives et aucune réussite depuis plus d'une heure.
+  const lastSuccess = (recent ?? []).find((run) => run.endedAt && !isFailure(run));
+  const stale = cronEnabled === true && recent !== null && recent.length > 0 && (!lastSuccess || now.getTime() - new Date(lastSuccess.endedAt as string).getTime() > HOUR_MS);
 
   return (
     <section aria-labelledby="synchronisation" className="rounded-xl border border-surface-alt bg-white p-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 id="synchronisation" className="flex items-center gap-2 font-heading text-xl font-semibold normal-case">
-            <span className="text-primary-ink">
-              <Icon name="refresh" />
+          <h2
+            id="synchronisation"
+            className={`flex items-center gap-2 font-heading text-xl font-semibold normal-case ${failed ? "text-danger" : ""}`}
+          >
+            <span className={failed ? "" : "text-primary-ink"}>
+              <Icon name={failed ? "alert" : "refresh"} />
             </span>
             {lastSync
               ? lastSync.endedAt
-                ? `HelloAsso synchronisé ${agoLabel(lastSync.endedAt, now)}`
+                ? failed
+                  ? `Dernière synchronisation en échec ${agoLabel(lastSync.endedAt, now)}`
+                  : `HelloAsso synchronisé ${agoLabel(lastSync.endedAt, now)}`
                 : "Synchronisation en cours"
               : "HelloAsso n’a pas encore été synchronisé"}
           </h2>
@@ -115,15 +176,48 @@ export default function SyncCard({ edition: editionSlug, strapiUrl, lastSync, no
       </div>
 
       <FeedbackArea feedback={notice} />
-      {lastErrors.length > 0 && (
+      {stale && (
+        <p data-testid="sync-stale" className="mt-4 flex items-start gap-3 rounded-lg border-2 border-danger bg-white p-3 font-semibold">
+          <span className="text-danger">
+            <Icon name="alert" />
+          </span>
+          {lastSuccess
+            ? `Dernière synchronisation réussie\u00a0: ${agoLabel(lastSuccess.endedAt as string, now)}. Les tâches planifiées sont actives, elle devrait avoir lieu toutes les 15\u00a0minutes. Vérifiez la configuration HelloAsso.`
+            : "Aucune synchronisation réussie parmi les dernières exécutions, alors que les tâches planifiées sont actives. Vérifiez la configuration HelloAsso."}
+        </p>
+      )}
+      {problems.length > 0 && (
         <div className="mt-4">
-          <h3 className="font-semibold">Erreurs de la dernière synchronisation</h3>
+          <h3 className="font-semibold">{`Erreurs de la dernière synchronisation (${problems.length})`}</h3>
+          <ul className="mt-2 space-y-2">
+            {problems.map((error, index) => {
+              const { reason, action } = describeError(error);
+              return (
+                <li key={`${error.code}-${error.itemId ?? index}-${index}`} className="rounded-lg border border-danger bg-white p-3">
+                  <p className="flex items-start gap-3 font-semibold text-danger">
+                    <Icon name="alert" />
+                    <span className="min-w-0 break-words">
+                      {error.itemId ? `Billet n°\u00a0${error.itemId}` : "Synchronisation"}
+                      {error.email ? <span className="font-normal text-ink">{`, ${error.email}`}</span> : null}
+                    </span>
+                  </p>
+                  <p className="mt-1 pl-8">{reason}</p>
+                  <p className="pl-8 text-muted">{`À faire\u00a0: ${action}`}</p>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+      {infos.length > 0 && (
+        <details className="mt-4">
+          <summary className="cursor-pointer font-semibold text-title">{`Informations (${infos.length})`}</summary>
           <ul className="mt-1 list-disc pl-5 text-muted">
-            {lastErrors.map((line) => (
+            {infos.map((line) => (
               <li key={line}>{line}</li>
             ))}
           </ul>
-        </div>
+        </details>
       )}
     </section>
   );
