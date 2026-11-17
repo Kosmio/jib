@@ -64,6 +64,9 @@ function peopleHtml({ title, items }, color) {
 function blockHtml(block, color) {
   if (typeof block === 'string') return `<p style="${paragraphStyle}">${escapeHtml(block)}</p>`;
   if (block.heading) return `<p style="${paragraphStyle};font-size:20px;font-weight:700;color:${COLORS.title}">${escapeHtml(block.heading)}</p>`;
+  if (block.code) {
+    return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px"><tr><td align="center" bgcolor="${COLORS.surface}" style="background-color:${COLORS.surface};border:2px solid ${COLORS.accent};border-radius:12px;padding:16px 12px;font-family:'Courier New',Courier,monospace;font-size:32px;line-height:1.2;font-weight:700;letter-spacing:6px;color:${COLORS.title}">${escapeHtml(block.code)}</td></tr></table>`;
+  }
   if (block.small) return `<p style="${paragraphStyle};font-size:15px;color:${COLORS.muted}">${escapeHtml(block.small)}</p>`;
   if (block.people) return peopleHtml(block.people, color);
   if (block.ul) {
@@ -80,6 +83,7 @@ function blockHtml(block, color) {
 function blockText(block) {
   if (typeof block === 'string') return block;
   if (block.heading) return block.heading;
+  if (block.code) return `${block.code}`;
   if (block.small) return block.small;
   if (block.people) return [block.people.title, ...block.people.items.map(({ name, subtitle }) => `- ${[name, subtitle].filter(Boolean).join(', ')}`)].join('\n');
   if (block.ul) return block.ul.map((item) => `- ${item}`).join('\n');

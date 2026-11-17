@@ -13,7 +13,7 @@ module.exports = ({ edition, firstName, url, validityMinutes, code }) => ({
     ...(code
       ? [
           { heading: 'Votre code de connexion' },
-          { heading: code },
+          { code },
           `Si le lien s’ouvre dans une autre application, saisissez ce code dans la page où vous avez demandé l’accès. Il est valable ${validityMinutes} minutes, ne fonctionne qu’une seule fois et s’annule dès que le lien est utilisé.`,
         ]
       : []),
