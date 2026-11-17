@@ -120,6 +120,15 @@
     "editedFields": {
       "type": "json",
       "default": []
+    },
+    "cardTokenHash": {
+      "type": "string",
+      "unique": true,
+      "private": true
+    },
+    "cardTokenCreatedAt": {
+      "type": "datetime",
+      "private": true
     }
   }
 }
