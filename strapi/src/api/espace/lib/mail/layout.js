@@ -15,6 +15,9 @@ const COLORS = {
   ink: '#2a3a44',
   muted: '#54585a',
   title: '#325062',
+  surface: '#f5f0eb',
+  wood: '#8b5a2b',
+  accent: '#ad8b5e',
   gold: '#f0ab00',
   goldInk: '#3a2410',
   link: '#007a5e',
@@ -40,8 +43,29 @@ function headerColor(themeColor) {
 const paragraphStyle = `margin:0 0 16px;font-size:17px;line-height:1.5;color:${COLORS.ink}`;
 const linkStyle = `color:${COLORS.link};text-decoration:underline`;
 
-function blockHtml(block) {
+// Avatar of a person of a `people` block: wood, accent, then the edition colour (tokens of 07-design.md).
+const avatarTones = (color) => [
+  [COLORS.wood, COLORS.white],
+  [COLORS.accent, COLORS.goldInk],
+  [color, COLORS.white],
+];
+
+function peopleHtml({ title, items }, color) {
+  const tones = avatarTones(color);
+  const rows = items
+    .map(({ initials, name, subtitle }, index) => {
+      const [background, ink] = tones[index % tones.length];
+      return `<tr><td width="40" valign="top" style="padding:0 12px 14px 0"><div style="width:40px;height:40px;line-height:40px;border-radius:20px;text-align:center;background-color:${background};color:${ink};font-size:15px;font-weight:700">${escapeHtml(initials)}</div></td><td valign="top" style="padding:0 0 14px;font-size:16px;line-height:1.4;color:${COLORS.muted}"><strong style="color:${COLORS.ink}">${escapeHtml(name)}</strong>${subtitle ? `<br>${escapeHtml(subtitle)}` : ''}</td></tr>`;
+    })
+    .join('');
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="${COLORS.surface}" style="margin:0 0 24px;background-color:${COLORS.surface};border-radius:12px"><tr><td style="padding:20px 24px 6px"><div style="margin:0 0 14px;font-size:20px;font-weight:700;color:${COLORS.title}">${escapeHtml(title)}</div><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table></td></tr></table>`;
+}
+
+function blockHtml(block, color) {
   if (typeof block === 'string') return `<p style="${paragraphStyle}">${escapeHtml(block)}</p>`;
+  if (block.heading) return `<p style="${paragraphStyle};font-size:20px;font-weight:700;color:${COLORS.title}">${escapeHtml(block.heading)}</p>`;
+  if (block.small) return `<p style="${paragraphStyle};font-size:15px;color:${COLORS.muted}">${escapeHtml(block.small)}</p>`;
+  if (block.people) return peopleHtml(block.people, color);
   if (block.ul) {
     const items = block.ul.map((item) => `<li style="margin:0 0 6px">${escapeHtml(item)}</li>`).join('');
     return `<ul style="${paragraphStyle};padding-left:24px">${items}</ul>`;
@@ -55,6 +79,9 @@ function blockHtml(block) {
 
 function blockText(block) {
   if (typeof block === 'string') return block;
+  if (block.heading) return block.heading;
+  if (block.small) return block.small;
+  if (block.people) return [block.people.title, ...block.people.items.map(({ name, subtitle }) => `- ${[name, subtitle].filter(Boolean).join(', ')}`)].join('\n');
   if (block.ul) return block.ul.map((item) => `- ${item}`).join('\n');
   if (block.button) return `${block.button.label}${NBSP}: ${block.button.url}`;
   return block.url;
@@ -80,7 +107,7 @@ function renderLayout({ subject, preheader = '', title, blocks, footer, manage =
 <div style="margin:0 0 6px;font-size:24px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:${COLORS.white}">${escapeHtml(title)}</div>
 <div style="font-size:16px;font-weight:600;color:${COLORS.white}">${escapeHtml(edition.title)}</div>
 </td></tr>
-<tr><td style="padding:32px 40px 16px">${blocks.map(blockHtml).join('\n')}</td></tr>
+<tr><td style="padding:32px 40px 16px">${blocks.map((block) => blockHtml(block, color)).join('\n')}</td></tr>
 <tr><td style="padding:0 40px 32px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid ${COLORS.page}"><tr><td style="padding-top:20px;font-size:14px;line-height:1.5;color:${COLORS.muted}">
 <img src="${escapeHtml(base)}/assets/logo-xylofutur.png" width="90" alt="Xylofutur" style="display:block;border:0;width:90px;height:auto;margin:0 0 12px">
 ${escapeHtml(footerText)}${manage ? ` <a href="${escapeHtml(manageUrl)}" style="${linkStyle}">Gérer mes notifications</a>` : ''}

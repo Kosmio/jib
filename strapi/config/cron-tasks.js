@@ -21,10 +21,15 @@ module.exports = {
     task: safely('espaceMeetingExpiry', (strapi) => strapi.service('api::espace.meetings').expirePending()),
     options: { rule: '*/5 * * * *', tz: TIME_ZONE },
   },
-  // R-62, T-31: every 5 minutes, one deferred e-mail per conversation for the messages unread for 5 minutes.
+  // R-62, T-31: every minute (V3-D), one deferred e-mail per conversation for the messages unread for 5 minutes.
   espaceMessageNotify: {
     task: safely('espaceMessageNotify', (strapi) => strapi.service('api::espace.conversations').notifyMessages()),
-    options: { rule: '*/5 * * * *', tz: TIME_ZONE },
+    options: { rule: '* * * * *', tz: TIME_ZONE },
+  },
+  // R-70 to R-72, R-87: every 15 minutes, the reminders the calendar makes due and the log does not hold yet, within 8h00 and 20h00 Paris time.
+  espaceReminders: {
+    task: safely('espaceReminders', (strapi) => strapi.service('api::espace.reminders').runDue()),
+    options: { rule: '*/15 * * * *', tz: TIME_ZONE },
   },
   // I-20, A-21: every night, the link and session tokens expired for more than 7 days.
   espaceTokenPurge: {
