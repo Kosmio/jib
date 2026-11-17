@@ -16,6 +16,8 @@ const W = require('../helpers/meetings-world');
 
 const ME_PHASE_1 = ['company', 'consent', 'edition', 'firstName', 'id', 'isOrganizer', 'jobTitle', 'lastName', 'role'];
 const ME_PHASE_2 = ['bio', 'counts', 'emailPrefs', 'exhibitor', 'hostedTableNumber', 'linkedinUrl', 'photoUrl', 'profileCompletion', 'topics', 'unavailableSessions'];
+// V5-D (R-50, R-42 amendé) : « Je cherche », « Je propose » et le téléphone, que seule la personne lit dans son propre Me.
+const ME_V5_D = ['lookingFor', 'offering', 'phone'];
 
 describe('profil : GET /me, PATCH /me et sujets (lot 9)', { timeout: 600_000 }, () => {
   const espace = useEspace({ overrides: { ORGANIZER_EMAILS: 'organisation@example.org' } });
@@ -39,7 +41,7 @@ describe('profil : GET /me, PATCH /me et sujets (lot 9)', { timeout: 600_000 }, 
       const lea = await person(world.edition);
       const { status, json } = await (await as(world.edition, lea)).get('/me');
       assert.equal(status, 200);
-      assert.deepEqual(Object.keys(json).sort(), [...ME_PHASE_1, ...ME_PHASE_2].sort());
+      assert.deepEqual(Object.keys(json).sort(), [...ME_PHASE_1, ...ME_PHASE_2, ...ME_V5_D].sort());
     });
 
     it('un profil importé, sans rien de plus : valeurs par défaut', async () => {
@@ -89,11 +91,13 @@ describe('profil : GET /me, PATCH /me et sujets (lot 9)', { timeout: 600_000 }, 
       assert.deepEqual(json.emailPrefs, { meetingRequests: false, messages: true, reminders: false });
     });
 
-    it('R-42 : ni e-mail, ni identifiant HelloAsso (NF-11)', async () => {
+    it('R-42 : ni e-mail, ni identifiant HelloAsso (NF-11) ; le téléphone n’y figure que sous la clé `phone` de la personne (V5-D)', async () => {
       const world = await newEdition();
       const lea = await person(world.edition);
       const response = await (await as(world.edition, lea)).get('/me');
-      assert.deepEqual(W.leaks(response.text), []);
+      // `W.leaks` range `"phone"` parmi les fuites (R-42 d’origine) ; amendé : la personne lit son propre numéro, null tant qu’il est vide.
+      assert.deepEqual(W.leaks(response.text).filter((pattern) => !/phone/.test(pattern)), []);
+      assert.equal(response.json.phone, null);
     });
 
     it('401 UNAUTHENTICATED sans session', async () => {

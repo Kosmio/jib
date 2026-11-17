@@ -215,3 +215,82 @@ describe('suggest : sans sujet renseigné, les intervenants et les exposants (R-
     assert.ok(new Set(days(30).map((day) => run(day).join(','))).size > 1);
   });
 });
+
+describe('suggest : « Je cherche » et « Je propose » (V5-D, R-50 étendu)', () => {
+  const withB2b = (card, b2b) => ({ ...card, b2b });
+  const seeker = { myLookingFor: 'Je cherche des financements pour une scierie' };
+
+  it('un mot significatif commun entre mon « Je cherche » et leur « Je propose » suggère la personne sans sujet commun', () => {
+    const candidates = [withB2b(attendee('a', ['t2']), { lookingFor: '', offering: 'Financements participatifs' }), attendee('b', ['t2'])];
+    assert.deepEqual(ids(suggest({ ...seeker, candidates })), ['a']);
+  });
+
+  it('et inversement : mon « Je propose » avec leur « Je cherche »', () => {
+    const candidates = [withB2b(attendee('a', []), { lookingFor: 'Une scierie partenaire', offering: '' })];
+    assert.deepEqual(ids(suggest({ myOffering: 'Exploitation de scieries', candidates })), ['a']);
+  });
+
+  it('le sens compte : mon « Je cherche » contre leur « Je cherche » ne donne rien', () => {
+    const candidates = [withB2b(attendee('a', []), { lookingFor: 'Financements', offering: '' })];
+    assert.deepEqual(suggest({ ...seeker, candidates }), []);
+  });
+
+  it('les mots vides ne comptent pas (des, pour, une, cherche, propose)', () => {
+    const candidates = [withB2b(attendee('a', []), { lookingFor: '', offering: 'Je propose des solutions pour une équipe' })];
+    assert.deepEqual(suggest({ myLookingFor: 'Je cherche des idées pour une usine', candidates }), []);
+  });
+
+  it('les mots de moins de 3 lettres ne comptent pas', () => {
+    const candidates = [withB2b(attendee('a', []), { lookingFor: '', offering: 'IA et SI' })];
+    assert.deepEqual(suggest({ myLookingFor: 'IA, SI, ou', candidates }), []);
+  });
+
+  it('le pluriel en s est retiré, les accents et la casse sont ignorés', () => {
+    const candidates = [withB2b(attendee('a', []), { lookingFor: '', offering: 'ÉCONOMIES CIRCULAIRES' })];
+    assert.deepEqual(ids(suggest({ myLookingFor: 'economie circulaire', candidates })), ['a']);
+  });
+
+  it('un candidat sans « Je cherche » ni « Je propose » (b2b absent) ne casse rien', () => {
+    assert.deepEqual(suggest({ ...seeker, candidates: [attendee('a', [])] }), []);
+    assert.deepEqual(suggest({ candidates: [withB2b(attendee('a', []), { lookingFor: null, offering: null })] }), []);
+  });
+
+  it('sans texte de mon côté, rien ne change (aucun sujet commun : liste vide)', () => {
+    const candidates = [withB2b(attendee('a', []), { lookingFor: 'scierie', offering: 'scierie' })];
+    assert.deepEqual(suggest({ candidates }), []);
+  });
+
+  it('les sujets communs passent avant les mots communs', () => {
+    const candidates = [withB2b(attendee('mots', []), { lookingFor: '', offering: 'financements scierie' }), attendee('sujet', ['t1'])];
+    assert.deepEqual(ids(suggest({ ...seeker, candidates })), ['sujet', 'mots']);
+  });
+
+  it('à sujets égaux, plus de mots communs passe avant', () => {
+    const candidates = [
+      withB2b(attendee('un', ['t1']), { lookingFor: '', offering: 'financements' }),
+      withB2b(attendee('deux', ['t1']), { lookingFor: '', offering: 'financements scierie' }),
+    ];
+    assert.deepEqual(ids(suggest({ ...seeker, candidates })), ['deux', 'un']);
+  });
+
+  it('sans sujet de mon côté, une personne par les mots est suggérée avant un intervenant sans mot commun', () => {
+    const candidates = [attendee('s1', [], 'speaker'), withB2b(attendee('a', []), { lookingFor: '', offering: 'financements' })];
+    assert.deepEqual(ids(suggest({ myTopicIds: [], ...seeker, candidates })), ['a', 's1']);
+  });
+
+  it('exclusions et soi-même restent écartés malgré des mots communs', () => {
+    const offer = { lookingFor: '', offering: 'financements' };
+    const candidates = [withB2b(attendee('me', []), offer), withB2b(attendee('a', []), offer), withB2b(attendee('b', []), offer)];
+    assert.deepEqual(ids(suggest({ ...seeker, candidates, excludedIds: ['a'] })), ['b']);
+  });
+
+  it('trois au plus', () => {
+    const candidates = Array.from({ length: 6 }, (_, index) => withB2b(attendee(`p${index}`, []), { lookingFor: '', offering: 'financements' }));
+    assert.equal(suggest({ ...seeker, candidates }).length, 3);
+  });
+
+  it('significantWords : jeu de mots attendu', () => {
+    assert.deepEqual([...lib().significantWords('Je cherche des Financements, des scieries et l’IA !')].sort(), ['financement', 'scierie']);
+    assert.deepEqual([...lib().significantWords(null)], []);
+  });
+});

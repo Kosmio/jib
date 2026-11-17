@@ -67,6 +67,7 @@ describe('annuaire, fiches et suggestions (lot 9)', { timeout: 900_000 }, () => 
   describe('routes du lot 9 et accès sans session (NF-01, A-02)', () => {
     const ROUTES = [
       'POST /api/espace/me/photo',
+      'DELETE /api/espace/me/photo', // V4-B, F-147
       'GET /api/espace/editions/:x/topics',
       'GET /api/espace/directory',
       'GET /api/espace/directory/p/:x',
@@ -80,7 +81,7 @@ describe('annuaire, fiches et suggestions (lot 9)', { timeout: 900_000 }, () => 
         .filter((route) => route.path.startsWith('/api/espace'))
         .flatMap((route) => route.methods.filter((method) => method !== 'HEAD').map((method) => `${method} ${route.path.replace(/:[A-Za-z]+/g, ':x')}`));
 
-    it('routes:list montre les sept routes du lot 9', () => {
+    it('routes:list montre les sept routes du lot 9 et la suppression de la photo (V4-B)', () => {
       for (const route of ROUTES) assert.ok(declared().includes(route), `route absente : ${route}`);
     });
 
