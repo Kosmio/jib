@@ -2,7 +2,7 @@
 
 /**
  * lib/messages.js (lot 14 ; R-62, R-64, F-72, A-37, T-31, T-32) : règles pures de la messagerie, sans Strapi.
- *   - `notificationsDue` : quels e-mails `new-message` partent maintenant (non lu depuis 5 min, jamais notifié, rien pour la paire
+ *   - `notificationsDue` : quels e-mails `new-message` partent maintenant (non lu depuis 2 min, jamais notifié, rien pour la paire
  *     depuis 30 min, préférence `messages` active, un seul e-mail par conversation et destinataire) ;
  *   - `excerpt`, `validateBody` (F-72 : 2 000 caractères), `canonicalPair` (A-37 : l'ordre des `id`), constantes de R-62 et R-64.
  */
@@ -31,8 +31,8 @@ const message = (id, overrides = {}) => ({ id, conversationId: 'c1', recipientId
 const due = (messages, extra = {}) => notificationsDue({ messages, now: NOW, ...extra });
 
 describe('constantes de R-62, R-64 et F-72', () => {
-  it('5 minutes non lu, 30 minutes entre deux e-mails, 30 messages par heure, 2 000 caractères, extrait de 200', () => {
-    assert.equal(UNREAD_DELAY_MS, 5 * MINUTE);
+  it('2 minutes non lu (R-88), 30 minutes entre deux e-mails, 30 messages par heure, 2 000 caractères, extrait de 200', () => {
+    assert.equal(UNREAD_DELAY_MS, 2 * MINUTE);
     assert.equal(QUIET_DELAY_MS, 30 * MINUTE);
     assert.equal(MESSAGE_LIMIT, 30);
     assert.equal(MESSAGE_WINDOW_MS, 60 * MINUTE);
@@ -41,17 +41,17 @@ describe('constantes de R-62, R-64 et F-72', () => {
   });
 });
 
-describe('notificationsDue : le délai de 5 minutes (R-62, T-31)', () => {
-  it('un message non lu depuis 6 minutes est dû', () => {
-    assert.deepEqual(due([message('m1', { createdAt: ago(6) })]), [{ conversationId: 'c1', recipientId: 'lea', messageIds: ['m1'] }]);
+describe('notificationsDue : le délai de 2 minutes (R-62, R-88, T-31)', () => {
+  it('un message non lu depuis 3 minutes est dû', () => {
+    assert.deepEqual(due([message('m1', { createdAt: ago(3) })]), [{ conversationId: 'c1', recipientId: 'lea', messageIds: ['m1'] }]);
   });
 
-  it('exactement 5 minutes : dû', () => {
-    assert.equal(due([message('m1', { createdAt: ago(5) })]).length, 1);
+  it('exactement 2 minutes : dû', () => {
+    assert.equal(due([message('m1', { createdAt: ago(2) })]).length, 1);
   });
 
-  it('4 minutes 59 secondes : pas encore', () => {
-    assert.deepEqual(due([message('m1', { createdAt: new Date(NOW.getTime() - 5 * MINUTE + 1000).toISOString() })]), []);
+  it('1 minute 59 secondes : pas encore', () => {
+    assert.deepEqual(due([message('m1', { createdAt: new Date(NOW.getTime() - 2 * MINUTE + 1000).toISOString() })]), []);
   });
 
   it('un message lu n’est pas dû', () => {
