@@ -36,7 +36,8 @@ const ME_PHASE_2_KEYS = ['bio', 'emailPrefs', 'exhibitor', 'hostedTableNumber', 
 const ME_FULL_KEYS = [...ME_KEYS, ...ME_PHASE_2_KEYS, 'counts'].sort();
 
 describe('accès à l’espace (lot 5)', { timeout: 300_000 }, () => {
-  const espace = useEspace({ overrides: { ORGANIZER_EMAILS: ORGANIZERS.join(',') } });
+  // LINK_RATE_IP_MAX=5 : les tests de limite par IP ci-dessous gardent leurs six demandes (le défaut passe à 60 en V1-B, NF-61).
+  const espace = useEspace({ overrides: { ORGANIZER_EMAILS: ORGANIZERS.join(','), LINK_RATE_IP_MAX: '5' } });
 
   // Données partagées, créées à la première utilisation : deux éditions ouvertes et une fermée.
   let worldPromise;
@@ -192,14 +193,14 @@ describe('accès à l’espace (lot 5)', { timeout: 300_000 }, () => {
         const attendee = await createAttendee(espace().app, a);
         const response = await submit({ editionSlug: a.slug, email: attendee.email });
         assert.equal(response.status, 303);
-        assert.equal(response.location, `${espace().publicUrl}/espace/${a.slug}/connexion?envoye=1`);
+        assert.ok(response.location.startsWith(`${espace().publicUrl}/espace/${a.slug}/connexion?envoye=1`), response.location);
       });
 
       it('adresse inconnue : même redirection ?envoye=1 (pas d’énumération)', async () => {
         const { a } = await world();
         const response = await submit({ editionSlug: a.slug, email: 'inconnu.formulaire@example.org' });
         assert.equal(response.status, 303);
-        assert.equal(response.location, `${espace().publicUrl}/espace/${a.slug}/connexion?envoye=1`);
+        assert.ok(response.location.startsWith(`${espace().publicUrl}/espace/${a.slug}/connexion?envoye=1`), response.location);
       });
 
       it('adresse mal formée : 303 vers ?erreur=email', async () => {
@@ -222,7 +223,7 @@ describe('accès à l’espace (lot 5)', { timeout: 300_000 }, () => {
         const locations = [];
         for (let i = 0; i < 6; i += 1) locations.push((await submit({ editionSlug: a.slug, email })).location);
         assert.equal(locations.at(-1), `${espace().publicUrl}/espace/${a.slug}/connexion?erreur=trop`);
-        assert.equal(locations[0], `${espace().publicUrl}/espace/${a.slug}/connexion?envoye=1`);
+        assert.ok(locations[0].startsWith(`${espace().publicUrl}/espace/${a.slug}/connexion?envoye=1`), locations[0]);
       });
 
       it('ne redirige jamais hors de PUBLIC_URL, même avec un identifiant d’édition hostile', async () => {
@@ -846,13 +847,13 @@ describe('accès à l’espace (lot 5)', { timeout: 300_000 }, () => {
       assert.equal(rows.length, 1);
     });
 
-    it('ne crée aucun organisateur dans une édition fermée', async () => {
+    it('crée l’organisateur dans une édition fermée et lui envoie un lien (F-103, V1-B)', async () => {
       const { closed } = await world();
-      const { app, outbox, mailsSince } = espace();
+      const { app, outbox, waitForMail } = espace();
       const since = outbox().length;
       assert.equal((await askLink(closed.slug, ORGANIZER_3)).status, 202);
-      assert.deepEqual(await mailsSince(since, { to: ORGANIZER_3 }), []);
-      assert.equal(await findAttendee(app, closed, ORGANIZER_3), null);
+      await waitForMail((mail) => mail.to.email === ORGANIZER_3, { since });
+      assert.equal((await findAttendee(app, closed, ORGANIZER_3)).role, 'organizer');
     });
 
     it('un Attendee dont l’adresse est dans ORGANIZER_EMAILS est organisateur sans changer de rôle', async () => {

@@ -1,9 +1,9 @@
 import { createRequire } from 'node:module';
 import type { BrowserContext, Page } from '@playwright/test';
-import { ACCESS_LINK_SUBJECT, ESPACE, EDITION, expect, hydrated, linkOf, mailsTo, nextMail, readOutbox, receiveLink, requestLink, test } from './espace';
+import { ACCESS_LINK_SUBJECT, ESPACE, EDITION, expect, hydrated, linkOf, mailsTo, nextMail, readOutbox, requestLink, test } from './espace';
 
 /**
- * Accès robustes dans le navigateur (lot V1-B, tests d'abord, `test.fixme` jusqu'à la livraison) : F-100, F-101, F-102, F-103, F-104
+ * Accès robustes dans le navigateur (lot V1-B, livré) : F-100, F-101, F-102, F-103, F-104
  * et l'état « Lien envoyé » qui rappelle l'adresse saisie.
  *
  * Données : le seed de recette, uniquement des inscrits activés (consentement donné, pas de détour par /bienvenue) : Jules (F-100, F-103, F-104),
@@ -16,7 +16,17 @@ const MANON = 'manon.bordenave@example.org';
 const CLARA = 'clara.dubourdieu@example.org';
 const ORGANIZER = 'organisation@example.org';
 const INVALID_STATE = 'Ce lien n’est plus valable';
-const MARKER = 'V1-B';
+
+/**
+ * Demande un lien depuis E0 et lit l'e-mail. Copie locale de `receiveLink` (espace.ts) : depuis V1-B, l'adresse de la page « Lien envoyé »
+ * porte `&email=…`, que l'expression `/\?envoye=1$/` de espace.ts refuse (à corriger par l'architecte).
+ */
+async function receiveLink(page: Page, email: string): Promise<string> {
+  const already = mailsTo(email, ACCESS_LINK_SUBJECT).length;
+  await requestLink(page, email);
+  await expect(page).toHaveURL(/\?envoye=1(&|$)/);
+  return linkOf(await nextMail(email, already));
+}
 
 /** Ouvre une session par le parcours réel (E0, e-mail, « Ouvrir mon espace ») pour un inscrit déjà consentant. */
 async function signIn(page: Page, email: string) {
@@ -27,6 +37,13 @@ async function signIn(page: Page, email: string) {
   return link;
 }
 
+/** Le lien de l'e-mail avec un autre `next` (le lien en porte déjà un : l'accueil par défaut). */
+const withNext = (link: string, next: string) => {
+  const url = new URL(link);
+  url.searchParams.set('next', next);
+  return url.toString();
+};
+
 /** GET sans suivre la redirection, avec les cookies de la page : statut et chemin de `Location`. */
 async function redirectOf(page: Page, path: string, baseURL: string | undefined) {
   const response = await page.request.get(path, { maxRedirects: 0 });
@@ -35,7 +52,6 @@ async function redirectOf(page: Page, path: string, baseURL: string | undefined)
 }
 
 test.describe('F-100 : /connexion avec une session valable redirige (V1-B)', () => {
-  test.fixme(true, MARKER);
 
   test('sans `next` : 303 vers l’accueil de l’édition ; avec un `next` interne : 303 vers ce chemin ; `next` externe ou d’une autre édition : accueil', async ({ page, baseURL }) => {
     await signIn(page, JULES);
@@ -65,13 +81,12 @@ test.describe('F-100 : /connexion avec une session valable redirige (V1-B)', () 
 });
 
 test.describe('F-101 : /verifier avec un jeton inutilisable et une session valable (V1-B)', () => {
-  test.fixme(true, MARKER);
 
   test('jeton déjà utilisé et session active : 303 vers `next` ; jeton inconnu : idem', async ({ page, baseURL }) => {
     const link = await signIn(page, ALICE);
     const next = encodeURIComponent(`${ESPACE}/agenda`);
 
-    const used = await redirectOf(page, `${link}&next=${next}`, baseURL);
+    const used = await redirectOf(page, withNext(link, `${ESPACE}/agenda`), baseURL);
     expect(used.status).toBe(303);
     expect(used.path).toBe(`${ESPACE}/agenda`);
 
@@ -100,7 +115,6 @@ test.describe('F-101 : /verifier avec un jeton inutilisable et une session valab
 });
 
 test.describe('F-102 : `next` survit à une nouvelle demande de lien (V1-B)', () => {
-  test.fixme(true, MARKER);
 
   test('depuis « plus valable » : le formulaire transmet `next`, l’e-mail porte le même `next`, le lien ouvre ce chemin (critère 4)', async ({ page, browser, baseURL }) => {
     const first = await receiveLink(page, MANON);
@@ -112,7 +126,7 @@ test.describe('F-102 : `next` survit à une nouvelle demande de lien (V1-B)', ()
     const context = await browser.newContext({ baseURL, extraHTTPHeaders: { 'X-Forwarded-For': '10.201.0.2' } });
     try {
       const other = await context.newPage();
-      await other.goto(`${first}&next=${encodeURIComponent(next)}`);
+      await other.goto(withNext(first, next));
       await expect(other.getByRole('heading', { level: 2 })).toHaveText(INVALID_STATE);
       const already = mailsTo(MANON, ACCESS_LINK_SUBJECT).length;
       await other.getByRole('button', { name: 'Recevoir un nouveau lien' }).click();
@@ -135,12 +149,13 @@ test.describe('F-102 : `next` survit à une nouvelle demande de lien (V1-B)', ()
     await page.getByLabel('Adresse e-mail utilisée pour l’inscription').fill(CLARA);
     await page.getByRole('button', { name: 'Recevoir mon lien' }).click();
     await expect(page).toHaveURL(/\?envoye=1/);
-    expect(new URL(linkOf(await nextMail(CLARA, already))).searchParams.get('next')).toBeNull();
+    // Aucun `next` externe : ni absent ni l'accueil ne posent problème, un hôte étranger oui.
+    const carried = new URL(linkOf(await nextMail(CLARA, already))).searchParams.get('next');
+    expect([null, `${ESPACE}/`]).toContain(carried);
   });
 });
 
 test.describe('« Lien envoyé » rappelle l’adresse saisie (V1-B)', () => {
-  test.fixme(true, MARKER);
 
   test('l’état affiche l’adresse, échappée ; « Demander un nouveau lien » la préremplit', async ({ page }) => {
     const address = 'rappel&test@example.org';
@@ -154,7 +169,6 @@ test.describe('« Lien envoyé » rappelle l’adresse saisie (V1-B)', () => {
 });
 
 test.describe('F-104 : une session expirée en cours de route renvoie à la connexion (V1-B)', () => {
-  test.fixme(true, MARKER);
 
   test('réponse 401 reçue par un îlot : redirection vers /connexion?next=<page>&expire=1 et message dédié', async ({ page, baseURL }) => {
     await signIn(page, JULES);
@@ -177,7 +191,6 @@ test.describe('F-104 : une session expirée en cours de route renvoie à la conn
 });
 
 test.describe('F-103 : un organisateur atteint le pilotage quand l’espace est fermé (V1-B)', () => {
-  test.fixme(true, MARKER);
 
   // Le serveur e2e n'offre aucune route pour fermer l'édition : la colonne est basculée dans la base e2e, puis rétablie.
   const requireFromStrapi = createRequire(import.meta.url);
@@ -208,8 +221,9 @@ test.describe('F-103 : un organisateur atteint le pilotage quand l’espace est 
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     await expect(page.getByRole('heading', { level: 2, name: 'Rendez-vous par pause B2B' })).toBeVisible();
 
+    // Les autres écrans lui restent fermés : renvoi vers le pilotage.
     await page.goto(`${ESPACE}/agenda`);
-    await expect(page.getByRole('link', { name: /pilotage/i }).first()).toBeVisible();
+    await expect(page).toHaveURL(`${baseURL}${ESPACE}/organisateur`);
   });
 
   test('un participant ne reçoit aucun lien et ne passe pas', async ({ page }) => {
@@ -221,7 +235,6 @@ test.describe('F-103 : un organisateur atteint le pilotage quand l’espace est 
 });
 
 test.describe('sans JavaScript (V1-B)', () => {
-  test.fixme(true, MARKER);
   test.use({ javaScriptEnabled: false });
 
   test('F-100 : /connexion avec une session redirige vers l’accueil', async ({ page, baseURL, context }) => {
