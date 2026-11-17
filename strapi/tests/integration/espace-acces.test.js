@@ -1145,7 +1145,9 @@ describe('accès à l’espace (lot 5)', { timeout: 300_000 }, () => {
       const { app } = espace();
       const edition = await createEdition(app, { slug: 'edition-depubliee', title: 'Édition dépubliée' });
       const alice = await person(edition);
-      await app.documents(UID.edition).unpublish({ documentId: edition.documentId });
+      // Dépublication en SQL direct : la garde NF-63 (V1-D) refuse de dépublier par le Document Service une édition qui a des participants.
+      const removed = await app.db.connection('editions').where({ document_id: edition.documentId }).whereNotNull('published_at').del();
+      assert.ok(removed >= 1, 'ligne publiée supprimée');
       assert.equal((await me(alice.cookie)).status, 401);
     });
 

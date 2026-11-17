@@ -124,6 +124,33 @@ describe('Strapi sur la base de test', { timeout: 180_000 }, () => {
       'GET /api/espace/admin/:x/stats',
       // F-91 : exports CSV de l'organisateur (participants, meetings, exhibitors, stats).
       'GET /api/espace/admin/:x/export/:x',
+      // V3-A : relances et désabonnement en un clic.
+      'POST /api/espace/admin/:x/reminders/preview',
+      'POST /api/espace/admin/:x/reminders/send',
+      'GET /api/espace/reminders/unsubscribe',
+      'POST /api/espace/reminders/unsubscribe',
+      // V1-C : e-mail de bienvenue et état du service.
+      'POST /api/espace/admin/:x/welcome/preview',
+      'POST /api/espace/admin/:x/welcome/send',
+      'GET /api/espace/admin/:x/service',
+      // V3-E (routes figées, pas encore livrées) : participants côté organisateur.
+      'GET /api/espace/admin/:x/attendees',
+      'GET /api/espace/admin/:x/attendees/:x',
+      'POST /api/espace/admin/:x/attendees',
+      'PATCH /api/espace/admin/:x/attendees/:x',
+      'POST /api/espace/admin/:x/attendees/:x/link',
+      'POST /api/espace/admin/:x/attendees/:x/cancel',
+      'POST /api/espace/admin/:x/attendees/:x/restore',
+      // V3-F (routes figées) : rendez-vous et blocages de créneaux côté organisateur.
+      'GET /api/espace/admin/:x/meetings',
+      'POST /api/espace/admin/:x/meetings/:x/cancel',
+      'POST /api/espace/admin/:x/meetings/:x/move',
+      'PUT /api/espace/admin/:x/slots/:x/blocks',
+      // V4-D1 (routes figées) : badges et cartes.
+      'POST /api/espace/admin/:x/badges',
+      'GET /api/espace/admin/:x/attendees/:x/badge',
+      'POST /api/espace/admin/:x/attendees/:x/card-token/regenerate',
+      'GET /api/espace/cards/:x/:x',
     ]);
     const declared = () =>
       espaceRoutes().flatMap((route) =>
@@ -272,6 +299,8 @@ describe('Strapi sur la base de test', { timeout: 180_000 }, () => {
     it('produit un fournisseur console qui écrit dans la boîte du test, sans envoyer', async () => {
       const provider = createMailProvider({ ...config(), nodeEnv: process.env.NODE_ENV, logger: strapi.app.log });
       assert.equal(provider.name, 'console');
+      // La boîte est un fichier par base, partagé avec les autres suites et avec les envois du démarrage : on la vide avant d’écrire.
+      fs.rmSync(strapi.env.EMAIL_OUTBOX_FILE, { force: true });
 
       const { messageId } = await provider.send({
         to: 'lea.ducasse@example.org',
