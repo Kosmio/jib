@@ -116,6 +116,10 @@
       "default": false,
       "private": true
     },
+    "welcomeStartedAt": {
+      "type": "datetime",
+      "private": true
+    },
     "helloassoOrgSlug": {
       "type": "string",
       "private": true

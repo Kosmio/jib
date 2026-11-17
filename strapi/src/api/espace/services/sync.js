@@ -3,15 +3,11 @@
 const { EspaceError } = require('../lib/errors');
 const { createHelloAssoClient, HelloAssoError } = require('../lib/helloasso');
 const { planSync } = require('../lib/import');
-const { linkUrl } = require('../lib/tokens');
 
 const EDITION = 'api::edition.edition';
 const ATTENDEE = 'api::espace.attendee';
-const EMAIL_LOG = 'api::espace.email-log';
 const SYNC_RUN = 'api::espace.sync-run';
 const STALE_RUN_MS = 15 * 60 * 1000;
-const WELCOME_HOURS = 72;
-const WELCOME_BATCH = 10;
 
 module.exports = ({ strapi }) => {
   const service = (name) => strapi.service(`api::espace.${name}`);
@@ -28,7 +24,7 @@ module.exports = ({ strapi }) => {
       return strapi.documents(SYNC_RUN).create({ data: { edition: { documentId: editionDocumentId }, startedAt: now } });
     });
 
-  /** Fetches the tickets, applies the plan, then sends the missing `welcome` e-mails. Fills `result`. */
+  /** Fetches the tickets, applies the plan, then starts the `welcome` e-mails of the newcomers (R-85). Fills `result`. */
   async function synchronize(edition, now, result) {
     const { apiBase, clientId, clientSecret } = strapi.config.get('server.helloasso');
     if (!(apiBase && clientId && clientSecret && edition.helloassoOrgSlug && edition.helloassoFormSlug)) {
@@ -96,48 +92,8 @@ module.exports = ({ strapi }) => {
       if (done) result.cancelled += 1;
     }
 
-    if (edition.participantSpaceEnabled) await sendWelcomes(edition, now, attempt);
-  }
-
-  /** A-17: `welcome` to every active attendee but the organizers who has no EmailLog `welcome` sent yet ; a failed send is tried again at the next run. */
-  async function sendWelcomes(edition, now, attempt) {
-    const ofEdition = { edition: { documentId: edition.documentId } };
-    const logs = await strapi.documents(EMAIL_LOG).findMany({
-      filters: { template: 'welcome', status: 'sent', attendee: ofEdition },
-      populate: { attendee: { fields: ['documentId'] } },
-      limit: 10000,
-    });
-    const welcomed = new Set(logs.map(({ attendee }) => attendee?.documentId));
-    const attendees = await strapi.documents(ATTENDEE).findMany({
-      filters: { ...ofEdition, status: 'active', role: { $ne: 'organizer' } },
-      limit: 10000,
-    });
-    const recipients = attendees.filter(({ documentId }) => !welcomed.has(documentId));
-
-    const publicUrl = strapi.config.get('server.espace.publicUrl');
-    const mailEdition = { slug: edition.slug, title: edition.title, themeColor: edition.hero_bg_color };
-    for (let from = 0; from < recipients.length; from += WELCOME_BATCH) {
-      await Promise.all(
-        recipients.slice(from, from + WELCOME_BATCH).map((attendee) =>
-          attempt(attendee.helloassoItemId ?? attendee.documentId, async () => {
-            const token = await service('tokens').issueLink(attendee.documentId, { ttlMinutes: WELCOME_HOURS * 60, now });
-            await service('mailer').send({
-              attendee,
-              template: 'welcome',
-              scenarioKey: 'welcome',
-              now,
-              data: {
-                edition: mailEdition,
-                publicUrl,
-                firstName: attendee.firstName,
-                url: linkUrl({ publicUrl, token, next: `/espace/${edition.slug}/` }),
-                validityHours: WELCOME_HOURS,
-              },
-            });
-          })
-        )
-      );
-    }
+    // R-85: not awaited, a long send must not hold the run.
+    service('welcome').inviteNew(edition, now);
   }
 
   /**

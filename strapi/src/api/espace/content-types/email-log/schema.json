@@ -34,6 +34,10 @@
       "type": "enumeration",
       "enum": ["sent", "failed"],
       "required": true
+    },
+    "error": {
+      "type": "text",
+      "maxLength": 300
     }
   }
 }

@@ -109,3 +109,32 @@ export function agoLabel(iso: string, now: Date = new Date()): string {
   if (hours < 24) return `il y a ${hours}\u00a0h`;
   return `il y a ${Math.floor(hours / 24)}\u00a0j`;
 }
+
+/** `GET /admin/{edition}/service` (F-106) : état du service. `mail.abandoned` : destinataires renoncés après trois échecs (R-85). */
+export type ServiceStatus = {
+  mail: {
+    provider: string;
+    senderConfigured: boolean;
+    failedLast24h: number;
+    lastError: string | null;
+    abandoned?: { email: string; error: string | null }[];
+  };
+  helloasso: { configured: boolean; lastRunStatus: "ok" | "error" | "running" | null; lastRunAt: string | null };
+  cron: { enabled: boolean };
+  space: { enabled: boolean; welcomeStartedAt: string | null };
+};
+
+export const getServiceStatus = (baseUrl: string, editionSlug: string) =>
+  request<ServiceStatus>(baseUrl, `/admin/${enc(editionSlug)}/service`, "GET");
+
+/** `POST /admin/{edition}/welcome/preview` (F-105). */
+export type WelcomePreview = { recipients: number; sampleHtml: string };
+
+export const previewWelcome = (baseUrl: string, editionSlug: string) =>
+  request<WelcomePreview>(baseUrl, `/admin/${enc(editionSlug)}/welcome/preview`, "POST");
+
+/** `POST /admin/{edition}/welcome/send` (F-105) ; 409 OUTSIDE_SENDING_HOURS hors de 8h00 à 20h00, heure de Paris. */
+export type WelcomeResult = { sent: number; failed: number; startedAt: string };
+
+export const sendWelcome = (baseUrl: string, editionSlug: string) =>
+  request<WelcomeResult>(baseUrl, `/admin/${enc(editionSlug)}/welcome/send`, "POST");
