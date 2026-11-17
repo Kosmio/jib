@@ -131,6 +131,7 @@ test('Tom : E0, lien, vérification, E2, E1, déconnexion, E0', async ({ page, c
 
   await test.step('déconnexion depuis E3 : retour à E0, session fermée', async () => {
     await page.getByRole('button', { name: 'Me déconnecter' }).click();
+    await page.locator('dialog#confirmation-deconnexion [data-deconnexion-confirmer]').click(); // V4-B, F-148 : confirmation
     await expect(page).toHaveURL(`${baseURL}${ESPACE}/connexion?deconnecte=1`);
     await expect(page.getByRole('status')).toHaveText('Déconnexion effectuée.');
     await expect(page.getByLabel('Adresse e-mail utilisée pour l’inscription')).toBeVisible();

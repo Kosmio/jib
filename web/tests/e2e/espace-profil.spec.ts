@@ -143,9 +143,6 @@ test.describe('F-146 : barre d’enregistrement et alerte de sortie', () => {
   });
 
   test('la barre s’atteint au clavier et ne masque jamais le champ en cours (390 px de large)', async ({ page }) => {
-    // DEFAUT CONNU (V4-B, critère 2) : « Nom » et « Fonction » prennent le focus sous la barre (ProfileForm.tsx:326, scroll-mb-44 sans effet
-    // quand le champ est déjà dans la fenêtre). Test marqué fail : à retirer quand le code est corrigé.
-    test.fail();
     await page.setViewportSize({ width: 390, height: 700 });
     await openProfile(page, MARION);
     await page.getByLabel('Prénom').fill('Marion');

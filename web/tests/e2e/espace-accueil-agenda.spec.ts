@@ -190,9 +190,9 @@ test('F-117 : annuaire décoché, le bandeau le dit et « Modifier ma visibilit�
   await openHome(page, CLARA);
   await expect(page.getByText('Vous n’apparaissez pas dans l’annuaire : personne ne peut vous proposer de rendez-vous.')).toBeVisible();
   const link = page.getByRole('link', { name: 'Modifier ma visibilité' });
-  await expect(link).toHaveAttribute('href', `${ESPACE}/profil`);
+  await expect(link).toHaveAttribute('href', `${ESPACE}/profil#visibilite`);
   await link.click();
-  await expect(page).toHaveURL(`${baseURL}${ESPACE}/profil`);
+  await expect(page).toHaveURL(`${baseURL}${ESPACE}/profil#visibilite`);
   await expect(page.getByRole('group', { name: 'Vos choix de visibilité' })).toBeVisible();
 });
 

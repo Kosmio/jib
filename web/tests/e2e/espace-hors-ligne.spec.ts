@@ -241,6 +241,7 @@ test('après la déconnexion puis la coupure du réseau, aucune page de l’espa
 
   await page.goto(`${ESPACE}/profil`);
   await page.getByRole('button', { name: 'Me déconnecter' }).click();
+  await page.locator('dialog#confirmation-deconnexion [data-deconnexion-confirmer]').click(); // V4-B, F-148 : confirmation
   await page.waitForURL(/\/espace\/.*connexion|\/espace\/?$/);
   const left = await snapshot(page);
   expect(Object.keys(left).filter((name) => name.startsWith('jib-espace-v2-ed-')).flatMap((name) => left[name]), 'copies de pages restantes').toEqual([]);
