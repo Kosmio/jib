@@ -454,7 +454,7 @@ Périmètre, exigences et critères : `12-badges.md` en entier (F-95 à F-99, R-
 
 ### V4-D1. Badges, génération et carte
 
-**Fichiers possédés** `E/lib/badges/**` (nouveau : mise en page, QR, jeton), `E/services/badges.js`, `E/controllers/badges.js`, `E/routes/badges.js`, `E/services/cards.js`, `E/controllers/cards.js`, `E/routes/cards.js` (nouveaux), `E/content-types/attendee/schema.json` (`cardTokenHash`, `cardTokenCreatedAt`), `strapi/src/api/edition/content-types/edition/schema.json` (`badgePlan`, `badgeAccent`), `strapi/package.json`, `strapi/pnpm-lock.yaml`, `P/[edition]/carte/[token].astro` (nouveau), `P/[edition]/connexion.astro` (retour de F-96 seulement si `next` ne le couvre pas déjà).
+**Fichiers possédés** `E/lib/badges/**` (nouveau : mise en page, QR, jeton), `E/services/badges.js`, `E/controllers/badges.js`, `E/routes/badges.js`, `E/services/cards.js`, `E/controllers/cards.js`, `E/routes/cards.js` (nouveaux), `E/content-types/attendee/schema.json` (`cardTokenHash`, `cardTokenCreatedAt`), `E/content-types/badge-setting/schema.json` (nouveau type, une entrée par édition : relation vers l'édition, `plan` média facultatif, `accent` facultatif ; remplace les champs `badgePlan` et `badgeAccent` de F-99, car A-15 interdit d'ajouter un média à l'édition existante), `strapi/package.json`, `strapi/pnpm-lock.yaml`, `P/[edition]/carte/[token].astro` (nouveau), `P/[edition]/connexion.astro` (retour de F-96 seulement si `next` ne le couvre pas déjà).
 
 **Contrat consommé par V4-D2, figé** : routes de `12-badges.md` (`POST /api/espace/admin/{edition}/badges` corps `{ types?: string[], sort?: 'name'|'company' }` → `application/pdf` avec en-tête `X-Badges-Count` et `X-Badges-Reduced` ; `GET /api/espace/admin/{edition}/attendees/{id}/badge` → `application/pdf` ; `POST /api/espace/admin/{edition}/attendees/{id}/card-token/regenerate` → `{ regeneratedAt }` ; `GET /api/espace/cards/{edition}/{token}` public).
 
@@ -468,7 +468,7 @@ Périmètre, exigences et critères : `12-badges.md` en entier (F-95 à F-99, R-
 
 **Tests** bout en bout `espace-pilotage-badges.spec.ts`.
 
-**Ordre en vague 4** : V4-F possède aussi le schéma de l'édition ; il s'intègre après V4-D1 et part de sa tête.
+**Ordre en vague 4** : V4-D1 ne touche pas au schéma de l'édition ; V4-F le possède seul en vague 4.
 
 ## V4-E. Charge
 
