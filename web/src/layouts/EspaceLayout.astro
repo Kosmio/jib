@@ -5,7 +5,6 @@
 // laisse la place de la barre : en bas sur mobile, à gauche à partir de 1024 px.
 import "../styles/espace.css";
 import { bannerColor } from "../lib/espace/format";
-import { getEdition } from "../lib/espace/api";
 
 export interface Props {
   /** État de la page : « Connexion », « Lien envoyé »… Le gabarit y ajoute le nom de l'espace. */
@@ -13,15 +12,13 @@ export interface Props {
   shell?: boolean;
   /** F-130 : couleur de l'édition pour la barre du navigateur, si la page l'a déjà lue ; sinon le bleu des titres (aucune requête ajoutée). */
   themeColor?: string | null;
+  /** NF-24 : date de l'événement (« 2026-12-03 »), pour l'expiration de la copie hors connexion ; sans elle, 14 jours. */
+  eventDate?: string | null;
 }
 
-const { title, shell = false, themeColor = null } = Astro.props;
+const { title, shell = false, themeColor = null, eventDate = null } = Astro.props;
 // Application installable : le manifeste est celui de l'édition de l'URL (pas de manifeste sur /espace/verifier ni sur la page introuvable).
 const edition = Astro.params.edition;
-// NF-24 : la date de l'événement dit au service worker quand la copie expire (48 h après). Lue seulement pour les quatre pages gardées,
-// et sans jamais faire échouer la page.
-const keptPage = edition && /^\/espace\/[^/]+\/(agenda|programme|messages)?\/?$/.test(Astro.url.pathname);
-const eventDate = keptPage ? await getEdition(edition).then((e) => e?.date ?? null).catch(() => null) : null;
 ---
 
 <!DOCTYPE html>

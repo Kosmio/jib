@@ -95,7 +95,7 @@ const tabClasses = {
 const CARD = "rounded-xl border border-surface-alt bg-white p-4";
 ---
 
-<AppShell title="Programme" active="program" editionSlug={slug} me={shellMe}>
+<AppShell title="Programme" active="program" editionSlug={slug} me={shellMe} eventDate={edition?.date ?? null}>
   <div class="group/prog">
     <header class="mx-auto max-w-180 px-4 pt-8 pb-4">
       {
