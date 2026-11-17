@@ -66,6 +66,52 @@ describe('conventions : aucun tiret cadratin', () => {
   }
 });
 
+describe('conventions : les fichiers des badges sont contrôlés (V4-D1, T-69)', () => {
+  const checked = new Set(TARGETS.flatMap(listFiles).map((file) => path.relative(REPO, file)));
+  const BADGE_FILES = [
+    'strapi/src/api/espace/lib/badges/index.js',
+    'strapi/src/api/espace/lib/badges/colors.js',
+    'strapi/src/api/espace/lib/badges/layout.js',
+    'strapi/src/api/espace/lib/badges/program.js',
+    'strapi/src/api/espace/lib/badges/qr.js',
+    'strapi/src/api/espace/lib/badges/text.js',
+    'strapi/src/api/espace/lib/badges/token.js',
+    'strapi/src/api/espace/lib/badges/types.js',
+    'strapi/src/api/espace/services/badges.js',
+    'strapi/src/api/espace/services/cards.js',
+    'strapi/src/api/espace/controllers/badges.js',
+    'strapi/src/api/espace/controllers/cards.js',
+    'strapi/src/api/espace/routes/badges.js',
+    'strapi/src/api/espace/routes/cards.js',
+    'strapi/src/api/espace/content-types/badge-setting/schema.json',
+    'strapi/src/api/espace/content-types/attendee/schema.json',
+    'web/src/pages/espace/[edition]/carte/[token].astro',
+    'strapi/tests/unit/badges.test.js',
+    'strapi/tests/integration/espace-badges.test.js',
+    'web/tests/e2e/espace-carte.spec.ts',
+  ];
+
+  for (const file of BADGE_FILES) {
+    it(`${file} existe, est sous une cible contrôlée et ne contient aucun tiret cadratin`, () => {
+      assert.ok(fs.existsSync(path.join(REPO, file)), 'fichier absent');
+      assert.ok(checked.has(file), 'fichier hors des cibles de conventions.test.js');
+      assert.ok(!EM_DASH.test(fs.readFileSync(path.join(REPO, file), 'utf8')), 'tiret cadratin');
+    });
+  }
+
+  it('le texte écrit sur le badge (le PDF) n’en reçoit jamais : printable remplace le tiret long par un trait d’union', () => {
+    const { printable } = require('../../src/api/espace/lib/badges');
+    for (const dash of [0x2010, 0x2011, 0x2012, 0x2013, 0x2014, 0x2015, 0x2212]) assert.ok(!EM_DASH.test(printable(`a${String.fromCharCode(dash)}b`)), dash.toString(16));
+  });
+
+  it('les polices et le logo des badges sont des fichiers du dépôt, sans appel à une adresse externe dans le code du lot', () => {
+    const dir = path.join(REPO, 'strapi/src/api/espace/lib/badges');
+    for (const asset of ['assets/Azonix.otf', 'assets/logo-jib.png']) assert.ok(fs.existsSync(path.join(dir, asset)), asset);
+    const code = listFiles('strapi/src/api/espace/lib/badges').filter((file) => file.endsWith('.js')).map((file) => fs.readFileSync(file, 'utf8')).join('\n');
+    assert.ok(!/https?:\/\/(?!localhost)/.test(code.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '')), 'adresse externe dans le code des badges');
+  });
+});
+
 describe('conventions : les gabarits des relances sont contrôlés (V3-A, critère 6)', () => {
   const checked = new Set(TARGETS.flatMap(listFiles).map((file) => path.relative(REPO, file)));
   const NEW_FILES = [

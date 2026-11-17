@@ -10,7 +10,7 @@
  * `tests/fixtures/existing-schemas.json`, relevée au commit a70a56e), et ne reçoivent que des champs scalaires :
  * 9 champs privés sur `edition`, `kind` sur `sequence`. Toute relation nouvelle part d'un type nouveau `api::espace.*`.
  *
- * Modèle du lot 2 (tests d'abord) : les 10 types nouveaux, leurs relations et leurs champs clés.
+ * Modèle du lot 2 (tests d'abord) : les types nouveaux (10 au lot 2, 11 avec `badge-setting` du lot V4-D1), leurs relations et leurs champs clés.
  */
 
 const { describe, it } = require('node:test');
@@ -108,7 +108,7 @@ describe('types de l’espace : règles communes (A-03, 02-modele-donnees.md)', 
   }
 });
 
-describe('modèle du lot 2 : les 10 types nouveaux (section 3 du plan)', () => {
+describe('modèle du lot 2 : les 11 types nouveaux (section 3 du plan, plus badge-setting du lot V4-D1)', () => {
   const EXPECTED = {
     topic: { table: 'espace_topics', relations: { edition: 'api::edition.edition', sessions: 'api::sequence.sequence' } },
     slot: { table: 'espace_slots', relations: { edition: 'api::edition.edition', session: 'api::sequence.sequence' } },
@@ -139,9 +139,11 @@ describe('modèle du lot 2 : les 10 types nouveaux (section 3 du plan)', () => {
     'magic-token': { table: 'espace_magic_tokens', relations: { attendee: 'api::espace.attendee' } },
     'email-log': { table: 'espace_email_logs', relations: { attendee: 'api::espace.attendee' } },
     'sync-run': { table: 'espace_sync_runs', relations: { edition: 'api::edition.edition' } },
+    // V4-D1 (12-badges.md, F-99) : plan du lieu et accent du badge, une entrée par édition ; A-15 interdit d'ajouter un média à `edition`.
+    'badge-setting': { table: 'espace_badge_settings', relations: { edition: 'api::edition.edition' } },
   };
 
-  it('contient exactement ces 10 types (Notification est P2 : non créée)', () => {
+  it('contient exactement ces 11 types (Notification est P2 : non créée)', () => {
     assert.deepEqual(espaceTypes().sort(), Object.keys(EXPECTED).sort());
   });
 
@@ -185,7 +187,7 @@ describe('modèle du lot 2 : les 10 types nouveaux (section 3 du plan)', () => {
 
   it('Attendee : champs de 02-modele-donnees.md, rôles et statuts', () => {
     const { attributes } = readSchema('espace', 'attendee');
-    for (const field of ['helloassoItemId', 'helloassoOrderId', 'email', 'firstName', 'lastName', 'jobTitle', 'company', 'role', 'bio', 'directoryOptIn', 'meetingsOptIn', 'newsOptIn', 'consentAt', 'activatedAt', 'lastSeenAt', 'status', 'emailPrefs', 'editedFields', 'photo']) {
+    for (const field of ['helloassoItemId', 'helloassoOrderId', 'email', 'firstName', 'lastName', 'jobTitle', 'company', 'role', 'bio', 'directoryOptIn', 'meetingsOptIn', 'newsOptIn', 'consentAt', 'activatedAt', 'lastSeenAt', 'status', 'emailPrefs', 'editedFields', 'photo', 'cardTokenHash', 'cardTokenCreatedAt']) {
       assert.ok(field in attributes, `attendee.${field}`);
     }
     assert.equal(attributes.email.type, 'string', 'e-mail en string, pas le type email de Strapi (R-44)');
@@ -194,6 +196,31 @@ describe('modèle du lot 2 : les 10 types nouveaux (section 3 du plan)', () => {
     assert.equal(attributes.role.default, 'participant');
     for (const optIn of ['directoryOptIn', 'newsOptIn']) assert.equal(attributes[optIn].default, false, `${optIn} décoché par défaut (R-40)`);
     assert.equal(attributes.meetingsOptIn.default, true, 'meetingsOptIn coché par défaut, avec désactivation possible (D-07)');
+  });
+
+  it('Attendee : cardTokenHash (empreinte du jeton de carte, unique) et cardTokenCreatedAt sont des scalaires privés (R-80, NF-55, A-15)', () => {
+    const { attributes } = readSchema('espace', 'attendee');
+    assert.equal(attributes.cardTokenHash.type, 'string');
+    assert.equal(attributes.cardTokenHash.unique, true, 'recherche par empreinte, jamais deux inscrits sur la même');
+    assert.equal(attributes.cardTokenCreatedAt.type, 'datetime');
+    for (const field of ['cardTokenHash', 'cardTokenCreatedAt']) assert.equal(attributes[field].private, true, `attendee.${field} doit rester privé : le jeton ne sort d'aucune réponse`);
+    assert.ok(!('token' in attributes) && !('cardToken' in attributes), 'le jeton lui-même n’est pas un champ : seule son empreinte est stockée');
+  });
+
+  it('BadgeSetting : une entrée par édition, plan en image unique et accent #rrggbb, tous deux facultatifs, sans brouillon (F-99)', () => {
+    const { attributes, options } = readSchema('espace', 'badge-setting');
+    assert.equal(options.draftAndPublish, false);
+    assert.equal(attributes.edition.relation, 'manyToOne');
+    assert.equal(attributes.edition.required, true);
+    assert.equal(attributes.plan.type, 'media');
+    assert.equal(attributes.plan.multiple, false);
+    assert.deepEqual(attributes.plan.allowedTypes, ['images']);
+    assert.ok(!attributes.plan.required);
+    assert.equal(attributes.accent.type, 'string');
+    assert.ok(!attributes.accent.required);
+    const accent = new RegExp(attributes.accent.regex);
+    for (const valid of ['#600e24', '#FFAA00']) assert.ok(accent.test(valid), valid);
+    for (const invalid of ['600e24', '#fff', '#12345g', 'rouge', '#600e245']) assert.ok(!accent.test(invalid), invalid);
   });
 
   it('Meeting : statuts du cycle de vie (R-10) et champ tableKey (R-13)', () => {
@@ -242,7 +269,7 @@ describe('modèle du lot 2 : les 10 types nouveaux (section 3 du plan)', () => {
   it('le MCP ne reçoit que sequence.kind : aucun type de l’espace n’y figure (données personnelles, aucune route REST)', () => {
     const mcp = require('../../mcp/content-types.json');
     assert.ok('kind' in mcp.sequences.fields, 'sequences.fields.kind');
-    assert.deepEqual(Object.keys(mcp).filter((key) => /attendee|topic|slot|exhibitor|meeting|conversation|message|token|email-log|sync/i.test(key)), []);
+    assert.deepEqual(Object.keys(mcp).filter((key) => /attendee|topic|slot|exhibitor|meeting|conversation|message|token|email-log|sync|badge/i.test(key)), []);
     for (const field of EDITION_FIELDS) assert.ok(!(field in mcp.editions.fields), `editions.fields.${field} ne doit pas figurer dans le MCP`);
   });
 });
