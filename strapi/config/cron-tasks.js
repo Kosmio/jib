@@ -36,4 +36,9 @@ module.exports = {
     task: safely('espaceTokenPurge', (strapi) => strapi.service('api::espace.tokens').purgeExpired()),
     options: { rule: '0 4 * * *', tz: TIME_ZONE },
   },
+  // NF-13, R-44: every night at 4h00, the EmailLog and SyncRun of more than 12 months, and the space of the editions past by more than 12 months.
+  espacePurge: {
+    task: safely('espacePurge', (strapi) => strapi.service('api::espace.privacy').purge()),
+    options: { rule: '0 4 * * *', tz: TIME_ZONE },
+  },
 };

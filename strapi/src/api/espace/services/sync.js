@@ -41,7 +41,9 @@ module.exports = ({ strapi }) => {
     const ofEdition = { edition: { documentId: edition.documentId } };
     const attendees = await strapi.documents(ATTENDEE).findMany({ filters: ofEdition, limit: 10000 });
     const byId = new Map(attendees.map((attendee) => [attendee.documentId, attendee]));
-    const plan = planSync({ items, attendees, fieldMap: edition.helloassoFieldMap });
+    const privacy = service('privacy');
+    const isErased = privacy.matcher(await privacy.erasedHashes(edition));
+    const plan = planSync({ items, attendees, fieldMap: edition.helloassoFieldMap, isErased });
     result.errors.push(...plan.errors);
 
     // One failing ticket is reported (APPLY_FAILED) and never stops the others.
@@ -58,6 +60,11 @@ module.exports = ({ strapi }) => {
     // A-16: the uniqueness of the e-mail and of the ticket is checked again under the lock, since the organizer may have created an Attendee meanwhile.
     const create = ({ decision, reason, proposedRole, ...fields }) =>
       service('locks').withLock(`attendee:${edition.documentId}`, async () => {
+        // R-44: the erasure may have happened since the plan was made.
+        if (await privacy.isErased(edition, fields.email)) {
+          result.errors.push({ itemId: fields.helloassoItemId, code: 'ERASED' });
+          return false;
+        }
         const existing = await strapi.documents(ATTENDEE).findFirst({
           filters: { ...ofEdition, $or: [{ email: { $eqi: fields.email } }, { helloassoItemId: fields.helloassoItemId }] },
         });

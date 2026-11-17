@@ -63,6 +63,8 @@ export const sendAttendeeLink = (strapiUrl: string, edition: string, id: string)
   request<{ status: "sent" | "failed"; error: string | null; remaining: number }>(strapiUrl, `${base(edition)}/${enc(id)}/link`, "POST");
 export const cancelAttendee = (strapiUrl: string, edition: string, id: string) =>
   request<AttendeeSheetData>(strapiUrl, `${base(edition)}/${enc(id)}/cancel`, "POST");
+export const eraseAttendee = (strapiUrl: string, edition: string, id: string) =>
+  request<AttendeeSheetData>(strapiUrl, `${base(edition)}/${enc(id)}/erase`, "POST");
 export const restoreAttendee = (strapiUrl: string, edition: string, id: string) =>
   request<AttendeeSheetData>(strapiUrl, `${base(edition)}/${enc(id)}/restore`, "POST");
 
@@ -201,6 +203,7 @@ export default function AttendeeSheet({ edition, strapiUrl, attendeeId, onClose 
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
+  const [erasing, setErasing] = useState(false);
   const [notice, setNotice] = useState<Feedback | null>(null);
 
   const show = (next: AttendeeSheetData) => {
@@ -230,6 +233,7 @@ export default function AttendeeSheet({ edition, strapiUrl, attendeeId, onClose 
     }
     setConfirming(false);
     setRegenerating(false);
+    setErasing(false);
     setBusy(false);
   }
 
@@ -269,6 +273,12 @@ export default function AttendeeSheet({ edition, strapiUrl, attendeeId, onClose 
       return "Inscrit désinscrit. Ses rendez-vous sont annulés et ses interlocuteurs prévenus.";
     }, "La désinscription a échoué. Réessayez.");
 
+  const erase = () =>
+    act(async () => {
+      show(await eraseAttendee(strapiUrl, edition, attendeeId));
+      return "Données anonymisées. Les rendez-vous à venir sont annulés, les messages restent sous « Participant supprimé » et l’adresse ne sera pas réimportée.";
+    }, "L’anonymisation a échoué. Réessayez.");
+
   const restore = () =>
     act(async () => {
       show(await restoreAttendee(strapiUrl, edition, attendeeId));
@@ -287,6 +297,7 @@ export default function AttendeeSheet({ edition, strapiUrl, attendeeId, onClose 
   }
 
   const cancelled = sheet.status === "cancelled";
+  const erased = sheet.email.endsWith("@erased.invalid");
   const rows: [string, string][] = [
     ["Rôle", ROLE_LABELS[sheet.role] ?? sheet.role],
     ["Statut", cancelled ? "Désinscrit" : "Inscrit"],
@@ -361,7 +372,26 @@ export default function AttendeeSheet({ edition, strapiUrl, attendeeId, onClose 
             Désinscrire
           </button>
         )}
+        <button type="button" onClick={() => setErasing(true)} disabled={busy || erased} className={dangerClass}>
+          Anonymiser
+        </button>
       </div>
+
+      {erasing && (
+        <div role="alertdialog" aria-labelledby="anonymiser-confirm" className="mt-4 rounded-lg border-2 border-danger bg-white p-4">
+          <p id="anonymiser-confirm" className="font-semibold">
+            {`Anonymiser ${sheet.firstName} ${sheet.lastName} ? Son profil est effacé définitivement, ses rendez-vous à venir sont annulés et ses interlocuteurs prévenus. Ses messages restent sous « Participant supprimé ». Son adresse ne sera plus réimportée.`}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <button type="button" onClick={erase} disabled={busy} aria-busy={busy} className={dangerClass}>
+              Confirmer l’anonymisation
+            </button>
+            <button type="button" onClick={() => setErasing(false)} disabled={busy} className={buttonClass}>
+              Annuler
+            </button>
+          </div>
+        </div>
+      )}
 
       {regenerating && (
         <div role="alertdialog" aria-labelledby="jeton-confirm" className="mt-4 rounded-lg border-2 border-danger bg-white p-4">

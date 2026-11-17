@@ -3,6 +3,7 @@
 // Sans session valable pour l'édition de l'URL : E0. Sans consentement enregistré : E2.
 import AppShell from "../../../components/espace/AppShell.astro";
 import EspaceButton from "../../../components/espace/EspaceButton.astro";
+import PrivacyActions from "../../../react-components/espace/PrivacyActions";
 import ProfileForm from "../../../react-components/espace/ProfileForm";
 import { espaceGet, guardSession, publicStrapiUrl } from "../../../lib/espace/api";
 import type { Topic } from "../../../lib/espace/client";
@@ -66,6 +67,8 @@ const initial = {
       </noscript>
       <ProfileForm client:load strapiUrl={publicStrapiUrl} editionSlug={slug} initial={initial} topics={topics} b2bRanges={b2bRanges} />
     </section>
+
+    <PrivacyActions client:load strapiUrl={publicStrapiUrl} editionSlug={slug} />
 
     {
       me.isOrganizer && (

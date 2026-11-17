@@ -57,15 +57,17 @@ function mapItem(item, fieldMap) {
  * What a synchronization must do, from the tickets and the Attendees already stored (keys: documentId, helloassoItemId, email,
  * firstName, lastName, jobTitle, company, status, statusLockedAt, editedFields).
  *   create: mapItem results to create ; update: [{ documentId, changes }] ; cancel: [documentId]
- *   errors: [{ itemId, code, email? }] with the codes DUPLICATE_EMAIL (I-14), INVALID_EMAIL, WAITING, UNKNOWN
+ *   errors: [{ itemId, code, email? }] with the codes DUPLICATE_EMAIL (I-14), INVALID_EMAIL, ERASED (R-44), WAITING, UNKNOWN
  * Tickets are handled by ascending id, so the first ticket of an e-mail address wins. Role, links and consents are never touched.
  * A-22: an active unknown ticket whose address is that of an Attendee already `cancelled` when the synchronization starts is
  * attached to this Attendee (ticket ids, status `active`, imported fields not edited). An Attendee is attached once per run:
  * a second active ticket at the same address stays in DUPLICATE_EMAIL.
+ * R-44: `isErased(email)` is true for the address of a person who asked for the erasure of their data: an unknown active ticket at
+ * this address is ignored (code ERASED, an information, not a failure) and never creates nor reactivates an Attendee.
  * R-89: an Attendee whose status the organizer decided (`statusLockedAt`) is never cancelled, reactivated or taken over by a ticket:
  * a new ticket at its address stays in DUPLICATE_EMAIL. Attendees created by hand carry no ticket id and are never planned for removal.
  */
-function planSync({ items, attendees, fieldMap }) {
+function planSync({ items, attendees, fieldMap, isErased = () => false }) {
   const known = new Map(attendees.filter((attendee) => attendee.helloassoItemId != null).map((attendee) => [String(attendee.helloassoItemId), attendee]));
   const taken = new Set(attendees.map((attendee) => normalizeEmail(attendee.email)));
   const returning = new Map(attendees.filter(({ status, statusLockedAt }) => status === 'cancelled' && !statusLockedAt).map((attendee) => [normalizeEmail(attendee.email), attendee]));
@@ -94,6 +96,7 @@ function planSync({ items, attendees, fieldMap }) {
       }
       if (Object.keys(changes).length) plan.update.push({ documentId: attendee.documentId, changes });
     } else if (!mapped.email) fail('INVALID_EMAIL');
+    else if (isErased(mapped.email)) fail('ERASED');
     else if (returning.has(mapped.email)) {
       const buyer = returning.get(mapped.email);
       returning.delete(mapped.email);
