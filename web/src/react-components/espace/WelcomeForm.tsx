@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { EspaceApiError, saveConsent, updateProfile, type Consent, type Profile } from "../../lib/espace/client";
 
-// E2 (F-10 à F-12) : les quatre champs importés de l'inscription et les trois choix de visibilité, décochés à la première visite.
+// E2 (F-10 à F-12, F-116, F-118, NF-56) : les quatre champs importés de l'inscription et les trois choix de visibilité.
+// Aucune case n'est cochée par le code : elles reflètent la valeur reçue du serveur (D-14). Chaque case dit sa conséquence quand elle est
+// décochée ; « Continuer » sans l'annuaire demande d'abord une confirmation en ligne (annoncée, focus dessus).
 // « Continuer » envoie PATCH /me puis PUT /me/consent, puis ouvre E1. Textes et classes : phase-1-design.md, question 1.
 // Aucun champ n'a d'attribut `name` (D3, NF-07) : le formulaire est rendu côté serveur, et sans JavaScript « Continuer » le soumet en
 // GET sur la page. Sans `name`, le navigateur ne sérialise rien : ni prénom, nom, fonction, entreprise ni choix dans l'URL, qui est
@@ -26,16 +28,19 @@ const CHOICES = [
     name: "directoryOptIn",
     label: "Apparaître dans l’annuaire des participants",
     help: "Nom, fonction, entreprise, photo et sujets. Jamais votre adresse e-mail.",
+    effect: "Vous ne serez pas visible et ne recevrez aucune demande.",
   },
   {
     name: "meetingsOptIn",
     label: "Recevoir des demandes de rendez-vous et des messages",
     help: "Les autres participants peuvent vous proposer un rendez-vous ou vous écrire en premier.",
+    effect: "Vous pourrez proposer des rendez-vous, pas en recevoir.",
   },
   {
     name: "newsOptIn",
     label: "Recevoir des nouvelles des prochaines éditions",
     help: "Vous pouvez vous désinscrire à tout moment.",
+    effect: null,
   },
 ] as const;
 
@@ -75,6 +80,7 @@ export default function WelcomeForm({ strapiUrl, editionSlug, initial }: Props) 
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [focusField, setFocusField] = useState<string | null>(null);
+  const [askDirectory, setAskDirectory] = useState(false);
 
   const loginUrl = `/espace/${encodeURIComponent(editionSlug)}/connexion`;
 
@@ -83,17 +89,41 @@ export default function WelcomeForm({ strapiUrl, editionSlug, initial }: Props) 
     if (focusField) document.getElementById(focusField)?.focus();
   }, [focusField]);
 
-  async function submit(event: React.FormEvent) {
+  // La confirmation reçoit le focus à son apparition : le lecteur d'écran en lit le titre et le texte.
+  useEffect(() => {
+    if (askDirectory) document.getElementById("confirmation-annuaire")?.focus();
+  }, [askDirectory]);
+
+  function validate(event: React.FormEvent) {
     event.preventDefault();
     if (saving) return;
+    if (!consent.directoryOptIn) {
+      setFormError(null);
+      setFocusField(null);
+      setAskDirectory(true);
+      return;
+    }
+    void save(consent);
+  }
+
+  function chooseDirectory(appear: boolean) {
+    const next = { ...consent, directoryOptIn: appear };
+    setConsent(next);
+    void save(next);
+  }
+
+  async function save(toSave: Consent) {
     setSaving(true);
+    setAskDirectory(false);
     setErrors({});
     setFormError(null);
     setFocusField(null);
 
+    let profileSaved = false;
     try {
       await updateProfile(strapiUrl, profile);
-      await saveConsent(strapiUrl, consent);
+      profileSaved = true;
+      await saveConsent(strapiUrl, toSave);
       window.location.assign(`/espace/${encodeURIComponent(editionSlug)}/`);
     } catch (error) {
       setSaving(false);
@@ -106,15 +136,18 @@ export default function WelcomeForm({ strapiUrl, editionSlug, initial }: Props) 
         setErrors(Object.fromEntries(flagged.map(({ name, fallback }) => [name, (error as EspaceApiError).fields[name] || fallback])));
         setFormError("Corrigez les champs signalés pour continuer.");
         setFocusField(flagged[0].name);
+      } else if (profileSaved) {
+        setFormError("Vos informations sont enregistrées, mais pas vos choix de visibilité. Vérifiez votre connexion et cliquez de nouveau sur « Continuer ».");
+        setFocusField("continuer");
       } else {
-        setFormError("L’enregistrement a échoué. Vérifiez votre connexion et réessayez.");
+        setFormError("Rien n’a été enregistré. Vérifiez votre connexion et réessayez.");
         setFocusField("continuer"); // le bouton désactivé pendant l'envoi a perdu le focus
       }
     }
   }
 
   return (
-    <form noValidate onSubmit={submit}>
+    <form noValidate onSubmit={validate}>
       <h2 className="font-heading text-xl font-semibold normal-case">Vos informations</h2>
       <p className="mt-1 text-sm text-muted">Importées depuis votre inscription, modifiables.</p>
 
@@ -147,16 +180,19 @@ export default function WelcomeForm({ strapiUrl, editionSlug, initial }: Props) 
 
       <fieldset className="mt-6 rounded-xl bg-surface p-4">
         <legend className="float-left w-full font-heading font-semibold text-title">Vos choix de visibilité</legend>
-        <p className="clear-both pt-1 text-sm text-muted">Ces choix sont facultatifs et modifiables à tout moment depuis votre profil.</p>
+        <p className="clear-both pt-1 text-sm text-muted">Vous pouvez les modifier à tout moment depuis votre profil.</p>
         <div className="mt-2">
-          {CHOICES.map(({ name, label, help }) => (
+          {CHOICES.map(({ name, label, help, effect }) => (
             <label key={name} className="flex min-h-11 gap-3 py-1">
               <input
                 type="checkbox"
                 checked={consent[name]}
-                onChange={(event) => setConsent({ ...consent, [name]: event.target.checked })}
+                onChange={(event) => {
+                  setAskDirectory(false);
+                  setConsent({ ...consent, [name]: event.target.checked });
+                }}
                 aria-labelledby={`${name}-libelle`}
-                aria-describedby={`${name}-aide`}
+                aria-describedby={effect && !consent[name] ? `${name}-aide ${name}-effet` : `${name}-aide`}
                 className="mt-0.5 size-5 shrink-0 accent-primary-ink"
               />
               <span>
@@ -166,10 +202,19 @@ export default function WelcomeForm({ strapiUrl, editionSlug, initial }: Props) 
                 <span id={`${name}-aide`} className="block text-sm text-muted">
                   {help}
                 </span>
+                {effect && !consent[name] && (
+                  <span id={`${name}-effet`} className="block text-sm font-semibold text-ink">
+                    {effect}
+                  </span>
+                )}
               </span>
             </label>
           ))}
         </div>
+        <p id="badge-consentement" className="mt-2 text-sm text-muted">
+          Mon badge comporte un QR code qui affiche mon nom, ma fonction et mon entreprise (et ma fiche si mon profil est visible) à la personne qui le
+          scanne.
+        </p>
         <div role="status" className="mt-2 empty:hidden">
           {consent.meetingsOptIn && !consent.directoryOptIn && (
             <p className="flex items-start gap-2 rounded-lg bg-white p-3 text-sm">
@@ -179,6 +224,40 @@ export default function WelcomeForm({ strapiUrl, editionSlug, initial }: Props) 
           )}
         </div>
       </fieldset>
+
+      {askDirectory && (
+        <div
+          id="confirmation-annuaire"
+          role="alert"
+          tabIndex={-1}
+          aria-labelledby="confirmation-annuaire-titre"
+          aria-describedby="confirmation-annuaire-texte"
+          className="mt-6 rounded-lg border-2 border-title bg-white p-4"
+        >
+          <p id="confirmation-annuaire-titre" className="font-heading font-semibold text-title">
+            Vous n’apparaîtrez pas dans l’annuaire
+          </p>
+          <p id="confirmation-annuaire-texte" className="mt-1 text-sm">
+            Les autres participants ne vous verront pas et ne pourront pas vous trouver. L’annuaire est le moyen le plus simple d’être contacté.
+          </p>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => chooseDirectory(false)}
+              className="inline-flex min-h-11 items-center justify-center rounded-lg border-2 border-title bg-white px-5 font-bold text-title hover:bg-surface"
+            >
+              Continuer sans apparaître
+            </button>
+            <button
+              type="button"
+              onClick={() => chooseDirectory(true)}
+              className="inline-flex min-h-11 items-center justify-center rounded-lg bg-gold px-5 font-bold text-gold-ink hover:bg-gold-light"
+            >
+              Apparaître dans l’annuaire
+            </button>
+          </div>
+        </div>
+      )}
 
       {formError && (
         <p role="alert" className="mt-6 flex items-start gap-3 rounded-lg border-2 border-danger bg-white p-3 font-semibold">

@@ -1,5 +1,5 @@
 ---
-// E2 : premier profil et consentement (F-10 à F-12). Seul îlot de la phase : WelcomeForm, qui envoie PATCH /me puis PUT /me/consent.
+// E2 : premier profil et consentement (F-10 à F-12, F-116, NF-56). Seul îlot de la phase : WelcomeForm, qui envoie PATCH /me puis PUT /me/consent.
 // Sans session valable pour l'édition de l'URL, retour à E0.
 import EspaceLayout from "../../../layouts/EspaceLayout.astro";
 import EditionBanner from "../../../components/espace/EditionBanner.astro";
@@ -14,7 +14,7 @@ if (!edition) return Astro.rewrite("/espace/introuvable");
 const me = await getMe(Astro.request.headers.get("cookie"));
 if (me?.edition.slug !== slug) return Astro.redirect(`/espace/${encodeURIComponent(slug)}/connexion`);
 
-// Valeurs actuelles : les cases sont décochées à la première visite, le profil est celui de l'import (F-10).
+// Valeurs actuelles reçues du serveur (D-14) : aucune case n'est cochée par l'écran, le profil est celui de l'import (F-10, F-116).
 const initial = {
   firstName: me.firstName,
   lastName: me.lastName,

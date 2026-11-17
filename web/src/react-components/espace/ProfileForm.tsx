@@ -432,6 +432,7 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b
               <label key={range.id} className="flex min-h-11 items-start gap-3 py-1">
                 <input
                   id={`plage-${index}`}
+                  aria-describedby={awayIds.includes(range.id) ? `plage-${index}-effet` : undefined}
                   type="checkbox"
                   checked={!awayIds.includes(range.id)}
                   onChange={(event) => {
@@ -443,6 +444,11 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b
                 <span>
                   <span className="block font-semibold">{range.hours || range.title}</span>
                   {range.hours && <span className="block text-sm text-muted">{range.title}</span>}
+                  {awayIds.includes(range.id) && (
+                    <span id={`plage-${index}-effet`} className="block text-sm font-semibold text-ink">
+                      Aucun nouveau créneau ne sera proposé sur cette plage. Les rendez-vous confirmés et les demandes en attente restent dans votre agenda.
+                    </span>
+                  )}
                 </span>
               </label>
             ))}
@@ -481,6 +487,12 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b
           ))}
         </div>
         <div role="status" className="mt-2 empty:hidden">
+          {!consent.meetingsOptIn && (
+            <p className="mb-2 flex items-start gap-2 rounded-lg bg-white p-3 text-sm">
+              <Icon name="info" />
+              Vous ne recevrez plus de nouvelles demandes de rendez-vous. Celles déjà en attente restent dans votre agenda, à accepter ou à refuser.
+            </p>
+          )}
           {consent.meetingsOptIn && !consent.directoryOptIn && (
             <p className="flex items-start gap-2 rounded-lg bg-white p-3 text-sm">
               <Icon name="info" />
