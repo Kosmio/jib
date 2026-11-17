@@ -92,7 +92,8 @@ const titles = {
             required
             inputmode="numeric"
             autocomplete="one-time-code"
-            pattern="[0-9]{6}"
+            pattern="[0-9 \-]{6,11}"
+            title="Six chiffres, avec ou sans espaces"
             autocapitalize="none"
             spellcheck="false"
             aria-describedby="code-aide"
