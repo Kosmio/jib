@@ -10,7 +10,7 @@
  * `tests/fixtures/existing-schemas.json`, relevée au commit a70a56e), et ne reçoivent que des champs scalaires :
  * 9 champs privés sur `edition`, `kind` sur `sequence`. Toute relation nouvelle part d'un type nouveau `api::espace.*`.
  *
- * Modèle du lot 2 (tests d'abord) : les types nouveaux (10 au lot 2, 11 avec `badge-setting` du lot V4-D1, 12 avec `message-report` du lot V5-B), leurs relations et leurs champs clés.
+ * Modèle du lot 2 (tests d'abord) : les types nouveaux (10 au lot 2, 11 avec `badge-setting` du lot V4-D1, 12 avec `message-report` du lot V5-B, 13 avec `erased-email` du lot V5-A), leurs relations et leurs champs clés.
  */
 
 const { describe, it } = require('node:test');
@@ -115,7 +115,7 @@ describe('types de l’espace : règles communes (A-03, 02-modele-donnees.md)', 
   }
 });
 
-describe('modèle du lot 2 : les 12 types nouveaux (section 3 du plan, plus badge-setting du lot V4-D1 et message-report du lot V5-B)', () => {
+describe('modèle du lot 2 : les 13 types nouveaux (section 3 du plan, plus badge-setting du lot V4-D1, message-report du lot V5-B et erased-email du lot V5-A)', () => {
   const EXPECTED = {
     topic: { table: 'espace_topics', relations: { edition: 'api::edition.edition', sessions: 'api::sequence.sequence' } },
     slot: { table: 'espace_slots', relations: { edition: 'api::edition.edition', session: 'api::sequence.sequence' } },
@@ -150,9 +150,11 @@ describe('modèle du lot 2 : les 12 types nouveaux (section 3 du plan, plus badg
     'badge-setting': { table: 'espace_badge_settings', relations: { edition: 'api::edition.edition' } },
     // V5-B (F-75, R-63) : signalement d'un message par son destinataire ; `message` reste nullable (le message peut disparaître avec l'effacement).
     'message-report': { table: 'espace_message_reports', relations: { edition: 'api::edition.edition', message: 'api::espace.message', author: 'api::espace.attendee' } },
+    // V5-A (F-33, R-44) : empreinte salée de l'e-mail d'une personne effacée, une entrée par édition ; l'import ignore ses billets.
+    'erased-email': { table: 'espace_erased_emails', relations: { edition: 'api::edition.edition' } },
   };
 
-  it('contient exactement ces 12 types (Notification est P2 : non créée)', () => {
+  it('contient exactement ces 13 types (Notification est P2 : non créée)', () => {
     assert.deepEqual(espaceTypes().sort(), Object.keys(EXPECTED).sort());
   });
 
@@ -172,6 +174,16 @@ describe('modèle du lot 2 : les 12 types nouveaux (section 3 du plan, plus badg
       });
     });
   }
+
+  it('erased-email (V5-A, R-44) : emailHash privé et obligatoire, erasedAt obligatoire, sans brouillon', () => {
+    const { attributes, options } = readSchema('espace', 'erased-email');
+    assert.equal(attributes.emailHash.private, true, 'l’empreinte ne sort d’aucune réponse');
+    assert.equal(attributes.emailHash.required, true);
+    assert.equal(attributes.erasedAt.type, 'datetime');
+    assert.equal(attributes.erasedAt.required, true);
+    assert.equal(attributes.edition.required, true);
+    assert.ok(!options.draftAndPublish);
+  });
 
   it('A-15 : Topic.sessions est une relation manyToMany unidirectionnelle vers sequence', () => {
     const { sessions } = readSchema('espace', 'topic').attributes;

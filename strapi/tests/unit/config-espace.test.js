@@ -137,10 +137,18 @@ describe('config/cron-tasks.js : synchronisation toutes les 15 minutes et purge 
     assert.equal(typeof purge.task, 'function');
   });
 
-  it('ne planifie rien d’autre que la synchronisation, l’expiration des demandes (`*/5`, lot 8), les notifications de messages (`* * * * *`, V3-A), les relances (`*/15`, V3-A) et la purge', () => {
+  it('ne planifie rien d’autre que la synchronisation, l’expiration des demandes (`*/5`, lot 8), les notifications de messages (`* * * * *`, V3-A), les relances (`*/15`, V3-A), la purge des jetons et la purge de l’espace (V5-A) à 4h00', () => {
     // V3-A : les notifications de messages passent à une exécution par minute ; les relances partagent la cadence de la synchronisation.
     const rules = tasks().map((entry) => entry.rule).sort();
-    assert.deepEqual(rules, ['* * * * *', '*/15 * * * *', '*/15 * * * *', '*/5 * * * *', '0 4 * * *']);
+    assert.deepEqual(rules, ['* * * * *', '*/15 * * * *', '*/15 * * * *', '*/5 * * * *', '0 4 * * *', '0 4 * * *']);
+  });
+
+  it('la tâche `espacePurge` tourne chaque nuit à 4h00 en Europe/Paris (NF-13, R-44, V5-A)', () => {
+    const entry = require('../../config/cron-tasks').espacePurge;
+    assert.ok(entry, 'tâche espacePurge absente');
+    assert.equal(entry.options.rule, '0 4 * * *');
+    assert.equal(entry.options.tz, 'Europe/Paris');
+    assert.equal(typeof entry.task, 'function');
   });
 
   it('la tâche `espaceMessageNotify` tourne chaque minute en Europe/Paris (V3-A, pour V3-D)', () => {
@@ -178,6 +186,7 @@ describe('config/cron-tasks.js : les tâches n’appellent que des services, auc
       'api::espace.sync': { runAll: run('sync.runAll') },
       'api::espace.tokens': { purgeExpired: run('tokens.purgeExpired') },
       'api::espace.reminders': { runDue: run('reminders.runDue') },
+      'api::espace.privacy': { purge: run('privacy.purge') },
     };
     const target = { service: (uid) => services[uid], log: { error: (message) => errors.push(String(message)) } };
     const strapi = new Proxy(target, {
@@ -230,6 +239,20 @@ describe('config/cron-tasks.js : les tâches n’appellent que des services, auc
     await assert.doesNotReject(require('../../config/cron-tasks').espaceReminders.task({ strapi }));
     assert.equal(errors.length, 1);
     assert.match(errors[0], /Brevo en panne/);
+  });
+
+  it('la purge de l’espace appelle privacy.purge() sans argument (l’horloge est celle du service) et rien d’autre (V5-A)', async () => {
+    const { strapi, calls, errors } = fakeStrapi();
+    await require('../../config/cron-tasks').espacePurge.task({ strapi });
+    assert.deepEqual(calls, [['privacy.purge', []]]);
+    assert.deepEqual(errors, []);
+  });
+
+  it('une erreur de la purge de l’espace est journalisée et ne remonte jamais (V5-A)', async () => {
+    const { strapi, errors } = fakeStrapi({ failWith: new Error('disque plein') });
+    await assert.doesNotReject(require('../../config/cron-tasks').espacePurge.task({ strapi }));
+    assert.equal(errors.length, 1);
+    assert.match(errors[0], /disque plein/);
   });
 
   it('le fichier ne contient plus aucune requête : ni strapi.db, ni query, ni Document Service, ni new Date()', () => {
