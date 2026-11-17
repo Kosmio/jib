@@ -290,6 +290,25 @@ function operations(strapi) {
     }));
   }
 
+  /** `meeting-cancelled` for both sides of a meeting cancelled by the organization (F-140): each is told by whom, with the reason if given. */
+  function cancelledByOrganizerMails(ctx, meeting, reason) {
+    const slotLabel = slotLabelOf(ctx.snap.slots.get(meeting.slot.documentId).startsAt);
+    const requester = ctx.attendees.get(meeting.requester.documentId);
+    const sides = [
+      { to: requester, counterpartName: targetName(ctx, meeting) },
+      ...targetRecipients(ctx, meeting).map((to) => ({ to, counterpartName: attendeeCardOf(ctx, meeting.requester.documentId).displayName })),
+    ];
+    return sides
+      .filter(({ to }) => to?.status === 'active')
+      .map(({ to, counterpartName }) => ({
+        to,
+        template: 'meeting-cancelled',
+        scenarioKey: `meeting-cancelled:${meeting.documentId}`,
+        data: { slotLabel, counterpartName, reason, byOrganizer: true },
+        links: { agendaUrl: agendaPath(ctx.edition) },
+      }));
+  }
+
   /**
    * Sends the e-mails after the transaction (A-27). Each link is a fresh 72 hour action link (I-21), one per button (A-33).
    * NF-52: nothing leaves when the space of the edition is closed. A failure is logged and never reaches the response.
@@ -614,6 +633,123 @@ function operations(strapi) {
 
       await deliver(edition, emails, now);
       return view;
+    },
+
+    /**
+     * GET /admin/:edition/meetings (F-139, E9): every meeting of the edition with both parties, the table or the stand and the status,
+     * and the slots with their blocks (R-90). `conflict`: an accepted meeting on a closed slot or a blocked table (F-141), `freeTables`:
+     * where it could move. Names and companies only, never an e-mail (R-42).
+     */
+    async adminList(editionId, { now = new Date() } = {}) {
+      const ctx = await load(editionId, now);
+      const { snap } = ctx;
+      const party = (attendeeId) => {
+        const attendee = ctx.attendees.get(attendeeId);
+        return { kind: 'attendee', name: fullName(attendee), subtitle: attendee.company ?? null };
+      };
+      const slotView = (slot) => ({
+        id: slot.id,
+        label: slot.label,
+        startsAt: slot.startsAt,
+        endsAt: slot.endsAt,
+        sessionTitle: slot.sessionTitle,
+        closed: slot.closed,
+        blockedTables: slot.blockedTables,
+        freeTables: slot.closed ? [] : rules.freeTables(snap, slot.id),
+      });
+      const slots = [...snap.slots.values()].sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt));
+      const meetings = ctx.meetings.map((meeting) => {
+        const slot = snap.slots.get(meeting.slot.documentId);
+        const exhibitor = meeting.targetExhibitor ? snap.exhibitors.get(meeting.targetExhibitor.documentId) : null;
+        const accepted = meeting.status === 'accepted';
+        const movable = accepted && Boolean(meeting.tableNumber) && !new Set(snap.hosted.values()).has(meeting.tableNumber) && !rules.hasStarted(snap, slot);
+        return {
+          id: meeting.documentId,
+          status: meeting.status,
+          slot: { id: slot.id, label: slot.label, startsAt: slot.startsAt, sessionTitle: slot.sessionTitle },
+          requester: party(meeting.requester.documentId),
+          target: exhibitor ? { kind: 'exhibitor', name: exhibitor.name, subtitle: exhibitor.standNumber ? `Stand ${exhibitor.standNumber}` : null } : party(meeting.targetAttendee.documentId),
+          location: meeting.location ?? null,
+          tableNumber: meeting.tableNumber ?? null,
+          createdAt: meeting.createdAt,
+          conflict: accepted && (slot.closed || Boolean(meeting.tableNumber && slot.blockedTables.includes(meeting.tableNumber))),
+          canCancel: ['pending', 'accepted'].includes(meeting.status) && !rules.hasStarted(snap, slot),
+          canMove: movable && !slot.closed,
+          freeTables: movable && !slot.closed ? rules.freeTables(snap, slot.id, meeting.documentId) : [],
+        };
+      });
+      meetings.sort((a, b) => new Date(a.slot.startsAt) - new Date(b.slot.startsAt) || new Date(a.createdAt) - new Date(b.createdAt));
+      return { tablesCount: snap.tablesCount, dedicatedTables: [...snap.hosted.values()].sort((a, b) => a - b), slots: slots.map(slotView), meetings };
+    },
+
+    /**
+     * POST /admin/:edition/meetings/:id/cancel (F-140, R-16): the organization cancels a pending request or an accepted meeting, with an
+     * optional reason ; the table is released and BOTH parties receive `meeting-cancelled` ("annulé par l'organisation").
+     * 404 MEETING_NOT_FOUND, 409 INVALID_TRANSITION, SLOT_PAST. -> { id, status, location, tableNumber }
+     */
+    async adminCancel(editionId, meetingId, body, { now = new Date() } = {}) {
+      const reason = optionalText(asObject(body).reason, REASON_MAX);
+      if (reason.error) throw validation({ reason: reason.error });
+
+      const { view, emails, edition } = await exclusive(editionId, 'INVALID_TRANSITION', async () => {
+        const ctx = await load(editionId, now);
+        const found = findMeeting(ctx, meetingId);
+        rules.assertTransition(found.status, 'cancel');
+        if (new Date(ctx.snap.slots.get(found.slot.documentId).startsAt) <= now) throw rules.meetingError('SLOT_PAST');
+
+        const meeting = await update(found, { status: 'cancelled', cancelledAt: now, cancelReason: reason.text, tableKey: null });
+        return { view: { id: meeting.documentId, status: meeting.status }, emails: cancelledByOrganizerMails(ctx, meeting, reason.text), edition: ctx.edition };
+      });
+
+      await deliver(edition, emails, now);
+      return view;
+    },
+
+    /**
+     * POST /admin/:edition/meetings/:id/move (F-141): an accepted meeting at a table goes to a free table of the same slot (not occupied,
+     * not blocked, not dedicated). 400 VALIDATION, 404, 409 INVALID_TRANSITION, SLOT_PAST, SLOT_CLOSED, NO_TABLE_LEFT.
+     * -> { id, status, location, tableNumber }
+     */
+    async adminMove(editionId, meetingId, body, { now = new Date() } = {}) {
+      const { table } = asObject(body);
+      if (!Number.isInteger(table) || table < 1) throw validation({ table: 'Choisissez une table.' });
+
+      return exclusive(editionId, 'NO_TABLE_LEFT', async () => {
+        const ctx = await load(editionId, now);
+        const found = findMeeting(ctx, meetingId);
+        const check = rules.checkMove(ctx.snap, found.documentId, table);
+        if (!check.ok) throw rules.meetingError(check.code);
+        const meeting = await update(found, { location: check.location, tableNumber: check.tableNumber, tableKey: `${found.slot.documentId}:${check.tableNumber}` });
+        return { id: meeting.documentId, status: meeting.status, location: meeting.location, tableNumber: meeting.tableNumber };
+      });
+    },
+
+    /**
+     * PUT /admin/:edition/slots/:id/blocks (F-141, R-90): the tables blocked on a slot and whether the slot is closed. Under the lock of the
+     * edition, like the attribution of the tables. 400 VALIDATION, 404 SLOT_NOT_FOUND.
+     * -> { id, blockedTables, closed, affected: [id of the accepted meetings the blocks touch] }
+     */
+    async adminSetBlocks(editionId, slotId, body, { now = new Date() } = {}) {
+      const given = asObject(body);
+      const fields = {};
+      const list = given.blockedTables;
+      if (!Array.isArray(list) || list.some((n) => !Number.isInteger(n) || n < 1)) fields.blockedTables = 'Indiquez des numéros de table.';
+      if (typeof given.closed !== 'boolean') fields.closed = 'Indiquez si le créneau est fermé.';
+      if (Object.keys(fields).length) throw validation(fields);
+
+      return exclusive(editionId, 'INVALID_TRANSITION', async () => {
+        const ctx = await load(editionId, now);
+        const slot = ctx.snap.slots.get(slotId);
+        if (!slot) throw rules.meetingError('SLOT_NOT_FOUND');
+        if (list.some((n) => n > ctx.snap.tablesCount)) throw validation({ blockedTables: `Les tables vont de 1 à ${ctx.snap.tablesCount}.` });
+
+        const blockedTables = rules.blockedTablesOf(list);
+        await documents(SLOT).update({ documentId: slotId, data: { blockedTables, closed: given.closed } });
+        const affected = ctx.meetings
+          .filter((meeting) => meeting.status === 'accepted' && meeting.slot.documentId === slotId && (given.closed || (meeting.tableNumber && blockedTables.includes(meeting.tableNumber))))
+          .map(({ documentId }) => documentId);
+        return { id: slotId, blockedTables, closed: given.closed, affected };
+      });
     },
 
     /**

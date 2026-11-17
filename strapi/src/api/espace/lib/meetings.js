@@ -4,7 +4,7 @@
  * Rules of the B2B meetings (R-10 to R-19, A-27 to A-32), pure: they read a snapshot of the edition and decide, the service
  * only loads, writes and notifies. Every identifier is a documentId (A-28). A snapshot `snap` is
  *   { now, tablesCount, window: { state, openAt, closeAt },
- *     slots: Map(id -> { id, startsAt, endsAt, sessionTitle }),
+ *     slots: Map(id -> { id, startsAt, endsAt, sessionTitle, closed, blockedTables }),
  *     meetings: [{ id, slotId, requesterId, targetAttendeeId, targetExhibitorId, status, tableNumber }],
  *     attendees: Map(id -> { id, status, role, meetingsOptIn, exhibitorId }),
  *     exhibitors: Map(id -> { id, standNumber, name, activeRepIds }),
@@ -28,6 +28,7 @@ const ERRORS = {
   MEETING_NOT_FOUND: [404, 'Rendez-vous introuvable.'],
   WINDOW_CLOSED: [409, 'La prise de rendez-vous n’est pas ouverte.'],
   SLOT_PAST: [409, 'Ce créneau a déjà commencé.'],
+  SLOT_CLOSED: [409, 'Ce créneau est fermé aux rendez-vous.'],
   HOST_AT_TABLE: [409, 'Vous tenez une table dédiée : vous recevez des réservations et n’envoyez pas de demandes.'],
   TARGET_UNAVAILABLE: [409, 'Cette personne ne reçoit pas de demandes de rendez-vous.'],
   SLOT_TAKEN: [409, 'Vous avez déjà un rendez-vous ou une demande en attente sur ce créneau.'],
@@ -99,6 +100,9 @@ function hostedTables(attendees, tablesCount) {
   return { hosted, warnings };
 }
 
+/** R-90: the `blockedTables` JSON of a slot as a sorted list of distinct positive integers (anything else is ignored). */
+const blockedTablesOf = (value) => (Array.isArray(value) ? [...new Set(value.filter((n) => Number.isInteger(n) && n > 0))].sort((a, b) => a - b) : []);
+
 /** A Meeting loaded with the documentIds of its relations -> the meeting of a snapshot. */
 const snapshotMeeting = (meeting) => ({
   id: meeting.documentId,
@@ -140,6 +144,8 @@ function buildSnapshot({ edition, now, slots, attendees, exhibitors, meetings })
           sessionId: slot.session?.documentId ?? null,
           sessionStart: slot.session?.start_time ?? null,
           sessionEnd: slot.session?.end_time ?? null,
+          closed: slot.closed === true,
+          blockedTables: blockedTablesOf(slot.blockedTables),
         },
       ])
     ),
@@ -187,7 +193,8 @@ function targetBusy(snap, target, slotId, ignoreMeetingId) {
     return accepted.filter((meeting) => meeting.targetExhibitorId === target.id).length >= (exhibitor?.activeRepIds.length ?? 0);
   }
   const table = snap.hosted.get(target.id);
-  return accepted.some((meeting) => involves(meeting, target.id) || (table !== undefined && meeting.tableNumber === table));
+  // R-90: a blocked dedicated table is as taken as an occupied one.
+  return accepted.some((meeting) => involves(meeting, target.id) || (table !== undefined && meeting.tableNumber === table)) || (table !== undefined && Boolean(snap.slots.get(slotId)?.blockedTables?.includes(table)));
 }
 
 /** Tables of the common pool (R-03): 1 to tablesCount without the dedicated ones. */
@@ -196,9 +203,9 @@ function commonTables(snap) {
   return Array.from({ length: Math.max(0, snap.tablesCount) }, (_, index) => index + 1).filter((number) => !dedicated.has(number));
 }
 
-/** Free tables of the common pool on a slot, ascending (R-13). */
+/** Free tables of the common pool on a slot, ascending (R-13). A table blocked on the slot counts as occupied (R-90). */
 function freeTables(snap, slotId, ignoreMeetingId) {
-  const used = new Set(acceptedAt(snap, slotId, ignoreMeetingId).map(({ tableNumber }) => tableNumber));
+  const used = new Set([...acceptedAt(snap, slotId, ignoreMeetingId).map(({ tableNumber }) => tableNumber), ...(snap.slots.get(slotId)?.blockedTables ?? [])]);
   return commonTables(snap).filter((number) => !used.has(number));
 }
 
@@ -237,7 +244,7 @@ function requestBlock(snap, requesterId, target) {
 
 /**
  * Creation of a request or of a booking (R-11, R-19). Order of the checks: R-11.1 WINDOW_CLOSED, .2 SLOT_PAST, .10 HOST_AT_TABLE,
- * .4 then .3 TARGET_UNAVAILABLE, .5 SLOT_TAKEN, .6 TARGET_BUSY, .7 ALREADY_REQUESTED, .8 NO_TABLE_LEFT, .9 TOO_MANY_PENDING.
+ * SLOT_CLOSED (R-90), .4 then .3 TARGET_UNAVAILABLE, .5 SLOT_TAKEN, .6 TARGET_BUSY, .7 ALREADY_REQUESTED, .8 NO_TABLE_LEFT, .9 TOO_MANY_PENDING.
  * A booking (R-19.2): 1, 2, 10, 4, 3, .5, TARGET_BUSY (table taken), ALREADY_REQUESTED (an upcoming meeting with the host).
  * `ignoreMeetingId`: a meeting left out of the reading (the request a counter-proposal answers, A-31).
  * -> { ok: true, mode: 'request' | 'booking' | 'stand', tableNumber? } | { ok: false, code }
@@ -248,6 +255,7 @@ function checkRequest(snap, { requesterId, target, slotId, ignoreMeetingId }) {
   const slot = snap.slots.get(slotId);
   if (!slot) return fail('SLOT_NOT_FOUND');
   if (hasStarted(snap, slot)) return fail('SLOT_PAST');
+  if (slot.closed) return fail('SLOT_CLOSED');
 
   const blocked = requestBlock(snap, requesterId, target);
   if (blocked) return fail(blocked === 'SELF' ? 'TARGET_UNAVAILABLE' : blocked);
@@ -293,6 +301,7 @@ function checkAccept(snap, meetingId, viewerId) {
   if (snap.window.state !== 'open') return fail('WINDOW_CLOSED');
   const slot = snap.slots.get(meeting.slotId);
   if (!slot || hasStarted(snap, slot)) return fail('SLOT_PAST');
+  if (slot.closed) return fail('SLOT_CLOSED');
   if (requesterBusy(snap, meeting.requesterId, meeting.slotId, meeting.id, { withPending: false })) return fail('SLOT_TAKEN');
 
   const target = meeting.targetExhibitorId ? { kind: 'x', id: meeting.targetExhibitorId } : { kind: 'p', id: meeting.targetAttendeeId };
@@ -332,6 +341,23 @@ function closeOnAccept(snap, meeting) {
 }
 
 /**
+ * Move of an accepted meeting to another table of the common pool, by the organizer (F-141): INVALID_TRANSITION unless it is accepted
+ * and sits at a table of the pool (not a stand, not a dedicated table), SLOT_PAST, SLOT_CLOSED, NO_TABLE_LEFT when `table` is not free
+ * (occupied, blocked or dedicated). -> { ok: true, location, tableNumber } | { ok: false, code }
+ */
+function checkMove(snap, meetingId, table) {
+  const fail = (code) => ({ ok: false, code });
+  const meeting = snap.meetings.find(({ id }) => id === meetingId);
+  if (!meeting) return fail('MEETING_NOT_FOUND');
+  if (meeting.status !== 'accepted' || !meeting.tableNumber || [...snap.hosted.values()].includes(meeting.tableNumber)) return fail('INVALID_TRANSITION');
+  const slot = snap.slots.get(meeting.slotId);
+  if (!slot || hasStarted(snap, slot)) return fail('SLOT_PAST');
+  if (slot.closed) return fail('SLOT_CLOSED');
+  if (!freeTables(snap, meeting.slotId, meeting.id).includes(table)) return fail('NO_TABLE_LEFT');
+  return { ok: true, location: `Table ${table}`, tableNumber: table };
+}
+
+/**
  * States of the slots for the viewer of a profile (R-12, F-50): slots already started are absent. `confirmed` and `requested`
  * (the viewer's own request) come first ; `unavailable` when R-11.2, .5, .6 or .8 fails ; otherwise `available`. Never says with whom the target meets.
  * -> Map(slotId -> 'available' | 'unavailable' | 'requested' | 'confirmed'), in time order
@@ -342,10 +368,11 @@ function slotStates(snap, { viewerId, target }) {
   const between = (meeting) =>
     target.kind === 'x' ? meeting.requesterId === viewerId && meeting.targetExhibitorId === target.id : involves(meeting, viewerId) && involves(meeting, target.id);
 
-  for (const { id } of slots) {
+  for (const { id, closed } of slots) {
     const together = snap.meetings.find((meeting) => meeting.slotId === id && between(meeting) && (isActive(meeting, 'accepted') || (isActive(meeting, 'pending') && meeting.requesterId === viewerId)));
     if (together) states.set(id, isActive(together, 'accepted') ? 'confirmed' : 'requested');
     else if (
+      closed ||
       requesterBusy(snap, viewerId, id) ||
       targetBusy(snap, target, id) ||
       isAway(snap, viewerId, id) ||
@@ -407,7 +434,11 @@ module.exports = {
   freeTables,
   checkRequest,
   checkAccept,
+  checkMove,
   closeOnAccept,
+  blockedTablesOf,
+  commonTables,
+  hasStarted,
   slotStates,
   meetingActions,
   assertTransition,

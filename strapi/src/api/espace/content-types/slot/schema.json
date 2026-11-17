@@ -38,6 +38,13 @@
     "label": {
       "type": "string",
       "required": true
+    },
+    "blockedTables": {
+      "type": "json"
+    },
+    "closed": {
+      "type": "boolean",
+      "default": false
     }
   }
 }
