@@ -218,7 +218,6 @@ test.describe('carte publique : régénération du jeton (T-64) et retour après
 
 test.describe('NF-54 : limitation de débit', () => {
   test('la page de la carte lit Strapi avec l’adresse du visiteur : 35 visiteurs différents en une minute ne sont pas limités ensemble', async ({ page, baseURL }) => {
-    test.fail(true, 'défaut D5 : Astro.clientAddress ignore X-Forwarded-For tant que security.allowedDomains n’est pas réglé (astro/dist/core/app/node.js:88), donc tous les scans gardent l’IP du proxy ou du serveur web et partagent la limite');
     await loadTokens(page, baseURL);
     const statuses: number[] = [];
     for (let visitor = 1; visitor <= 35; visitor += 1) {
