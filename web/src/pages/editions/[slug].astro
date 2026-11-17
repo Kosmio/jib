@@ -330,21 +330,24 @@ const eventJsonLd: Record<string, unknown> = {
             <span class="sr-only"> (s’ouvre dans un nouvel onglet)</span>
           </a>
         )}
-        <div class="space-y-6">
+        <!-- Fil chronologique : un trait vertical relie les heures de début, une pastille à la couleur de la séquence marque chacune -->
+        <div class="relative space-y-6 md:before:absolute md:before:left-[5px] md:before:top-8 md:before:bottom-0 md:before:w-px md:before:bg-surface-alt">
           {sequences.map((seq) => {
             const interventions = (seq.interventions || []).slice().sort(
               (a, b) => (a.order ?? 999) - (b.order ?? 999)
             );
-            const timeLabel = seq.end_time
-              ? `${seq.start_time} – ${seq.end_time}`
-              : `À partir de ${seq.start_time}`;
             const theme = getProgramTheme(seq.theme, seq.title);
             return (
-              <div class="flex flex-col md:flex-row gap-4 md:gap-6">
-                <!-- Créneau horaire -->
-                <div class="md:w-32 flex-shrink-0 pt-1 md:pt-5">
-                  <span class="text-sm font-medium text-muted">{timeLabel}</span>
-                </div>
+              <div class="flex flex-col md:flex-row gap-3 md:gap-6">
+                <!-- Créneau horaire : début en grand, fin en dessous (à côté sur mobile) -->
+                <p class="md:w-36 flex-shrink-0 md:pl-7 md:pt-5 md:sticky md:top-20 md:self-start flex flex-wrap items-baseline gap-x-2 md:block tabular-nums">
+                  {!seq.end_time && <span class="text-sm font-medium text-muted md:block md:mb-1">À partir de</span>}
+                  <span class="relative font-heading text-2xl md:text-[1.75rem] font-bold leading-none tracking-tight text-title">
+                    <span aria-hidden="true" class={`hidden md:block absolute -left-7 top-1/2 -translate-y-1/2 size-[11px] rounded-full ring-4 ring-white ${theme ? theme.dot : "bg-surface-alt"}`}></span>
+                    {seq.start_time}
+                  </span>
+                  {seq.end_time && <span class="text-sm font-medium text-muted md:block md:mt-1.5">jusqu’à {seq.end_time}</span>}
+                </p>
                 <!-- Carte séquence : bandeau de couleur et pictogramme si la séquence a un thème, beige sinon -->
                 <div class={`flex-1 bg-surface rounded-xl border overflow-hidden ${theme ? `border-2 ${theme.border}` : "border-surface-alt"}`}>
                   {theme && (
@@ -410,9 +413,7 @@ const eventJsonLd: Record<string, unknown> = {
                                           {intervenant.name}
                                         </a>
                                         <p class="text-sm text-muted">
-                                          {intervenant.title}
-                                          {intervenant.title && org?.name && <span class="text-muted">, </span>}
-                                          {org?.name && (
+                                          {intervenant.title}{intervenant.title && org?.name && <span class="text-muted">, </span>}{org?.name && (
                                             <a href={`/organisations/${org.slug}`} class="text-primary-dark hover:text-primary underline-offset-2 hover:underline transition-colors font-medium">
                                               {org.name}
                                             </a>
@@ -555,7 +556,7 @@ const eventJsonLd: Record<string, unknown> = {
         {dedupedOrganisations.length > 0 && (
           <div class="mt-12">
             <h3 class="text-xl font-bold mb-6">Organisations</h3>
-            <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {dedupedOrganisations.map((org) => (
                 <a href={`/organisations/${org.slug}`} class="group flex items-center gap-4 p-5 rounded-xl bg-white border border-gray-100 hover:shadow-lg transition-shadow">
                   {org.logo ? (
