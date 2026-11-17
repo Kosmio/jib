@@ -25,4 +25,9 @@ module.exports = {
   photo: async (ctx) => {
     ctx.body = await me().setPhoto(requireSession(ctx), ctx.request.files?.photo);
   },
+
+  // DELETE /api/espace/me/photo (session): removes the photo (F-147)
+  removePhoto: async (ctx) => {
+    ctx.body = await me().removePhoto(requireSession(ctx));
+  },
 };

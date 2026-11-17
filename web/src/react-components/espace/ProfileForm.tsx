@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   EspaceApiError,
   request,
@@ -72,6 +72,16 @@ const PHOTO_MAX_BYTES = 5 * 1024 * 1024;
 const PHOTO_SIDE = 256;
 const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
+type FormValues = {
+  profile: Profile;
+  bio: string;
+  linkedinUrl: string;
+  awayIds: string[];
+  topicIds: string[];
+  consent: Consent;
+  emailPrefs: EmailPrefs;
+};
+
 type FieldName = (typeof FIELDS)[number]["name"] | "bio" | "linkedinUrl" | "unavailableSessions" | "topics" | "emailPrefs";
 type FieldErrors = Partial<Record<FieldName, string>>;
 
@@ -143,8 +153,20 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b
   });
   const [savedConsent, setSavedConsent] = useState<Consent>(consent);
   const [emailPrefs, setEmailPrefs] = useState<EmailPrefs>(initial.emailPrefs);
+  // F-146 : valeurs au dernier enregistrement ; toute différence avec le formulaire est une modification en attente.
+  const [baseline, setBaseline] = useState<FormValues>(() => ({
+    profile: { firstName: initial.firstName, lastName: initial.lastName, jobTitle: initial.jobTitle, company: initial.company },
+    bio: initial.bio,
+    linkedinUrl: initial.linkedinUrl,
+    awayIds: initial.unavailableSessions,
+    topicIds: initial.topics,
+    consent: { directoryOptIn: initial.directoryOptIn, meetingsOptIn: initial.meetingsOptIn, newsOptIn: initial.newsOptIn },
+    emailPrefs: initial.emailPrefs,
+  }));
+  const [confirmingPhoto, setConfirmingPhoto] = useState(false);
+  const savedRef = useRef<HTMLParagraphElement>(null);
   const [photoUrl, setPhotoUrl] = useState(initial.photoUrl);
-  const [photoState, setPhotoState] = useState<{ busy: boolean; error: string | null; done: boolean }>({ busy: false, error: null, done: false });
+  const [photoState, setPhotoState] = useState<{ busy: boolean; error: string | null; done: boolean; removed: boolean }>({ busy: false, error: null, done: false, removed: false });
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -154,6 +176,23 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b
   const loginUrl = `/espace/${encodeURIComponent(editionSlug)}/connexion`;
   const photo = photoSrc(strapiUrl, photoUrl);
   const atTopicLimit = topicIds.length >= TOPICS_MAX;
+  const dirty = JSON.stringify({ profile, bio, linkedinUrl, awayIds, topicIds, consent, emailPrefs }) !== JSON.stringify(baseline);
+
+  // F-146 : alerte du navigateur en quittant la page avec des modifications non enregistrées (changement d'onglet, lien, fermeture).
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+
+  // F-146 : le focus passe au message de succès, pour que le lecteur d'écran l'annonce et que la barre ne garde pas le focus.
+  useEffect(() => {
+    if (saved) savedRef.current?.focus();
+  }, [saved]);
 
   // Le focus passe au premier champ en erreur (ou au bouton, après un échec d'envoi) une fois le message affiché.
   useEffect(() => {
@@ -164,15 +203,48 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b
     setSaved(false);
   }
 
+  /** F-146 « Annuler » : remet le formulaire aux valeurs du dernier enregistrement. */
+  function cancel() {
+    setProfile(baseline.profile);
+    setBio(baseline.bio);
+    setLinkedinUrl(baseline.linkedinUrl);
+    setAwayIds(baseline.awayIds);
+    setTopicIds(baseline.topicIds);
+    setConsent(baseline.consent);
+    setEmailPrefs(baseline.emailPrefs);
+    setErrors({});
+    setFormError(null);
+    setSaved(false);
+  }
+
+  /** F-147 : supprime la photo (DELETE /me/photo) après confirmation. */
+  async function removePhoto() {
+    setConfirmingPhoto(false);
+    setPhotoState({ busy: true, error: null, done: false, removed: false });
+    try {
+      await request<{ photoUrl: null }>(strapiUrl, "/me/photo", "DELETE");
+      setPhotoUrl(null);
+      setPhotoState({ busy: false, error: null, done: false, removed: true });
+      setFocusField(null);
+      setTimeout(() => setFocusField("photo"), 0);
+    } catch (error) {
+      if (error instanceof EspaceApiError && error.status === 401) {
+        window.location.assign(loginUrl);
+        return;
+      }
+      setPhotoState({ busy: false, error: "La suppression de la photo a échoué. Vérifiez votre connexion et réessayez.", done: false, removed: false });
+    }
+  }
+
   async function choosePhoto(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-    const fail = (error: string) => setPhotoState({ busy: false, error, done: false });
+    const fail = (error: string) => setPhotoState({ busy: false, error, done: false, removed: false });
     if (!PHOTO_TYPES.includes(file.type)) return fail("Choisissez une image JPEG, PNG ou WebP.");
     if (file.size > PHOTO_MAX_BYTES) return fail("La photo dépasse 5 Mo.");
 
-    setPhotoState({ busy: true, error: null, done: false });
+    setPhotoState({ busy: true, error: null, done: false, removed: false });
     let blob: Blob;
     try {
       blob = await squarePhoto(file);
@@ -184,7 +256,7 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b
       body.append("photo", blob, blob.type === "image/webp" ? "photo.webp" : "photo.jpg");
       const result = await request<{ photoUrl: string }>(strapiUrl, "/me/photo", "POST", body);
       setPhotoUrl(result.photoUrl);
-      setPhotoState({ busy: false, error: null, done: true });
+      setPhotoState({ busy: false, error: null, done: true, removed: false });
     } catch (error) {
       if (error instanceof EspaceApiError && error.status === 401) {
         window.location.assign(loginUrl);
@@ -222,6 +294,7 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b
         await saveConsent(strapiUrl, consent);
         setSavedConsent(consent);
       }
+      setBaseline({ profile, bio, linkedinUrl, awayIds, topicIds, consent, emailPrefs });
       setSaved(true);
       setSaving(false);
     } catch (error) {
@@ -250,7 +323,7 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b
     `mt-2 w-full rounded-lg border-2 bg-white px-4 text-lg text-ink ${errors[name] ? "border-danger" : "border-accent"}`;
 
   return (
-    <form noValidate onSubmit={submit} className="space-y-6">
+    <form noValidate onSubmit={submit} className="space-y-6 [&_input]:scroll-mb-44 [&_textarea]:scroll-mb-44">
       <section aria-labelledby="photo-titre">
         <h2 id="photo-titre" className="font-heading text-xl font-semibold normal-case">
           Votre photo
@@ -282,12 +355,58 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b
             >
               {photo ? "Changer la photo" : "Ajouter une photo"}
             </label>
+            {photo && !confirmingPhoto && (
+              <button
+                type="button"
+                id="supprimer-photo"
+                onClick={() => setConfirmingPhoto(true)}
+                disabled={photoState.busy}
+                className="ml-2 inline-flex min-h-11 items-center justify-center px-3 font-bold text-title underline disabled:opacity-60"
+              >
+                Supprimer la photo
+              </button>
+            )}
             <p id="photo-aide" className="mt-2 text-sm text-muted">
               JPEG, PNG ou WebP, 5&nbsp;Mo au plus. Elle est recadrée en carré et enregistrée dès son envoi.
             </p>
           </div>
         </div>
+        {confirmingPhoto && (
+          <div role="group" aria-labelledby="photo-confirmation" className="mt-3 rounded-lg border-2 border-title bg-white p-3">
+            <p id="photo-confirmation" className="font-semibold">
+              Supprimer votre photo ? Vos initiales la remplaceront.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                id="confirmer-suppression-photo"
+                autoFocus
+                onClick={removePhoto}
+                className="inline-flex min-h-11 items-center justify-center rounded-lg border-2 border-danger bg-white px-4 font-bold text-danger"
+              >
+                Oui, supprimer
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmingPhoto(false);
+                  setFocusField(null);
+                  setTimeout(() => setFocusField("supprimer-photo"), 0);
+                }}
+                className="inline-flex min-h-11 items-center justify-center rounded-lg border-2 border-title bg-white px-4 font-bold text-title"
+              >
+                Garder la photo
+              </button>
+            </div>
+          </div>
+        )}
         <div role="status" className="empty:hidden">
+          {photoState.removed && (
+            <p className="mt-2 flex items-start gap-2 font-semibold text-primary-ink">
+              <Icon name="check" />
+              Photo supprimée
+            </p>
+          )}
           {photoState.busy && <p className="mt-2 font-semibold">Envoi de la photo…</p>}
           {photoState.done && (
             <p className="mt-2 flex items-start gap-2 font-semibold text-primary-ink">
@@ -457,7 +576,7 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b
         </fieldset>
       )}
 
-      <fieldset className="min-w-0 rounded-xl bg-surface p-4">
+      <fieldset id="visibilite" className="min-w-0 scroll-mt-4 rounded-xl bg-surface p-4">
         <legend className="float-left w-full font-heading font-semibold text-title">Vos choix de visibilité</legend>
         <p className="clear-both pt-1 text-sm text-muted">Modifiables à tout moment.</p>
         <div className="mt-2">
@@ -544,19 +663,40 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b
         </p>
       )}
 
-      <div>
-        <button
-          id="enregistrer"
-          type="submit"
-          disabled={saving}
-          aria-busy={saving}
-          className="inline-flex min-h-13 w-full items-center justify-center rounded-lg bg-gold px-6 text-lg font-bold text-gold-ink shadow-md shadow-gold/25 hover:bg-gold-light disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {saving ? "Enregistrement…" : "Enregistrer"}
-        </button>
+      <div
+        data-barre-enregistrement={dirty ? "" : undefined}
+        className={dirty ? "sticky bottom-17 z-30 -mx-5 border-t border-surface-alt bg-white px-5 py-3 shadow-[0_-4px_12px_rgb(0_0_0/0.08)] lg:bottom-0" : ""}
+      >
+        {dirty && !saving && (
+          <p id="modifications-en-attente" className="mb-2 text-sm font-semibold">
+            Modifications non enregistrées
+          </p>
+        )}
+        <div className="flex gap-3">
+          {dirty && (
+            <button
+              id="annuler"
+              type="button"
+              onClick={cancel}
+              disabled={saving}
+              className="inline-flex min-h-13 shrink-0 items-center justify-center rounded-lg border-2 border-title bg-white px-5 text-lg font-bold text-title hover:bg-surface disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Annuler
+            </button>
+          )}
+          <button
+            id="enregistrer"
+            type="submit"
+            disabled={saving}
+            aria-busy={saving}
+            className="inline-flex min-h-13 w-full items-center justify-center rounded-lg bg-gold px-6 text-lg font-bold text-gold-ink shadow-md shadow-gold/25 hover:bg-gold-light disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {saving ? "Enregistrement…" : "Enregistrer"}
+          </button>
+        </div>
         <div role="status" className="empty:hidden">
           {saved && (
-            <p className="mt-3 flex items-start justify-center gap-2 font-semibold text-primary-ink">
+            <p ref={savedRef} tabIndex={-1} className="mt-3 flex items-start justify-center gap-2 font-semibold text-primary-ink outline-none">
               <Icon name="check" />
               Profil enregistré
             </p>

@@ -81,6 +81,24 @@ const linkClass = (id: ShellTab) =>
         class="fixed inset-x-0 bottom-0 z-40 border-t border-surface-alt bg-white lg:inset-y-0 lg:right-auto lg:flex lg:w-64 lg:flex-col lg:justify-between lg:border-t-0 lg:border-r lg:p-4"
       >
         <p class="sr-only" role="status" aria-live="polite" aria-atomic="true" data-live-announce></p>
+        {/* F-149 : sous 1024 px, l'avatar menant au profil reste présent sur tous les écrans sauf l'accueil, dont l'en-tête a le sien (la colonne latérale le porte au-delà). */}
+        {active !== "home" && (
+        <a
+          href={`${base}/profil`}
+          data-profil-avatar
+          aria-label={`Mon profil, ${me.firstName} ${me.lastName}`}
+          aria-current={active === "profile" ? "page" : undefined}
+          class="fixed top-2 right-2 z-40 flex size-11 items-center justify-center rounded-full border-2 border-white bg-white shadow-md lg:hidden"
+        >
+          {photo ? (
+            <img src={photo} alt="" width="96" height="96" class="size-10 rounded-full bg-surface-alt object-cover" />
+          ) : (
+            <span aria-hidden="true" class="flex size-10 items-center justify-center rounded-full bg-title text-sm font-semibold text-white">
+              {initialsOf(me.firstName, me.lastName)}
+            </span>
+          )}
+        </a>
+        )}
         <div class="lg:flex lg:flex-col lg:gap-6">
           <img
             src="/assets/logo-jib.svg"

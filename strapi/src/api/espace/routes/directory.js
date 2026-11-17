@@ -7,6 +7,7 @@ const config = { auth: false, middlewares: ['api::espace.context'] };
 module.exports = {
   routes: [
     { method: 'POST', path: '/espace/me/photo', handler: 'me.photo', config },
+    { method: 'DELETE', path: '/espace/me/photo', handler: 'me.removePhoto', config },
     { method: 'GET', path: '/espace/editions/:slug/topics', handler: 'directory.topics', config },
     { method: 'GET', path: '/espace/directory', handler: 'directory.list', config },
     { method: 'GET', path: '/espace/directory/p/:id', handler: 'directory.profile', config },

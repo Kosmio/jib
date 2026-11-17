@@ -79,5 +79,56 @@ const initial = {
       <input type="hidden" name="editionSlug" value={slug} />
       <EspaceButton variant="secondary">Me déconnecter</EspaceButton>
     </form>
+
+    {/* F-148 : confirmation avant déconnexion. Sans JavaScript, le formulaire part tel quel. */}
+    <dialog
+      id="confirmation-deconnexion"
+      aria-labelledby="confirmation-deconnexion-titre"
+      aria-describedby="confirmation-deconnexion-texte"
+      class="m-auto w-[calc(100%-2rem)] max-w-md rounded-xl border-2 border-title bg-white p-5 text-ink backdrop:bg-ink/50"
+    >
+      <h2 id="confirmation-deconnexion-titre" class="font-heading text-xl font-semibold normal-case">Se déconnecter ?</h2>
+      <p id="confirmation-deconnexion-texte" class="mt-2">
+        Pour revenir, il faudra un nouveau lien de connexion ou un code, envoyé par e-mail.
+      </p>
+      <div class="mt-4 grid gap-3">
+        <button
+          type="button"
+          data-deconnexion-confirmer
+          class="inline-flex min-h-13 items-center justify-center rounded-lg border-2 border-title bg-white px-6 text-lg font-bold text-title hover:bg-surface"
+        >
+          Me déconnecter
+        </button>
+        <button
+          type="button"
+          data-deconnexion-annuler
+          autofocus
+          class="inline-flex min-h-13 items-center justify-center rounded-lg bg-gold px-6 text-lg font-bold text-gold-ink hover:bg-gold-light"
+        >
+          Rester connecté
+        </button>
+      </div>
+    </dialog>
   </div>
 </AppShell>
+
+<script>
+  const form = document.querySelector<HTMLFormElement>("form[data-espace-deconnexion]");
+  const dialogue = document.getElementById("confirmation-deconnexion") as HTMLDialogElement | null;
+  if (form && dialogue && typeof dialogue.showModal === "function") {
+    let confirme = false;
+    // Écouteur du formulaire : il passe avant celui du document (EspaceLayout) qui vide les copies hors connexion.
+    form.addEventListener("submit", (event) => {
+      if (confirme) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      dialogue.showModal();
+    });
+    dialogue.querySelector("[data-deconnexion-annuler]")?.addEventListener("click", () => dialogue.close());
+    dialogue.querySelector("[data-deconnexion-confirmer]")?.addEventListener("click", () => {
+      confirme = true;
+      dialogue.close();
+      form.requestSubmit();
+    });
+  }
+</script>

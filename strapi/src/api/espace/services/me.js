@@ -285,5 +285,20 @@ module.exports = ({ strapi }) => {
         await fs.promises.rm(file.filepath, { force: true });
       }
     },
+
+    /** DELETE /me/photo (F-147): detaches the photo and deletes the file; without a photo it is a no-op. -> { photoUrl: null } */
+    async removePhoto(session) {
+      const { documentId } = session.attendee;
+      const { photo } = await documents(ATTENDEE).findOne({ documentId, populate: { photo: true } });
+      if (photo) {
+        await documents(ATTENDEE).update({ documentId, data: { photo: null } });
+        await strapi
+          .plugin('upload')
+          .service('upload')
+          .remove(photo)
+          .catch((error) => strapi.log.warn(`[me] photo not removed: ${error.message.split('\n')[0]}`));
+      }
+      return { photoUrl: null };
+    },
   };
 };
