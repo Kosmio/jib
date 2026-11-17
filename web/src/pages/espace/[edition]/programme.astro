@@ -11,6 +11,8 @@ import { Avatar } from "../../../react-components/espace/ProfileCardView";
 import { espaceGet, getMe, getOpenEdition, publicStrapiUrl } from "../../../lib/espace/api";
 import type { ProfileCard } from "../../../lib/espace/client";
 import { editionLine } from "../../../lib/espace/format";
+import { requestWindow } from "../../../lib/espace/meetings";
+import ProgramNow from "../../../react-components/espace/ProgramNow";
 import { getProgramTheme } from "../../../lib/program-themes";
 
 // Forme de `GET /editions/:slug/program` (phase-2-plan.md, section 3.2). Les horaires sont du texte (« 9h15 ») ; `startsAt` est l'instant ISO.
@@ -23,11 +25,16 @@ type Session = {
   end: string | null;
   startsAt: string | null;
   kind: "talk" | "b2b_break" | "other";
+  until?: string | null;
+  state?: "current" | "next" | null;
+  meetings?: { id: string; start: string; counterpart: string; location: string | null }[];
   theme?: string | null;
   subtitle?: string | null;
   speakers: Speaker[];
 };
 type Program = {
+  now?: string;
+  liveDay?: boolean;
   flyer?: { imageUrl: string | null; pdfUrl: string | null };
   notes: string[];
   sessions: Session[];
@@ -45,7 +52,9 @@ const shellMe = me?.edition.slug === slug ? me : null;
 const base = `/espace/${encodeURIComponent(slug)}`;
 
 // Public, mais le cookie est relayé : `attendeeId` (lien vers la fiche) n'est renseigné que pour une session qui peut ouvrir cette fiche (A-34).
-const result = await espaceGet<Program>(`/editions/${encodeURIComponent(slug)}/program`, cookie);
+// `?now=` simule l'heure en préproduction et en test (F-150) ; Strapi l'ignore en production.
+const simulatedNow = Astro.url.searchParams.get("now");
+const result = await espaceGet<Program>(`/editions/${encodeURIComponent(slug)}/program${simulatedNow ? `?now=${encodeURIComponent(simulatedNow)}` : ""}`, cookie);
 if (!result.ok && result.status === 404) return Astro.rewrite("/espace/introuvable");
 const program: Program = result.ok
   ? { notes: [], sessions: [], speakers: [], venues: [], ...result.data }
@@ -63,6 +72,16 @@ const mediaUrl = (url: string | null | undefined) =>
 const flyerImage = mediaUrl(program.flyer?.imageUrl);
 const flyerPdf = mediaUrl(program.flyer?.pdfUrl);
 
+// F-152 : « Prendre RDV » seulement fenêtre de demandes ouverte ; sinon la pause dit combien de rendez-vous j'y ai.
+const now = program.now ? new Date(program.now) : new Date();
+const windowOpen = requestWindow(edition, now).state === "open";
+const liveDay = Boolean(program.liveDay);
+const liveSessions = program.sessions.flatMap(({ id, startsAt, until }) => (startsAt && until ? [{ id, startsAt, until }] : []));
+const STATE_BADGE =
+  "inline-flex min-h-6 items-center rounded-full px-2.5 py-0.5 text-sm font-bold data-[state=current]:bg-title data-[state=current]:text-white data-[state=next]:border data-[state=next]:border-title data-[state=next]:bg-white data-[state=next]:text-title";
+const STATE_LABEL = { current: "En cours", next: "À suivre" } as const;
+const LIVE_ITEM = "scroll-mt-16 data-[state=current]:ring-2 data-[state=current]:ring-title data-[state=next]:ring-1 data-[state=next]:ring-title";
+const meetingCount = (n: number) => (n === 0 ? "Aucun rendez-vous" : n === 1 ? "1 rendez-vous" : `${n} rendez-vous`);
 const rdvHref = shellMe ? `${base}/annuaire` : `${base}/connexion`;
 const profileHref = (attendeeId: string | null) => (shellMe && attendeeId ? `${base}/annuaire/p/${encodeURIComponent(attendeeId)}` : null);
 const timeOf = ({ start, end }: Session) => start ?? (end ? `Fin ${end}` : "");
@@ -153,7 +172,14 @@ const CARD = "rounded-xl border border-surface-alt bg-white p-4";
         }
         {notes.map((note) => <p class="mb-3 text-muted">{note}</p>)}
         {
-          !shellMe && program.sessions.some(({ kind }) => kind === "b2b_break") && (
+          liveDay && liveSessions.length > 0 && (
+            <p class="mb-3" data-jump-now hidden={!program.sessions.some(({ state }) => state === "current")}>
+              <a href="#en-cours" class="inline-flex min-h-11 items-center font-semibold text-title underline">Aller à la séquence en cours</a>
+            </p>
+          )
+        }
+        {
+          !shellMe && windowOpen && program.sessions.some(({ kind }) => kind === "b2b_break") && (
             <p class="mb-3 text-muted">Pour prendre rendez-vous, connectez-vous avec l’adresse de votre inscription.</p>
           )
         }
@@ -166,6 +192,22 @@ const CARD = "rounded-xl border border-surface-alt bg-white p-4";
                 const isBreak = session.kind === "b2b_break";
                 const description = html(session.description);
                 const theme = isBreak ? null : getProgramTheme(session.theme, session.title);
+                const state = liveDay ? (session.state ?? null) : null;
+                const badge = liveDay && (
+                  <span data-state-badge data-state={state ?? undefined} hidden={!state} class={STATE_BADGE}>{state ? STATE_LABEL[state] : ""}</span>
+                );
+                const mine = session.meetings ?? [];
+                const myMeetings = isBreak && mine.length > 0 && (
+                  <ul class="mt-2 space-y-1" aria-label="Mes rendez-vous" data-my-meetings>
+                    {mine.map((meeting) => (
+                      <li class="text-sm font-semibold text-ink">
+                        {meeting.start}
+                        {` · ${meeting.counterpart}`}
+                        {meeting.location && ` · ${meeting.location}`}
+                      </li>
+                    ))}
+                  </ul>
+                );
                 const time = session.startsAt ? <time datetime={session.startsAt}>{timeOf(session)}</time> : timeOf(session);
                 const speakers = session.speakers?.length > 0 && (
                   <ul class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
@@ -178,7 +220,12 @@ const CARD = "rounded-xl border border-surface-alt bg-white p-4";
                 );
                 if (theme) {
                   return (
-                    <li class={`overflow-hidden rounded-xl border-2 bg-white ${theme.border}`}>
+                    <li
+                      data-session-id={session.id}
+                      data-state={state ?? undefined}
+                      id={state === "current" ? "en-cours" : undefined}
+                      class={`overflow-hidden rounded-xl border-2 bg-white ${LIVE_ITEM} ${theme.border}`}
+                    >
                       <div class={`flex items-center gap-3 p-4 ${theme.band}`}>
                         <span aria-hidden="true" class={`flex size-11 shrink-0 items-center justify-center rounded-full ${theme.badge}`}>
                           <svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
@@ -192,6 +239,7 @@ const CARD = "rounded-xl border border-surface-alt bg-white p-4";
                             {session.end && <Fragment set:text={`à\u00a0${session.end}`} />}
                           </p>
                           {session.subtitle && <p class="leading-snug">{session.subtitle}</p>}
+                          {badge && <p class="mb-1">{badge}</p>}
                           <h3 class="text-lg leading-snug font-bold text-inherit uppercase">{session.title}</h3>
                         </div>
                       </div>
@@ -208,10 +256,14 @@ const CARD = "rounded-xl border border-surface-alt bg-white p-4";
                 }
                 return (
                   <li
-                    class={`flex gap-4 rounded-xl border p-4 ${isBreak ? "items-center border-gold/50 bg-gold/15" : "border-surface-alt bg-white"}`}
+                    data-session-id={session.id}
+                    data-state={state ?? undefined}
+                    id={state === "current" ? "en-cours" : undefined}
+                    class={`flex gap-4 rounded-xl border p-4 ${LIVE_ITEM} ${isBreak ? "items-center border-gold/50 bg-gold/15" : "border-surface-alt bg-white"}`}
                   >
                     <p class={`w-14 shrink-0 font-heading text-lg font-medium ${isBreak ? "text-gold-ink" : "text-title"}`}>{time}</p>
                     <div class="min-w-0 flex-1">
+                      {badge && <p class="mb-1">{badge}</p>}
                       <h3 class={`text-lg leading-snug font-bold ${isBreak ? "text-gold-ink" : "text-ink"}`}>{session.title}</h3>
                       {description && (
                         <div
@@ -220,8 +272,12 @@ const CARD = "rounded-xl border border-surface-alt bg-white p-4";
                         />
                       )}
                       {speakers}
+                      {myMeetings}
                     </div>
-                    {isBreak && (
+                    {isBreak && !windowOpen && shellMe && (
+                      <p class="shrink-0 text-right font-semibold text-gold-ink" data-meeting-count>{meetingCount(mine.length)}</p>
+                    )}
+                    {isBreak && windowOpen && (
                       <a
                         href={rdvHref}
                         class="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg bg-gold px-4 font-bold text-gold-ink hover:bg-gold-light"
@@ -310,6 +366,7 @@ const CARD = "rounded-xl border border-surface-alt bg-white p-4";
       </section>
     </div>
   </div>
+  {liveDay && liveSessions.length > 0 && <ProgramNow client:load sessions={liveSessions} now={program.now ?? now.toISOString()} />}
 </AppShell>
 
 <script>
@@ -323,6 +380,14 @@ const CARD = "rounded-xl border border-surface-alt bg-white p-4";
       else tab.removeAttribute("aria-current");
     }
   };
+  // Les onglets ne remplissent pas l'historique : l'entrée courante est remplacée (sans JavaScript, l'ancre reste un lien ordinaire).
+  for (const tab of tabs) {
+    tab.addEventListener("click", (event) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      location.replace(tab.getAttribute("href") ?? "#journee");
+    });
+  }
   window.addEventListener("hashchange", sync);
   sync();
 </script>
