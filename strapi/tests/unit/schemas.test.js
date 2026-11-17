@@ -24,6 +24,7 @@ const API_DIR = path.resolve(__dirname, '../../src/api');
 const STRUCTURAL = new Set(['relation', 'media', 'component', 'dynamiczone']);
 const EDITION_FIELDS = [
   'welcomeStartedAt',
+  'readOnlyAt', // V4-F (NF-70) : instant de bascule en lecture seule, privé
   'participantSpaceEnabled',
   'helloassoOrgSlug',
   'helloassoFormType',
@@ -77,6 +78,12 @@ describe('garde des relations : les types existants ne changent pas (A-15, mémo
     for (const attribute of Object.keys(attributes).filter((key) => !(key in frozen.edition.attributes) && !EDITION_PUBLIC_FIELDS.includes(key))) {
       assert.equal(attributes[attribute].private, true, `edition.${attribute}`);
     }
+  });
+
+  it('edition.readOnlyAt (V4-F, NF-70) est un datetime privé', () => {
+    const { readOnlyAt } = readSchema('edition').attributes;
+    assert.equal(readOnlyAt?.type, 'datetime');
+    assert.equal(readOnlyAt?.private, true);
   });
 
   it('aucun type existant ne vise un type de l’espace dans une relation', () => {
