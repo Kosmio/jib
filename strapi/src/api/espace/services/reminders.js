@@ -285,12 +285,12 @@ module.exports = ({ strapi }) => {
       return total;
     },
 
-    /** I-39: switches `reminders` off for the owner of a signed token, without any session. -> { attendee, edition } or null for a token that is not valid. */
-    async unsubscribe(token) {
+    /** I-39: the owner of a signed token, without any session. `apply: false` only reads (the GET page changes nothing). -> { attendee, edition } or null for a token that is not valid. */
+    async unsubscribe(token, { apply = true } = {}) {
       const id = reminders.verifyUnsubscribe(secret(), token);
       const attendee = id && (await documents(ATTENDEE).findOne({ documentId: id, populate: { edition: { fields: ['slug', 'title'] } } }));
       if (!attendee) return null;
-      if (attendee.emailPrefs?.reminders !== false) {
+      if (apply && attendee.emailPrefs?.reminders !== false) {
         await documents(ATTENDEE).update({ documentId: id, data: { emailPrefs: { meetingRequests: true, messages: true, ...attendee.emailPrefs, reminders: false } } });
       }
       return { attendee, edition: attendee.edition };
