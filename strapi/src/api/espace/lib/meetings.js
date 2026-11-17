@@ -86,6 +86,7 @@ function requestWindow(edition, now) {
 function hostedTables(attendees, tablesCount) {
   const hosted = new Map();
   const warnings = [];
+  const taken = new Set();
   const byId = (a, b) => (typeof a.id === 'number' && typeof b.id === 'number' ? a.id - b.id : 0);
   const candidates = attendees.filter(({ status, hostedTableNumber }) => status === 'active' && hostedTableNumber !== null && hostedTableNumber !== undefined);
 
@@ -94,8 +95,11 @@ function hostedTables(attendees, tablesCount) {
     const number = attendee.hostedTableNumber;
     const warn = (code) => warnings.push({ code, attendeeId, hostedTableNumber: number });
     if (attendee.role !== 'speaker' || !Number.isInteger(number) || number < 1 || number > tablesCount) warn('HOSTED_TABLE_INVALID');
-    else if ([...hosted.values()].includes(number)) warn('HOSTED_TABLE_CONFLICT');
-    else hosted.set(attendeeId, number);
+    else if (taken.has(number)) warn('HOSTED_TABLE_CONFLICT');
+    else {
+      hosted.set(attendeeId, number);
+      taken.add(number);
+    }
   }
   return { hosted, warnings };
 }
@@ -125,7 +129,9 @@ function buildSnapshot({ edition, now, slots, attendees, exhibitors, meetings })
 
   const activeRepIds = new Map();
   for (const { documentId, status, exhibitor } of attendees) {
-    if (status === 'active' && exhibitor?.documentId) activeRepIds.set(exhibitor.documentId, [...(activeRepIds.get(exhibitor.documentId) ?? []), documentId]);
+    if (status !== 'active' || !exhibitor?.documentId) continue;
+    if (!activeRepIds.has(exhibitor.documentId)) activeRepIds.set(exhibitor.documentId, []);
+    activeRepIds.get(exhibitor.documentId).push(documentId);
   }
 
   return {

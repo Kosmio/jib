@@ -71,40 +71,114 @@ function operations(strapi) {
 
   // --- loading ---
 
-  /** The edition and all it takes to apply the rules and to build the views: one read, inside the lock for a write. */
-  async function load(editionDocumentId, now) {
-    const filters = { edition: { documentId: editionDocumentId } };
+  /** The edition and its slots, in time order: what every reading needs. */
+  async function loadEditionAndSlots(editionDocumentId) {
     const edition = await documents(EDITION).findOne({ documentId: editionDocumentId, status: 'published', populate: ['lieux'] });
     const slots = await documents(SLOT).findMany({
-      filters,
+      filters: { edition: { documentId: editionDocumentId } },
       populate: { session: { fields: ['documentId', 'title', 'start_time', 'end_time'] } },
       sort: ['startsAt:asc'],
       limit: 1000,
     });
-    const attendees = await documents(ATTENDEE).findMany({ filters, populate: ATTENDEE_CARD_POPULATE, limit: 5000 });
-    const exhibitors = await documents(EXHIBITOR).findMany({ filters, populate: EXHIBITOR_CARD_POPULATE, limit: 1000 });
-    const stored = await documents(MEETING).findMany({ filters, populate: MEETING_POPULATE, sort: ['createdAt:asc'], limit: 10000 });
-    const meetings = stored.filter((meeting) => {
+    return { edition, slots };
+  }
+
+  /**
+   * NF-67: the meetings whose requester, target or slot is gone are ignored (and reported once). Identifier sets, not scans: the cost
+   * of a meeting does not depend on the size of the edition.
+   */
+  function intactMeetings(stored, { attendeeIds, exhibitorIds, slotIds }) {
+    return stored.filter((meeting) => {
       const intact =
         meeting.slot &&
         meeting.requester &&
         (meeting.targetAttendee || meeting.targetExhibitor) &&
-        attendees.some(({ documentId }) => documentId === meeting.requester.documentId) &&
-        (!meeting.targetAttendee || attendees.some(({ documentId }) => documentId === meeting.targetAttendee.documentId)) &&
-        (!meeting.targetExhibitor || exhibitors.some(({ documentId }) => documentId === meeting.targetExhibitor.documentId)) &&
-        slots.some(({ documentId }) => documentId === meeting.slot.documentId);
+        attendeeIds.has(meeting.requester.documentId) &&
+        (!meeting.targetAttendee || attendeeIds.has(meeting.targetAttendee.documentId)) &&
+        (!meeting.targetExhibitor || exhibitorIds.has(meeting.targetExhibitor.documentId)) &&
+        slotIds.has(meeting.slot.documentId);
       if (!intact) reportOrphan(strapi, meeting);
       return intact;
     });
+  }
 
+  const idsOf = (rows) => new Set(rows.map(({ documentId }) => documentId));
+  const byDocumentId = (rows) => new Map(rows.map((row) => [row.documentId, row]));
+
+  function context({ edition, now, slots, attendees, exhibitors, meetings }) {
     return {
       edition,
       now,
       snap: rules.buildSnapshot({ edition, now, slots, attendees, exhibitors, meetings }),
-      attendees: new Map(attendees.map((attendee) => [attendee.documentId, attendee])),
-      exhibitors: new Map(exhibitors.map((exhibitor) => [exhibitor.documentId, exhibitor])),
+      attendees: byDocumentId(attendees),
+      exhibitors: byDocumentId(exhibitors),
       meetings,
+      meetingsById: byDocumentId(meetings),
     };
+  }
+
+  /** The edition and all it takes to apply the rules and to build the views: one read, inside the lock for a write. */
+  async function load(editionDocumentId, now) {
+    const filters = { edition: { documentId: editionDocumentId } };
+    const { edition, slots } = await loadEditionAndSlots(editionDocumentId);
+    const attendees = await documents(ATTENDEE).findMany({ filters, populate: ATTENDEE_CARD_POPULATE, limit: 5000 });
+    const exhibitors = await documents(EXHIBITOR).findMany({ filters, populate: EXHIBITOR_CARD_POPULATE, limit: 1000 });
+    const stored = await documents(MEETING).findMany({ filters, populate: MEETING_POPULATE, sort: ['createdAt:asc'], limit: 10000 });
+    const meetings = intactMeetings(stored, { attendeeIds: idsOf(attendees), exhibitorIds: idsOf(exhibitors), slotIds: idsOf(slots) });
+    return context({ edition, now, slots, attendees, exhibitors, meetings });
+  }
+
+  /**
+   * What a reading for one person needs, and no more (NF-21): the slots, the dedicated tables (the people who hold one), the person and,
+   *  - `own`: her meetings (sent, received, received as a representative of an exhibitor) and the cards they show ;
+   *  - `statuses` + `target`: the pending and accepted meetings of the edition (they take the slots and the tables) and the target.
+   * The snapshot answers the rules as the full load does: the identifier sets keep the orphans out the same way.
+   */
+  async function loadFor(editionDocumentId, now, { me, own = false, statuses = null, target = null }) {
+    const filters = { edition: { documentId: editionDocumentId } };
+    const { edition, slots } = await loadEditionAndSlots(editionDocumentId);
+    const [attendeeIds, exhibitorIds] = (
+      await Promise.all([
+        documents(ATTENDEE).findMany({ filters, fields: ['documentId'], limit: 5000 }),
+        documents(EXHIBITOR).findMany({ filters, fields: ['documentId'], limit: 1000 }),
+      ])
+    ).map(idsOf);
+
+    const wanted = [{ documentId: me }, { hostedTableNumber: { $notNull: true } }];
+    if (target?.kind === 'p') wanted.push({ documentId: target.id });
+    if (target?.kind === 'x') wanted.push({ exhibitor: { documentId: target.id } });
+    const attendees = byDocumentId(await documents(ATTENDEE).findMany({ filters: { ...filters, $or: wanted }, populate: ATTENDEE_CARD_POPULATE, limit: 5000 }));
+    const myExhibitorId = attendees.get(me)?.exhibitor?.documentId;
+
+    const ofMine = [{ requester: { documentId: me } }, { targetAttendee: { documentId: me } }];
+    if (myExhibitorId) ofMine.push({ targetExhibitor: { documentId: myExhibitorId } });
+    const stored = await documents(MEETING).findMany({
+      filters: own ? { ...filters, $or: ofMine } : { ...filters, status: { $in: statuses } },
+      populate: MEETING_POPULATE,
+      sort: ['createdAt:asc'],
+      limit: 10000,
+    });
+    const meetings = intactMeetings(stored, { attendeeIds, exhibitorIds, slotIds: idsOf(slots) });
+
+    const exhibitorsWanted = new Set(target?.kind === 'x' ? [target.id] : []);
+    if (own) {
+      if (myExhibitorId) exhibitorsWanted.add(myExhibitorId);
+      for (const { targetExhibitor } of meetings) if (targetExhibitor) exhibitorsWanted.add(targetExhibitor.documentId);
+      // The cards of the other parties and the active representatives of the exhibitors involved (who is on the target side).
+      const missing = new Set();
+      for (const { requester, targetAttendee } of meetings) for (const party of [requester, targetAttendee]) if (party && !attendees.has(party.documentId)) missing.add(party.documentId);
+      const clauses = [];
+      if (missing.size) clauses.push({ documentId: { $in: [...missing] } });
+      if (exhibitorsWanted.size) clauses.push({ exhibitor: { documentId: { $in: [...exhibitorsWanted] } } });
+      if (clauses.length) {
+        for (const attendee of await documents(ATTENDEE).findMany({ filters: { ...filters, $or: clauses }, populate: ATTENDEE_CARD_POPULATE, limit: 5000 })) attendees.set(attendee.documentId, attendee);
+      }
+    }
+    const exhibitors = exhibitorsWanted.size
+      ? await documents(EXHIBITOR).findMany({ filters: { ...filters, documentId: { $in: [...exhibitorsWanted] } }, populate: EXHIBITOR_CARD_POPULATE, limit: 1000 })
+      : [];
+
+    return context({ edition, now, slots, attendees: [...attendees.values()], exhibitors, meetings });
   }
 
   /**
@@ -123,7 +197,7 @@ function operations(strapi) {
   }
 
   const findMeeting = (ctx, meetingId) => {
-    const meeting = typeof meetingId === 'string' ? ctx.meetings.find(({ documentId }) => documentId === meetingId) : null;
+    const meeting = typeof meetingId === 'string' ? ctx.meetingsById.get(meetingId) : null;
     if (!meeting) throw rules.meetingError('MEETING_NOT_FOUND');
     return meeting;
   };
@@ -397,7 +471,7 @@ function operations(strapi) {
       const { me, editionId } = sessionOf(session);
       const target = rules.parseTarget(targetText);
       if (!target) throw validation({ target: 'Cible non valable.' });
-      const ctx = await load(editionId, now);
+      const ctx = await loadFor(editionId, now, { me, statuses: ['pending', 'accepted'], target });
       if (!targetExists(ctx, target)) throw rules.meetingError('TARGET_NOT_FOUND');
 
       const { snap } = ctx;
@@ -489,7 +563,7 @@ function operations(strapi) {
      */
     async list(session, { now = new Date() } = {}) {
       const { me, editionId } = sessionOf(session);
-      const ctx = await load(editionId, now);
+      const ctx = await loadFor(editionId, now, { me, own: true });
       const mine = ctx.meetings.filter((meeting) => meeting.requester.documentId === me || rules.isTargetSide(ctx.snap, rules.snapshotMeeting(meeting), me));
       const views = mine.map((meeting) => ({ meeting, view: meetingView(ctx, meeting, me) }));
       const byTime = (a, b) => new Date(a.slot.startsAt) - new Date(b.slot.startsAt);
@@ -658,11 +732,12 @@ function operations(strapi) {
         freeTables: slot.closed ? [] : rules.freeTables(snap, slot.id),
       });
       const slots = [...snap.slots.values()].sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt));
+      const dedicated = new Set(snap.hosted.values());
       const meetings = ctx.meetings.map((meeting) => {
         const slot = snap.slots.get(meeting.slot.documentId);
         const exhibitor = meeting.targetExhibitor ? snap.exhibitors.get(meeting.targetExhibitor.documentId) : null;
         const accepted = meeting.status === 'accepted';
-        const movable = accepted && Boolean(meeting.tableNumber) && !new Set(snap.hosted.values()).has(meeting.tableNumber) && !rules.hasStarted(snap, slot);
+        const movable = accepted && Boolean(meeting.tableNumber) && !dedicated.has(meeting.tableNumber) && !rules.hasStarted(snap, slot);
         return {
           id: meeting.documentId,
           status: meeting.status,
@@ -776,7 +851,7 @@ function operations(strapi) {
      */
     async calendar(session, { now = new Date() } = {}) {
       const { me, editionId } = sessionOf(session);
-      const ctx = await load(editionId, now);
+      const ctx = await loadFor(editionId, now, { me, own: true });
       const { edition } = ctx;
       const venue = edition.lieux?.[0];
 

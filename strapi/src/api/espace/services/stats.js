@@ -7,9 +7,12 @@ const ATTENDEE = 'api::espace.attendee';
 const MEETING = 'api::espace.meeting';
 const MESSAGE = 'api::espace.message';
 const SLOT = 'api::espace.slot';
+const EDITION = 'api::edition.edition';
 const EXHIBITOR = 'api::espace.exhibitor';
 const SYNC_RUN = 'api::espace.sync-run';
 const LIMIT = 10000;
+// What the counts, the profile completion, the dedicated tables (A-29) and the holders of an address (F-121) read of an attendee.
+const ATTENDEE_FIELDS = ['role', 'status', 'firstName', 'lastName', 'email', 'company', 'jobTitle', 'bio', 'hostedTableNumber', 'activatedAt', 'consentAt', 'directoryOptIn'];
 const DEFAULT_TABLES = 20;
 const TOP_EXHIBITORS = 5;
 // R-70 a: below 70 % a profile gets a reminder, from 70 % it counts as complete.
@@ -60,6 +63,48 @@ function withHolders(errors, attendees) {
 module.exports = ({ strapi }) => {
   const documents = (uid) => strapi.documents(uid);
 
+  /** Table and join columns of a relation, as Strapi 5 names them (`espace_meetings_slot_lnk`, ...): read from its metadata. */
+  const tableOf = (uid) => strapi.db.metadata.get(uid).tableName;
+  const joinOf = (uid, attribute) => {
+    const { name, joinColumn, inverseJoinColumn } = strapi.db.metadata.get(uid).attributes[attribute].joinTable;
+    return { table: name, owner: joinColumn.name, target: inverseJoinColumn.name };
+  };
+
+  /**
+   * F-125, T-40: the meetings booked on a slot, counted by the database (two grouped queries instead of a read of every meeting).
+   * -> { byStatus: { status: n }, fill: Map(slot id -> { accepted, pending }), requests: Map(exhibitor id -> n) } ; the keys are row ids.
+   */
+  async function countMeetings(edition) {
+    const knex = strapi.db.connection;
+    const editionLink = joinOf(MEETING, 'edition');
+    const slotLink = joinOf(MEETING, 'slot');
+    const exhibitorLink = joinOf(MEETING, 'targetExhibitor');
+    const booked = () =>
+      knex(`${tableOf(MEETING)} as m`)
+        .join(`${editionLink.table} as le`, 'le.' + editionLink.owner, 'm.id')
+        .join(`${tableOf(EDITION)} as e`, 'e.id', 'le.' + editionLink.target)
+        .join(`${slotLink.table} as ls`, 'ls.' + slotLink.owner, 'm.id')
+        .where('e.document_id', edition.documentId);
+
+    const bySlot = await booked().select('ls.' + slotLink.target + ' as slot', 'm.status').countDistinct('m.id as n').groupBy('ls.' + slotLink.target, 'm.status');
+    const byExhibitor = await booked()
+      .join(`${exhibitorLink.table} as lx`, 'lx.' + exhibitorLink.owner, 'm.id')
+      .select('lx.' + exhibitorLink.target + ' as exhibitor')
+      .countDistinct('m.id as n')
+      .groupBy('lx.' + exhibitorLink.target);
+
+    const byStatus = Object.fromEntries(STATUSES.map((status) => [status, 0]));
+    const fill = new Map();
+    for (const { slot, status, n } of bySlot) {
+      byStatus[status] += Number(n);
+      if (!['accepted', 'pending'].includes(status)) continue;
+      const counts = fill.get(slot) ?? { accepted: 0, pending: 0 };
+      counts[status] += Number(n);
+      fill.set(slot, counts);
+    }
+    return { byStatus, fill, requests: new Map(byExhibitor.map(({ exhibitor, n }) => [exhibitor, Number(n)])) };
+  }
+
   return {
     /**
      * GET /admin/:edition/stats (F-90, A-29): the indicators of E9, computed on the fly. Counts only, never a text (R-63).
@@ -70,48 +115,31 @@ module.exports = ({ strapi }) => {
       const ofEdition = { edition: { documentId: edition.documentId } };
       const tablesCount = edition.tablesCount ?? DEFAULT_TABLES;
 
-      const [everyone, allMeetings, slots, exhibitors, messageCount, [lastRun]] = await Promise.all([
+      const [everyone, { byStatus, fill, requests }, slots, messageCount, [lastRun]] = await Promise.all([
         documents(ATTENDEE).findMany({
           filters: ofEdition,
+          fields: ATTENDEE_FIELDS,
           populate: { photo: { fields: ['documentId'] }, topics: { fields: ['documentId'] } },
           limit: LIMIT,
         }),
-        documents(MEETING).findMany({
-          filters: ofEdition,
-          fields: ['status'],
-          populate: { slot: { fields: ['documentId'] }, targetExhibitor: { fields: ['documentId'] } },
-          limit: LIMIT,
-        }),
+        countMeetings(edition),
         documents(SLOT).findMany({ filters: ofEdition, populate: { session: { fields: ['title'] } }, sort: 'startsAt:asc', limit: LIMIT }),
-        documents(EXHIBITOR).findMany({ filters: ofEdition, populate: { organisation: { fields: ['name'] } }, limit: LIMIT }),
         documents(MESSAGE).count({ filters: { conversation: ofEdition } }),
         documents(SYNC_RUN).findMany({ filters: ofEdition, sort: 'startedAt:desc', limit: 1 }),
       ]);
+      const exhibitors = requests.size
+        ? await documents(EXHIBITOR).findMany({ filters: { ...ofEdition, id: { $in: [...requests.keys()] } }, populate: { organisation: { fields: ['name'] } }, limit: LIMIT })
+        : [];
 
-      // F-125, T-40: the exports list the meetings booked on a slot, so the indicators count those and no others.
-      const meetings = allMeetings.filter(({ slot }) => slot);
       const people = everyone.filter(({ role }) => role !== 'organizer');
       const active = people.filter(({ status }) => status === 'active');
 
       const byRole = Object.fromEntries(ROLES.map((role) => [role, 0]));
       for (const { role } of active) byRole[role] = (byRole[role] ?? 0) + 1;
 
-      const byStatus = Object.fromEntries(STATUSES.map((status) => [status, 0]));
-      for (const { status } of meetings) byStatus[status] += 1;
-
-      const fill = new Map();
-      for (const { slot, status } of meetings) {
-        if (!slot || !['accepted', 'pending'].includes(status)) continue;
-        const counts = fill.get(slot.documentId) ?? { accepted: 0, pending: 0 };
-        counts[status] += 1;
-        fill.set(slot.documentId, counts);
-      }
-
-      const requests = new Map();
-      for (const { targetExhibitor } of meetings) if (targetExhibitor) requests.set(targetExhibitor.documentId, (requests.get(targetExhibitor.documentId) ?? 0) + 1);
       const topExhibitors = exhibitors
-        .filter(({ documentId, organisation }) => requests.has(documentId) && organisation)
-        .map(({ documentId, organisation, standNumber }) => ({ id: documentId, name: organisation.name, requests: requests.get(documentId), standNumber: standNumber ?? null }))
+        .filter(({ id, organisation }) => organisation && requests.has(id))
+        .map(({ id, documentId, organisation, standNumber }) => ({ id: documentId, name: organisation.name, requests: requests.get(id), standNumber: standNumber ?? null }))
         .sort((a, b) => b.requests - a.requests || byName(a.name, b.name))
         .slice(0, TOP_EXHIBITORS);
 
@@ -126,8 +154,8 @@ module.exports = ({ strapi }) => {
         slots: slots.map((slot) => ({
           sessionTitle: slot.session?.title ?? '',
           label: slot.label,
-          accepted: fill.get(slot.documentId)?.accepted ?? 0,
-          pending: fill.get(slot.documentId)?.pending ?? 0,
+          accepted: fill.get(slot.id)?.accepted ?? 0,
+          pending: fill.get(slot.id)?.pending ?? 0,
           tables: tablesCount,
         })),
         topExhibitors,

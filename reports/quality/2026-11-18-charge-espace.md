@@ -37,3 +37,19 @@ Chaque requête authentifiée paie d'abord `loadSession` (`strapi/src/api/espace
 ## Limites
 
 Mesure unique de 30 s par route, sur une machine chargée, générateur et serveur dans le même processus. Pour trancher les cas proches du seuil (`/directory`, `/me`), refaire la mesure avec un Strapi dans son propre processus. Aucune correction n'a été faite : le lot est de test seul.
+
+## Après le lot PERF (lot/perf-meetings-stats, NF-21)
+
+Changements : `GET /meetings`, `GET /slots` et `GET /meetings.ics` ne lisent plus toute l'édition (rendez-vous de la personne, ou pending et accepted pour les créneaux ; participants limités à la personne, aux contreparties, aux tables dédiées et à la cible) ; l'écarté des orphelins (NF-67) et `findMeeting` passent par des Set et Map ; `stats` compte les rendez-vous en base (deux requêtes groupées knex sur les tables de liaison Strapi 5) au lieu de les charger. Mêmes formes de réponse, mêmes règles.
+
+Mesure sur la même machine, même script, avant puis après (le même jour, exécutions successives) :
+
+| Route | p95 avant (ms) | p95 après (ms) | p50 avant / après | SQL avant / après |
+|---|---|---|---|---|
+| GET /me (non modifié, témoin de bruit) | 259 | 540 | 200 / 353 | 20 / 20 |
+| GET /directory (non modifié) | 359 | 445 | 219 / 325 | 25 / 25 |
+| GET /meetings | 685 | 526 | 550 / 349 | 37 / 47 |
+| GET /admin/charge/stats | 435 | 527 | 336 / 281 | 35 / 29 |
+| GET /admin/charge/attendees (non modifié) | 135 | 254 | 106 / 157 | 15 / 15 |
+
+Les routes non modifiées ont perdu 40 à 100 % entre les deux exécutions : la machine était plus chargée pendant la seconde, les p95 absolus ne se comparent donc pas. Lecture fiable : p50 de `/meetings` en baisse de 37 % malgré un bruit de fond en hausse, p50 de `/stats` en baisse de 16 %. Le seuil de 300 ms n'est toujours pas tenu sur ce poste ; le coût restant est la session (une dizaine de requêtes par appel) et le processus partagé avec le générateur. À refaire sur un Strapi séparé.
