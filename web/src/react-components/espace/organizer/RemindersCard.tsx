@@ -23,7 +23,8 @@ const base = (edition: string) => `/admin/${encodeURIComponent(edition)}/reminde
 
 /** Vrai entre 8h00 et 19h59, heure de Paris. */
 function inSendingHours(now = new Date()): boolean {
-  const hour = Number(new Intl.DateTimeFormat("fr-FR", { hour: "numeric", hourCycle: "h23", timeZone: "Europe/Paris" }).format(now));
+  const parts = new Intl.DateTimeFormat("fr-FR", { hour: "numeric", hourCycle: "h23", timeZone: "Europe/Paris" }).formatToParts(now);
+  const hour = parseInt(parts.find((part) => part.type === "hour")?.value ?? "", 10);
   return hour >= 8 && hour < 20;
 }
 
