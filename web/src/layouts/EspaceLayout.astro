@@ -14,15 +14,17 @@ export interface Props {
   themeColor?: string | null;
   /** NF-24 : date de l'événement (« 2026-12-03 »), pour l'expiration de la copie hors connexion ; sans elle, 14 jours. */
   eventDate?: string | null;
+  /** NF-70 : édition terminée, les actions qui écrivent sont désactivées (posé par AppShell, jamais sur le pilotage). */
+  readOnly?: boolean;
 }
 
-const { title, shell = false, themeColor = null, eventDate = null } = Astro.props;
+const { title, shell = false, themeColor = null, eventDate = null, readOnly = false } = Astro.props;
 // Application installable : le manifeste est celui de l'édition de l'URL (pas de manifeste sur /espace/verifier ni sur la page introuvable).
 const edition = Astro.params.edition;
 ---
 
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" data-lecture-seule={readOnly ? "" : undefined}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -63,26 +65,45 @@ const edition = Astro.params.edition;
 
       // F-131 : le service worker pose `data-hors-ligne` (heure de la copie) sur une page servie depuis sa copie. Bandeau, et plus
       // aucune action qui écrit : boutons et champs de <main> désactivés, clics et envois bloqués.
-      const copie = document.documentElement.dataset.horsLigne;
-      if (copie) {
-        const heure = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
-          .formatToParts(new Date(copie))
-          .reduce((acc, part) => ({ ...acc, [part.type]: part.value }), {} as Record<string, string>);
-        const bandeau = document.getElementById("hors-ligne");
-        if (bandeau) {
-          bandeau.textContent = `Hors connexion : contenu enregistré à ${heure.hour} h ${heure.minute}`;
-          bandeau.hidden = false;
+      // NF-70 : `data-lecture-seule` (édition terminée) désactive de même les actions de <main>, sauf ce qui porte
+      // `data-permis-lecture-seule` (préférences e-mail, exports) et la déconnexion.
+      const racine = document.documentElement;
+      const copie = racine.dataset.horsLigne;
+      const lectureSeule = racine.hasAttribute("data-lecture-seule");
+      if (copie || lectureSeule) {
+        if (copie) {
+          const heure = new Intl.DateTimeFormat("fr-FR", { timeZone: "Europe/Paris", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+            .formatToParts(new Date(copie))
+            .reduce((acc, part) => ({ ...acc, [part.type]: part.value }), {} as Record<string, string>);
+          const bandeau = document.getElementById("hors-ligne");
+          if (bandeau) {
+            bandeau.textContent = `Hors connexion : contenu enregistré à ${heure.hour} h ${heure.minute}`;
+            bandeau.hidden = false;
+          }
         }
+        const permis = (el: Element | null) =>
+          !copie && Boolean(el?.closest("[data-permis-lecture-seule], [data-espace-deconnexion]"));
         const main = document.getElementById("main-content");
         const bloquer = () =>
-          main?.querySelectorAll<HTMLElement>("button, input, textarea, select").forEach((el) => el.setAttribute("disabled", ""));
+          main
+            ?.querySelectorAll<HTMLElement>("button, input, textarea, select")
+            .forEach((el) => (permis(el) ? undefined : el.setAttribute("disabled", "")));
         bloquer();
         if (main) new MutationObserver(bloquer).observe(main, { childList: true, subtree: true });
-        document.addEventListener("submit", (e) => (e.preventDefault(), e.stopImmediatePropagation()), true);
+        document.addEventListener(
+          "submit",
+          (e) => {
+            if (permis(e.target as Element)) return;
+            e.preventDefault();
+            e.stopImmediatePropagation();
+          },
+          true,
+        );
         document.addEventListener(
           "click",
           (e) => {
-            if ((e.target as Element).closest("#main-content button, #main-content input[type=submit]")) (e.preventDefault(), e.stopImmediatePropagation());
+            const cible = (e.target as Element).closest("#main-content button, #main-content input[type=submit]");
+            if (cible && !permis(cible)) (e.preventDefault(), e.stopImmediatePropagation());
           },
           true,
         );

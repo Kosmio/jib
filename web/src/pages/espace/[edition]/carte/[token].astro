@@ -23,7 +23,7 @@ type Card = ProfileCard & {
   reduced: boolean;
   bio?: string | null;
 };
-type CardResponse = { edition: Pick<EspaceEdition, "slug" | "title" | "date" | "city" | "themeColor">; card: Card };
+type CardResponse = { edition: Pick<EspaceEdition, "slug" | "title" | "date" | "city" | "themeColor"> & { readOnly?: boolean }; card: Card };
 
 const slug = Astro.params.edition ?? "";
 const token = Astro.params.token ?? "";
@@ -59,7 +59,7 @@ const tag = card ? tagOf(card) : null;
   {
     card && found ? (
       <>
-        <EditionBanner title={found.edition.title} subtitle={editionLine(found.edition)} themeColor={found.edition.themeColor} />
+        <EditionBanner title={found.edition.title} subtitle={editionLine(found.edition)} themeColor={found.edition.themeColor} readOnly={found.edition.readOnly} />
         <EspaceCard>
           <div class="flex items-center gap-4">
             <span class="inline-flex shrink-0 rounded-full border-4 border-gold p-1">

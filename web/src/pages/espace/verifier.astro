@@ -27,7 +27,7 @@ const valid = link.valid && edition !== null;
 ---
 
 <EspaceLayout title={valid ? "Ouvrir mon espace" : "Lien non valable"}>
-  <EditionBanner title="Bienvenue dans votre espace participant" subtitle={meetingsSubtitle(edition)} themeColor={edition?.themeColor} />
+  <EditionBanner title="Bienvenue dans votre espace participant" subtitle={meetingsSubtitle(edition)} themeColor={edition?.themeColor} readOnly={edition?.readOnly} />
   {
     valid ? (
       <EspaceCard heading="Votre lien est valable">

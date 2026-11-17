@@ -55,7 +55,7 @@ const titles = {
 ---
 
 <EspaceLayout title={state === "sent" && codeError ? "Code non valable" : state === "sent" && codeTooMany ? "Trop d’essais" : titles[state]}>
-  <EditionBanner title="Bienvenue dans votre espace participant" subtitle={meetingsSubtitle(edition)} themeColor={edition.themeColor} />
+  <EditionBanner title="Bienvenue dans votre espace participant" subtitle={meetingsSubtitle(edition)} themeColor={edition.themeColor} readOnly={edition.readOnly} />
   {
     state === "sent" ? (
       <EspaceCard heading="Vérifiez votre messagerie">

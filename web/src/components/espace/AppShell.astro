@@ -21,9 +21,11 @@ export interface Props {
   themeColor?: string | null;
   /** V3-C : date de l'événement (`edition.date`), relayée à EspaceLayout pour l'expiration des copies hors connexion. */
   eventDate?: string | null;
+  /** NF-70 : `edition.readOnly`, déjà lu par la page. Affiche le bandeau ; hors pilotage, les actions qui écrivent sont désactivées (EspaceLayout). */
+  readOnly?: boolean;
 }
 
-const { title, active, editionSlug, me, themeColor = null, eventDate = null } = Astro.props;
+const { title, active, editionSlug, me, themeColor = null, eventDate = null, readOnly = false } = Astro.props;
 const base = `/espace/${encodeURIComponent(editionSlug)}`;
 
 // Icônes en trait (stroke 2 px) en SVG en ligne, décoratives : le libellé voisin porte le sens.
@@ -70,7 +72,7 @@ const linkClass = (id: ShellTab) =>
   `${linkBase} ${id === active ? "border-primary text-primary-ink lg:bg-surface" : "border-transparent text-muted hover:text-title lg:hover:bg-surface"}`;
 ---
 
-<EspaceLayout title={title} shell={me !== null} themeColor={themeColor} eventDate={eventDate}>
+<EspaceLayout title={title} shell={me !== null} themeColor={themeColor} eventDate={eventDate} readOnly={readOnly && active !== "organizer"}>
   {
     me && (
       <nav
@@ -213,6 +215,13 @@ const linkClass = (id: ShellTab) =>
           </li>
         </ul>
       </nav>
+    )
+  }
+  {
+    readOnly && (
+      <p role="status" data-lecture-seule-bandeau class="bg-surface-alt px-4 py-3 text-center text-base font-semibold text-title">
+        L’édition est terminée, votre espace reste consultable.
+      </p>
     )
   }
   <slot />
