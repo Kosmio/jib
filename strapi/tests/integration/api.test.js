@@ -122,6 +122,8 @@ describe('Strapi sur la base de test', { timeout: 180_000 }, () => {
       'GET /api/espace/conversations/:x/messages',
       'POST /api/espace/conversations/:x/messages',
       'GET /api/espace/admin/:x/stats',
+      // F-91 : exports CSV de l'organisateur (participants, meetings, exhibitors, stats).
+      'GET /api/espace/admin/:x/export/:x',
     ]);
     const declared = () =>
       espaceRoutes().flatMap((route) =>
