@@ -135,17 +135,20 @@ jobs:
           echo "${{ secrets.GITHUB_TOKEN }}" | ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} \
             "docker login ghcr.io -u ${{ github.actor }} --password-stdin"
 
-          # Pull images
+          # Pull images. Avec pipefail, un téléchargement en échec arrête le déploiement : sans lui, « | cat » masquait l'erreur
+          # et les conteneurs repartaient sur l'ancienne image, déploiement affiché en succès.
+          set -o pipefail
           ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} bash << 'EOF' 2>&1 | cat
             set -e
             cd ~/jib/infra/deploy
             ENV_FILE="overlays/${{ inputs.environment }}/.env.${{ inputs.environment }}"
             SECRETS_FILE="overlays/${{ inputs.environment }}/.env.secrets"
+            # Le fichier fusionné contient les secrets : il est retiré même si le téléchargement échoue.
+            trap 'rm -f "$ENV_FILE.merged"' EXIT
             cp "$ENV_FILE" "$ENV_FILE.merged"
             cat "$SECRETS_FILE" >> "$ENV_FILE.merged"
             sed -i "s/^JIB_VERSION=.*/JIB_VERSION=${{ inputs.version }}/" "$ENV_FILE.merged"
             DOCKER_COMPOSE_ENV_FILE="$ENV_FILE.merged" scripts/deploy.sh ${{ inputs.environment }} pull 2>&1
-            rm -f "$ENV_FILE.merged"
           EOF
 
       - name: Reset database
