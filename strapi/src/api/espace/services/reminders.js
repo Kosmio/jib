@@ -6,6 +6,7 @@ const { renderEmail } = require('../lib/mail/render');
 const { formatTimeLabel, parseProgramTime } = require('../lib/time');
 const { linkUrl } = require('../lib/tokens');
 const reminders = require('../lib/reminders');
+const { isReadOnly } = require('../lib/read-only');
 
 const EDITION = 'api::edition.edition';
 const ATTENDEE = 'api::espace.attendee';
@@ -248,6 +249,7 @@ module.exports = ({ strapi }) => {
     /** F-92, R-71, R-72: the manual send, keyed by the date of the day. 409 OUTSIDE_SENDING_HOURS. -> { sent, skipped, failed } */
     async send(edition, scenario, { now = new Date() } = {}) {
       assertScenario(scenario);
+      if (isReadOnly(edition, now)) throw new EspaceError(409, 'EDITION_READ_ONLY', 'L’édition est terminée : les relances ne partent plus.');
       if (!reminders.inSendingHours(now)) throw new EspaceError(409, 'OUTSIDE_SENDING_HOURS', 'Les relances partent entre 8h00 et 20h00, heure de Paris.');
       return guarded(edition, async () => {
         const context = await load(edition);
@@ -265,7 +267,7 @@ module.exports = ({ strapi }) => {
       const total = { sent: 0, failed: 0 };
       if (!reminders.inSendingHours(now)) return total;
       const editions = await documents(EDITION).findMany({ status: 'published', populate: ['lieux'], limit: 1000 });
-      for (const edition of editions.filter(({ participantSpaceEnabled, date }) => participantSpaceEnabled && date)) {
+      for (const edition of editions.filter((edition) => edition.participantSpaceEnabled && edition.date && !isReadOnly(edition, now))) {
         if (running.has(edition.documentId)) continue;
         try {
           await guarded(edition, async () => {

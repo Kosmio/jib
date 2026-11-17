@@ -4,6 +4,7 @@ const { EspaceError } = require('../lib/errors');
 const { ATTENDEE_CARD_POPULATE, attendeeCard, identity } = require('../lib/cards');
 const { CARD_TOKEN_PATTERN, TYPE_LABELS, hashCardToken, isReduced, typeOf } = require('../lib/badges');
 const { createRateLimiter } = require('../lib/rate-limit');
+const { isReadOnly } = require('../lib/read-only');
 
 const ATTENDEE = 'api::espace.attendee';
 // NF-54: 30 requests per minute and per IP on the public card route.
@@ -27,8 +28,8 @@ module.exports = ({ strapi }) => {
       if (typeof token !== 'string' || !CARD_TOKEN_PATTERN.test(token)) throw invalid();
 
       const edition = await strapi.service('api::espace.editions').findPublished(String(slug));
-      // NF-52 (closed space) ; readOnlyAt (R-83) is honoured as soon as the edition has that field.
-      if (!edition?.participantSpaceEnabled || (edition.readOnlyAt && new Date(edition.readOnlyAt).getTime() <= Date.now())) throw invalid();
+      // NF-52 (closed space) ; read-only edition (R-83, NF-70).
+      if (!edition?.participantSpaceEnabled || isReadOnly(edition)) throw invalid();
 
       const attendee = await strapi.documents(ATTENDEE).findFirst({
         filters: { cardTokenHash: hashCardToken(token), status: 'active', edition: { documentId: edition.documentId } },

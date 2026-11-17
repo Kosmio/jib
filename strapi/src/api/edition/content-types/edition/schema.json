@@ -116,6 +116,10 @@
       "default": false,
       "private": true
     },
+    "readOnlyAt": {
+      "type": "datetime",
+      "private": true
+    },
     "welcomeStartedAt": {
       "type": "datetime",
       "private": true

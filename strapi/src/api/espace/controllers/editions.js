@@ -1,6 +1,7 @@
 'use strict';
 
 const { EspaceError } = require('../lib/errors');
+const { isReadOnly } = require('../lib/read-only');
 
 module.exports = {
   // GET /api/espace/editions/:slug (public): what the pages need to display an edition, and nothing private.
@@ -17,6 +18,7 @@ module.exports = {
       venue: venue ? { name: venue.name, address: venue.address } : null,
       themeColor: edition.hero_bg_color ?? null,
       participantSpaceEnabled: Boolean(edition.participantSpaceEnabled),
+      readOnly: isReadOnly(edition),
       meetingRequestsOpenAt: edition.meetingRequestsOpenAt ?? null,
       meetingRequestsCloseAt: edition.meetingRequestsCloseAt ?? null,
     };

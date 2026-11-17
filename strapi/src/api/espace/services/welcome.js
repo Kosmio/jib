@@ -3,6 +3,7 @@
 const { EspaceError } = require('../lib/errors');
 const { renderEmail } = require('../lib/mail/render');
 const { linkUrl } = require('../lib/tokens');
+const { isReadOnly } = require('../lib/read-only');
 
 const EDITION = 'api::edition.edition';
 const ATTENDEE = 'api::espace.attendee';
@@ -108,6 +109,7 @@ module.exports = ({ strapi }) => {
      * 409 OUTSIDE_SENDING_HOURS, 409 WELCOME_RUNNING. -> { sent, failed, startedAt }
      */
     async send(edition, { now = new Date() } = {}) {
+      if (isReadOnly(edition, now)) throw new EspaceError(409, 'EDITION_READ_ONLY', 'L’édition est terminée : les e-mails de bienvenue ne partent plus.');
       if (!inSendingHours(now)) throw new EspaceError(409, 'OUTSIDE_SENDING_HOURS', 'Les e-mails de bienvenue partent entre 8h00 et 20h00, heure de Paris.');
       if (running.has(edition.documentId)) throw new EspaceError(409, 'WELCOME_RUNNING', 'Un envoi est déjà en cours.');
       running.add(edition.documentId);
@@ -125,7 +127,7 @@ module.exports = ({ strapi }) => {
 
     /** R-85, called by the synchronization, never awaited: invites the newcomers once the first send has happened, within the sending hours, until three failures. */
     async inviteNew(edition, now = new Date()) {
-      if (!(edition.participantSpaceEnabled && edition.welcomeStartedAt && inSendingHours(now)) || running.has(edition.documentId)) return;
+      if (!(edition.participantSpaceEnabled && edition.welcomeStartedAt && !isReadOnly(edition, now) && inSendingHours(now)) || running.has(edition.documentId)) return;
       running.add(edition.documentId);
       try {
         await deliver(edition, (await pending(edition)).filter(({ failures }) => failures < MAX_FAILURES), now);

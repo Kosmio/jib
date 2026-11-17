@@ -15,6 +15,8 @@ export type EspaceEdition = {
   city: string | null;
   themeColor: string | null;
   participantSpaceEnabled: boolean;
+  /** NF-70 : l'édition est terminée (readOnlyAt passé) ; l'espace reste consultable, toute écriture répond 409 EDITION_READ_ONLY. */
+  readOnly: boolean;
   /** Fenêtre de prise de rendez-vous (instants ISO) ; null : pas de borne. */
   meetingRequestsOpenAt: string | null;
   meetingRequestsCloseAt: string | null;

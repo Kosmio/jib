@@ -1,6 +1,7 @@
 ---
 // Bandeau d'édition : couleur d'édition (Strapi), logos, halo doré et constellation, titre et sous-titre.
 // Une couleur qui ne passe pas 4,5:1 sous le blanc, ou qui n'est pas un hexadécimal à six chiffres, donne le fond `bg-title`.
+// NF-70 : `readOnly` (édition terminée, `edition.readOnly`) pose sous le sous-titre « L’édition est terminée, votre espace reste consultable ».
 // La phase 2 y ajoutera le compte à rebours J-n (F-20).
 import { bannerColor } from "../../lib/espace/format";
 
@@ -8,9 +9,10 @@ export interface Props {
   title: string;
   subtitle: string;
   themeColor?: string | null;
+  readOnly?: boolean;
 }
 
-const { title, subtitle, themeColor } = Astro.props;
+const { title, subtitle, themeColor, readOnly = false } = Astro.props;
 const color = bannerColor(themeColor);
 ---
 
@@ -58,5 +60,12 @@ const color = bannerColor(themeColor);
     </div>
     <h1 class="mt-8 text-2xl leading-tight text-white md:text-3xl">{title}</h1>
     <p class="mt-4 text-lg text-white">{subtitle}</p>
+    {
+      readOnly && (
+        <p role="status" class="mt-4 inline-block rounded-lg bg-white px-3 py-2 text-base font-medium text-title">
+          L’édition est terminée, votre espace reste consultable.
+        </p>
+      )
+    }
   </div>
 </header>

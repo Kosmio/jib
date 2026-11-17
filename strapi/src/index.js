@@ -1438,6 +1438,7 @@ const ADMIN_CONFIG = {
       tablesCount: ['Nombre de tables', 'Nombre de tables disponibles pour les rendez-vous B2B, par créneau. Ne pas descendre sous le numéro d’une table déjà attribuée.'],
       meetingRequestsOpenAt: ['Ouverture des demandes de rendez-vous', 'Date et heure (Paris) à partir desquelles on peut demander un rendez-vous. Vide : ouvert dès l’ouverture de l’espace.'],
       meetingRequestsCloseAt: ['Fermeture des demandes de rendez-vous', 'Date et heure (Paris). Vide : fermeture la veille à 18h00.'],
+      readOnlyAt: ['Lecture seule à partir du', 'Vide : sept jours après la date de l’édition. Passé cette date, l’espace reste consultable mais plus modifiable, et les relances s’arrêtent.'],
       welcomeStartedAt: ['Envoi des e-mails de bienvenue lancé le', 'Rempli automatiquement quand l’envoi des welcome part depuis le pilotage. À ne pas modifier à la main.'],
     },
     tail: [
@@ -1447,6 +1448,7 @@ const ADMIN_CONFIG = {
       ['helloassoFieldMap'],
       ['slotDurationMinutes', 'tablesCount'],
       ['meetingRequestsOpenAt', 'meetingRequestsCloseAt'],
+      ['readOnlyAt'],
       ['welcomeStartedAt'],
     ],
   },
