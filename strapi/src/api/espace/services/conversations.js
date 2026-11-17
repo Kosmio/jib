@@ -8,6 +8,7 @@ const {
   MESSAGE_LIMIT,
   MESSAGE_WINDOW_MS,
   QUIET_DELAY_MS,
+  UNREAD_DELAY_MS,
   canonicalPair,
   excerpt,
   notificationsDue,
@@ -129,7 +130,7 @@ module.exports = ({ strapi }) => {
       filters: {
         readAt: { $null: true },
         emailNotifiedAt: { $null: true },
-        createdAt: { $lte: new Date(now.getTime() - 5 * 60 * 1000) },
+        createdAt: { $lte: new Date(now.getTime() - UNREAD_DELAY_MS) },
         conversation: { edition: { documentId: edition.documentId } },
       },
       populate: { author: { fields: ['documentId'] }, conversation: { fields: ['documentId'], populate: { participants: true } } },
@@ -328,8 +329,8 @@ module.exports = ({ strapi }) => {
     },
 
     /**
-     * R-62, F-73, T-31 (scheduled task `espaceMessageNotify`, every 5 minutes): one e-mail `new-message` per conversation and
-     * recipient for the messages still unread after 5 minutes, at most one every 30 minutes, if the preference `messages` is on.
+     * R-62, R-88, F-73, T-31 (scheduled task `espaceMessageNotify`, every minute): one e-mail `new-message` per conversation and
+     * recipient for the messages still unread after 2 minutes, at most one every 30 minutes, if the preference `messages` is on.
      * Editions whose space is closed send nothing (NF-52). -> { sent }
      */
     async notifyMessages({ now = new Date() } = {}) {

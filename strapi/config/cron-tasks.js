@@ -21,7 +21,7 @@ module.exports = {
     task: safely('espaceMeetingExpiry', (strapi) => strapi.service('api::espace.meetings').expirePending()),
     options: { rule: '*/5 * * * *', tz: TIME_ZONE },
   },
-  // R-62, T-31: every minute (V3-D), one deferred e-mail per conversation for the messages unread for 5 minutes.
+  // R-62, T-31: every minute (V3-D), one deferred e-mail per conversation for the messages unread for 2 minutes.
   espaceMessageNotify: {
     task: safely('espaceMessageNotify', (strapi) => strapi.service('api::espace.conversations').notifyMessages()),
     options: { rule: '* * * * *', tz: TIME_ZONE },

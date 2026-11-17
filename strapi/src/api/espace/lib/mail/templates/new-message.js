@@ -3,7 +3,7 @@
 const NBSP = '\u00a0';
 
 /**
- * `new-message` (R-62, F-73): sent when a message is still unread after 5 minutes, at most once per conversation and recipient every 30 minutes.
+ * `new-message` (R-62, F-73): sent when a message is still unread after 2 minutes (R-88), at most once per conversation and recipient every 30 minutes.
  * `excerpt` is the beginning of the message, 200 characters at most ; `threadUrl` is a 72 hour action link to the conversation (I-21).
  * The e-mail never carries more than the excerpt (R-63).
  */
