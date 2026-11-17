@@ -11,6 +11,7 @@ import { Avatar } from "../../../react-components/espace/ProfileCardView";
 import { espaceGet, getMe, getOpenEdition, publicStrapiUrl } from "../../../lib/espace/api";
 import type { ProfileCard } from "../../../lib/espace/client";
 import { editionLine } from "../../../lib/espace/format";
+import { getProgramTheme } from "../../../lib/program-themes";
 
 // Forme de `GET /editions/:slug/program` (phase-2-plan.md, section 3.2). Les horaires sont du texte (« 9h15 ») ; `startsAt` est l'instant ISO.
 type Speaker = { name: string; title: string | null; organisation: string | null; photoUrl: string | null; attendeeId: string | null };
@@ -22,9 +23,12 @@ type Session = {
   end: string | null;
   startsAt: string | null;
   kind: "talk" | "b2b_break" | "other";
+  theme?: string | null;
+  subtitle?: string | null;
   speakers: Speaker[];
 };
 type Program = {
+  flyer?: { imageUrl: string | null; pdfUrl: string | null };
   notes: string[];
   sessions: Session[];
   speakers: (Speaker & { sessions: string[] })[];
@@ -52,6 +56,12 @@ const notes = program.notes
   .map((note) => note.trim().replace(/^\((.*)\)$/s, "$1").trim())
   .filter(Boolean)
   .map((note) => note.charAt(0).toUpperCase() + note.slice(1));
+
+// Programme imprimé : l'image ouvre le PDF. Les médias sont servis par Strapi, adresse publique.
+const mediaUrl = (url: string | null | undefined) =>
+  url ? (/^https?:\/\//i.test(url) ? url : url.startsWith("/") ? `${publicStrapiUrl}${url}` : null) : null;
+const flyerImage = mediaUrl(program.flyer?.imageUrl);
+const flyerPdf = mediaUrl(program.flyer?.pdfUrl);
 
 const rdvHref = shellMe ? `${base}/annuaire` : `${base}/connexion`;
 const profileHref = (attendeeId: string | null) => (shellMe && attendeeId ? `${base}/annuaire/p/${encodeURIComponent(attendeeId)}` : null);
@@ -125,6 +135,22 @@ const CARD = "rounded-xl border border-surface-alt bg-white p-4";
         class="group-has-[#intervenants:target]/prog:hidden group-has-[#infos:target]/prog:hidden"
       >
         <h2 id="journee-titre" class="sr-only">Journée</h2>
+        {
+          (flyerImage || flyerPdf) && (
+            <a
+              href={flyerPdf ?? flyerImage}
+              target="_blank"
+              rel="noopener noreferrer"
+              class={`${CARD} mb-4 flex min-h-11 items-center gap-4 font-semibold text-title hover:bg-surface`}
+            >
+              {flyerImage && <img src={flyerImage} alt="" loading="lazy" class="w-20 shrink-0 rounded-md border border-surface-alt" />}
+              <span class="underline">
+                {flyerPdf ? "Ouvrir le programme imprimable (PDF)" : "Agrandir le programme"}
+                <span class="sr-only"> (s’ouvre dans un nouvel onglet)</span>
+              </span>
+            </a>
+          )
+        }
         {notes.map((note) => <p class="mb-3 text-muted">{note}</p>)}
         {
           !shellMe && program.sessions.some(({ kind }) => kind === "b2b_break") && (
@@ -139,13 +165,52 @@ const CARD = "rounded-xl border border-surface-alt bg-white p-4";
               {program.sessions.map((session) => {
                 const isBreak = session.kind === "b2b_break";
                 const description = html(session.description);
+                const theme = isBreak ? null : getProgramTheme(session.theme);
+                const time = session.startsAt ? <time datetime={session.startsAt}>{timeOf(session)}</time> : timeOf(session);
+                const speakers = session.speakers?.length > 0 && (
+                  <ul class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
+                    {session.speakers.map((speaker) => {
+                      const href = profileHref(speaker.attendeeId);
+                      const label = speaker.organisation ? `${speaker.name}, ${speaker.organisation}` : speaker.name;
+                      return <li>{href ? <a href={href} class="text-title underline">{label}</a> : label}</li>;
+                    })}
+                  </ul>
+                );
+                if (theme) {
+                  return (
+                    <li class={`overflow-hidden rounded-xl border-2 bg-white ${theme.border}`}>
+                      <div class={`flex items-center gap-3 p-4 ${theme.band}`}>
+                        <span aria-hidden="true" class={`flex size-11 shrink-0 items-center justify-center rounded-full ${theme.badge}`}>
+                          <svg class="size-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                            {theme.icon.map((d) => <path d={d} />)}
+                            {theme.circles?.map(([cx, cy, r]) => <circle cx={cx} cy={cy} r={r} />)}
+                          </svg>
+                        </span>
+                        <div class="min-w-0 flex-1">
+                          <p class="font-heading text-lg font-medium">
+                            {time}
+                            {session.end && <Fragment set:text={`à\u00a0${session.end}`} />}
+                          </p>
+                          {session.subtitle && <p class="leading-snug">{session.subtitle}</p>}
+                          <h3 class="text-lg leading-snug font-bold text-inherit uppercase">{session.title}</h3>
+                        </div>
+                      </div>
+                      {(description || speakers) && (
+                        <div class="p-4">
+                          {description && (
+                            <div class="text-muted italic [&_a]:text-title [&_a]:underline [&_p+p]:mt-2 [&_ul]:list-disc [&_ul]:pl-5" set:html={description} />
+                          )}
+                          {speakers}
+                        </div>
+                      )}
+                    </li>
+                  );
+                }
                 return (
                   <li
                     class={`flex gap-4 rounded-xl border p-4 ${isBreak ? "items-center border-gold/50 bg-gold/15" : "border-surface-alt bg-white"}`}
                   >
-                    <p class={`w-14 shrink-0 font-heading text-lg font-medium ${isBreak ? "text-gold-ink" : "text-title"}`}>
-                      {session.startsAt ? <time datetime={session.startsAt}>{timeOf(session)}</time> : timeOf(session)}
-                    </p>
+                    <p class={`w-14 shrink-0 font-heading text-lg font-medium ${isBreak ? "text-gold-ink" : "text-title"}`}>{time}</p>
                     <div class="min-w-0 flex-1">
                       <h3 class={`text-lg leading-snug font-bold ${isBreak ? "text-gold-ink" : "text-ink"}`}>{session.title}</h3>
                       {description && (
@@ -154,15 +219,7 @@ const CARD = "rounded-xl border border-surface-alt bg-white p-4";
                           set:html={description}
                         />
                       )}
-                      {session.speakers?.length > 0 && (
-                        <ul class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
-                          {session.speakers.map((speaker) => {
-                            const href = profileHref(speaker.attendeeId);
-                            const label = speaker.organisation ? `${speaker.name}, ${speaker.organisation}` : speaker.name;
-                            return <li>{href ? <a href={href} class="text-title underline">{label}</a> : label}</li>;
-                          })}
-                        </ul>
-                      )}
+                      {speakers}
                     </div>
                     {isBreak && (
                       <a

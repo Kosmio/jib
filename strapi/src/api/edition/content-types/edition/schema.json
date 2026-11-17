@@ -70,6 +70,12 @@
       "multiple": false,
       "allowedTypes": ["images"]
     },
+    "programmeImageUrl": {
+      "type": "string"
+    },
+    "programmePdfUrl": {
+      "type": "string"
+    },
     "hero_bg_color": {
       "type": "customField",
       "customField": "plugin::color-picker.color"

@@ -40,7 +40,7 @@ module.exports = ({ strapi }) => {
 
   return {
     /**
-     * GET /editions/:slug/program (F-80, F-81, public) -> { notes, sessions, speakers, venues }.
+     * GET /editions/:slug/program (F-80, F-81, public) -> { flyer, notes, sessions, speakers, venues }.
      * Sessions are sorted on the parsed start time (`order` is empty in the data), a sequence without a readable start
      * time goes to `notes` by its title (« les horaires sont indiqués à titre provisoire »). Contents come from Strapi, nothing is copied.
      */
@@ -101,6 +101,8 @@ module.exports = ({ strapi }) => {
             end: end ? sequence.end_time : null,
             startsAt: edition.date ? zonedToUtc(edition.date, start).toISOString() : null,
             kind: sequence.kind ?? 'talk',
+            theme: sequence.theme ?? null,
+            subtitle: text(sequence.subtitle) || null,
             topics: topicsOf.get(sequence.documentId) ?? [],
             speakers: [...people.values()].map(speakerOf),
           },
@@ -119,6 +121,8 @@ module.exports = ({ strapi }) => {
       }
 
       return {
+        // Printed program of the edition: the image opens the PDF (public page and E8).
+        flyer: { imageUrl: text(edition.programmeImageUrl) || null, pdfUrl: text(edition.programmePdfUrl) || null },
         notes: notes.sort((a, b) => a.order - b.order).map(({ title }) => title),
         sessions: sessions.map(({ value }) => value),
         speakers: [...speakers.values()].sort((a, b) => a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' })),

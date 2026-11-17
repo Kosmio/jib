@@ -105,6 +105,8 @@ export interface Sequence extends Entity {
   end_time: string | null;
   description: string | null;
   order: number | null;
+  theme?: 'foret' | 'industrie' | 'coproduits' | 'ville' | 'construction' | null;
+  subtitle?: string | null;
   edition?: Edition;
   interventions?: Intervention[];
   tags?: Tag[];
@@ -145,6 +147,8 @@ export interface Edition extends Entity {
   description: string | null;
   inscription_url: string | null;
   image: Image | null;
+  programmeImageUrl?: string | null;
+  programmePdfUrl?: string | null;
   hero_bg_color: string | null;
   lieux: Lieu[];
   sequences?: Sequence[];

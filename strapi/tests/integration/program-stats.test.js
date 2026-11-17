@@ -68,7 +68,7 @@ describe('programme et tableau de bord (lot 14)', { timeout: 900_000 }, () => {
       const { edition } = await programScene();
       const response = await program(edition);
       assert.equal(response.status, 200, response.text);
-      assert.deepEqual(Object.keys(response.json).sort(), ['notes', 'sessions', 'speakers', 'venues']);
+      assert.deepEqual(Object.keys(response.json).sort(), ['flyer', 'notes', 'sessions', 'speakers', 'venues']);
     });
 
     it('les séquences sont triées sur l’heure de début, quel que soit l’ordre de saisie', async () => {
@@ -80,7 +80,7 @@ describe('programme et tableau de bord (lot 14)', { timeout: 900_000 }, () => {
     it('forme d’une séance : id, title, description, start, end, startsAt, kind, topics, speakers', async () => {
       const { edition } = await programScene();
       const { sessions } = (await program(edition)).json;
-      for (const session of sessions) assert.deepEqual(Object.keys(session).sort(), ['description', 'end', 'id', 'kind', 'speakers', 'start', 'startsAt', 'title', 'topics']);
+      for (const session of sessions) assert.deepEqual(Object.keys(session).sort(), ['description', 'end', 'id', 'kind', 'speakers', 'start', 'startsAt', 'subtitle', 'theme', 'title', 'topics']);
       const afternoon = sessions.find(({ title }) => title === 'Après-midi');
       assert.equal(afternoon.description, 'Ateliers de l’après-midi.');
       assert.equal(afternoon.start, '14h00');

@@ -224,6 +224,14 @@
         "type": "media",
         "description": "Image principale de l'édition (bannière). Utilisez upload_media pour obtenir l'ID"
       },
+      "programmeImageUrl": {
+        "type": "string",
+        "description": "Adresse de l'image du programme imprimé (capture du A4), déposée dans la médiathèque : coller son lien (https://… ou /uploads/…). Affichée en tête du programme de la page édition et de l'espace participant ; un clic ouvre programmePdfUrl s'il est renseigné, sinon l'image"
+      },
+      "programmePdfUrl": {
+        "type": "string",
+        "description": "Adresse du programme imprimable (PDF) déposé dans la médiathèque (https://… ou /uploads/…). Sans image, un lien « Télécharger le programme » est affiché"
+      },
       "hero_bg_color": {
         "type": "customField (plugin::color-picker.color)",
         "description": "Couleur de fond du hero de la page édition. Hex (ex: '#3F2A14'). Si vide, fallback sur la couleur 'wood' de la charte. Attention au contraste : texte du hero en blanc, accents dorés"
@@ -318,6 +326,15 @@
       "order": {
         "type": "integer",
         "description": "Ordre d'affichage dans le programme (les séquences sont triées par order croissant)"
+      },
+      "theme": {
+        "type": "enumeration",
+        "enum": ["foret", "industrie", "coproduits", "ville", "construction"],
+        "description": "Thème visuel de la séquence, repris du programme imprimé : donne la couleur du bandeau et le pictogramme. 'foret' = vert, arbre ; 'industrie' = jaune, éclair ; 'coproduits' = bronze, fiole ; 'ville' = bordeaux, rondins ; 'construction' = bleu ardoise, bâtiment. Vide = carte neutre (accueil, pauses)"
+      },
+      "subtitle": {
+        "type": "string",
+        "description": "Sur-titre affiché au-dessus du titre dans le bandeau de couleur (ex: 'Adapter les forêts au changement climatique'). Optionnel"
       },
       "kind": {
         "type": "enumeration",

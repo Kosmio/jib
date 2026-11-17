@@ -4,6 +4,7 @@ import { getEditionBySlug, buildImageUrl } from "../../lib/strapi";
 import { regionLabels } from "../../lib/types";
 import { getTagColor, getTagLabel } from "../../lib/tag-colors";
 import { safeHtml } from "../../lib/html";
+import { getProgramTheme } from "../../lib/program-themes";
 
 const { slug } = Astro.params;
 const response = await getEditionBySlug(slug!);
@@ -24,6 +25,15 @@ const sequences = (edition.sequences || []).slice().sort(
   (a, b) => (a.order ?? 999) - (b.order ?? 999)
 );
 
+// Programme imprimé : adresses saisies dans Strapi (https://… ou chemin de la médiathèque), toute autre forme est ignorée.
+const mediaLink = (url?: string | null) => {
+  const value = url?.trim();
+  if (!value) return null;
+  if (/^https?:\/\//i.test(value)) return value;
+  return value.startsWith("/") ? buildImageUrl(value) : null;
+};
+const flyerImage = mediaLink(edition.programmeImageUrl);
+const flyerPdf = mediaLink(edition.programmePdfUrl);
 const totalInterventions = sequences.reduce((n, s) => n + (s.interventions?.length || 0), 0);
 
 const byName = (a: { name: string }, b: { name: string }) =>
@@ -301,6 +311,25 @@ const eventJsonLd: Record<string, unknown> = {
     <section id="programme" class="py-16 md:py-24 bg-white scroll-mt-20">
       <div class="max-w-5xl mx-auto px-6">
         <h2 class="text-2xl md:text-3xl font-bold mb-10">Programme</h2>
+        {flyerImage ? (
+          <a href={flyerPdf ?? flyerImage} target="_blank" rel="noopener" class="group mb-10 flex flex-col sm:flex-row sm:items-center gap-5">
+            <img
+              src={flyerImage}
+              alt={`Programme imprimé, ${edition.title}`}
+              loading="lazy"
+              class="w-full sm:w-56 rounded-xl border border-surface-alt shadow-md group-hover:shadow-lg transition-shadow"
+            />
+            <span class="inline-flex items-center gap-2 font-semibold text-primary-dark group-hover:text-primary underline underline-offset-2">
+              {flyerPdf ? "Ouvrir le programme imprimable (PDF)" : "Agrandir le programme"}
+              <span class="sr-only"> (s’ouvre dans un nouvel onglet)</span>
+            </span>
+          </a>
+        ) : flyerPdf && (
+          <a href={flyerPdf} target="_blank" rel="noopener" class="mb-10 inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-surface-alt bg-surface font-semibold text-primary-dark hover:text-primary transition-colors">
+            Télécharger le programme (PDF)
+            <span class="sr-only"> (s’ouvre dans un nouvel onglet)</span>
+          </a>
+        )}
         <div class="space-y-6">
           {sequences.map((seq) => {
             const interventions = (seq.interventions || []).slice().sort(
@@ -309,14 +338,34 @@ const eventJsonLd: Record<string, unknown> = {
             const timeLabel = seq.end_time
               ? `${seq.start_time} – ${seq.end_time}`
               : `À partir de ${seq.start_time}`;
+            const theme = getProgramTheme(seq.theme);
             return (
               <div class="flex flex-col md:flex-row gap-4 md:gap-6">
                 <!-- Créneau horaire -->
                 <div class="md:w-32 flex-shrink-0 pt-1 md:pt-5">
                   <span class="text-sm font-medium text-muted">{timeLabel}</span>
                 </div>
-                <!-- Carte séquence (beige) -->
-                <div class="flex-1 bg-surface rounded-xl px-5 py-5 md:px-6 md:py-6 border border-surface-alt">
+                <!-- Carte séquence : bandeau de couleur et pictogramme si la séquence a un thème, beige sinon -->
+                <div class={`flex-1 bg-surface rounded-xl border overflow-hidden ${theme ? `border-2 ${theme.border}` : "border-surface-alt"}`}>
+                  {theme && (
+                    <div class={`flex items-center gap-4 px-5 py-4 md:px-6 md:py-5 ${theme.band}`}>
+                      <span aria-hidden="true" class={`flex size-12 md:size-14 shrink-0 items-center justify-center rounded-full ${theme.badge}`}>
+                        <svg class="size-7 md:size-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                          {theme.icon.map((d) => <path d={d} />)}
+                          {theme.circles?.map(([cx, cy, r]) => <circle cx={cx} cy={cy} r={r} />)}
+                        </svg>
+                      </span>
+                      <div class="min-w-0">
+                        {seq.subtitle && <p class="text-sm md:text-base leading-snug">{seq.subtitle}</p>}
+                        <h3 class="text-lg md:text-xl font-bold uppercase leading-snug text-inherit">{seq.title}</h3>
+                        {seq.description && (
+                          <div class="mt-1 text-sm md:text-base italic leading-snug [&_a]:underline" set:html={safeHtml(seq.description)} />
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  <div class={theme ? (interventions.length > 0 ? "px-5 py-5 md:px-6 md:py-6" : "hidden") : "px-5 py-5 md:px-6 md:py-6"}>
+                  {!theme && (
                   <div class="flex items-start gap-3 flex-wrap mb-3">
                     <h3 class="text-lg md:text-xl font-semibold">{seq.title}</h3>
                     {seq.tags && seq.tags.map((tag) => (
@@ -325,7 +374,8 @@ const eventJsonLd: Record<string, unknown> = {
                       </span>
                     ))}
                   </div>
-                  {seq.description && (
+                  )}
+                  {!theme && seq.description && (
                     <div class="text-sm text-muted prose prose-sm max-w-none mb-4" set:html={safeHtml(seq.description)} />
                   )}
                   {interventions.length > 0 && (
@@ -397,6 +447,7 @@ const eventJsonLd: Record<string, unknown> = {
                       })}
                     </ul>
                   )}
+                  </div>
                 </div>
               </div>
             );

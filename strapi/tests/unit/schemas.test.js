@@ -33,7 +33,9 @@ const EDITION_FIELDS = [
   'meetingRequestsOpenAt',
   'meetingRequestsCloseAt',
 ];
-const ALLOWED_ADDITIONS = { edition: EDITION_FIELDS, sequence: ['kind'] };
+// 2026-11-17, retours de recette : champs scalaires publics, lus par le site (programme aux couleurs du programme imprimé).
+const EDITION_PUBLIC_FIELDS = ['programmeImageUrl', 'programmePdfUrl'];
+const ALLOWED_ADDITIONS = { edition: [...EDITION_FIELDS, ...EDITION_PUBLIC_FIELDS], sequence: ['kind', 'theme', 'subtitle'] };
 
 const readSchema = (type, name = type) => JSON.parse(fs.readFileSync(path.join(API_DIR, type, 'content-types', name, 'schema.json'), 'utf8'));
 const structuralOf = (attributes) => Object.fromEntries(Object.entries(attributes).filter(([, definition]) => STRUCTURAL.has(definition.type)));
@@ -69,9 +71,9 @@ describe('garde des relations : les types existants ne changent pas (A-15, mémo
     });
   }
 
-  it('les champs ajoutés à edition sont tous privés (absents de l’API publique)', () => {
+  it('les champs de l’espace ajoutés à edition sont tous privés (absents de l’API publique)', () => {
     const { attributes } = readSchema('edition');
-    for (const attribute of Object.keys(attributes).filter((key) => !(key in frozen.edition.attributes))) {
+    for (const attribute of Object.keys(attributes).filter((key) => !(key in frozen.edition.attributes) && !EDITION_PUBLIC_FIELDS.includes(key))) {
       assert.equal(attributes[attribute].private, true, `edition.${attribute}`);
     }
   });
