@@ -161,7 +161,9 @@ test.describe('« Lien envoyé » rappelle l’adresse saisie (V1-B)', () => {
     const address = 'rappel&test@example.org';
     await requestLink(page, address);
     await expect(page).toHaveURL(/\?envoye=1/);
-    await expect(page.getByRole('status')).toContainText(address);
+    // L'adresse vient d'un cookie éphémère : jamais dans l'URL, affichée dans le paragraphe voisin de la zone de statut.
+    expect(decodeURIComponent(page.url())).not.toContain(address);
+    await expect(page.getByText('Adresse saisie')).toContainText(address);
 
     await page.getByRole('link', { name: 'Demander un nouveau lien' }).click();
     await expect(page.getByLabel('Adresse e-mail utilisée pour l’inscription')).toHaveValue(address);
