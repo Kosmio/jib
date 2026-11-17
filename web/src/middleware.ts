@@ -67,8 +67,10 @@ export const onRequest = defineMiddleware(async (context, next) => {
   if (!isEspace(context.url.pathname)) return next();
 
   // Une réécriture (introuvable, erreur) fait perdre `Astro.params` : l'édition de l'URL d'origine voyage par `locals`.
-  const edition = editionOf(context.url.pathname);
-  Object.assign(context.locals, { espaceEdition: edition });
+  // Le middleware rejoue sur la réécriture : une valeur déjà posée n'est pas écrasée.
+  const locals = context.locals as { espaceEdition?: string | null };
+  const edition = locals.espaceEdition !== undefined ? locals.espaceEdition : editionOf(context.url.pathname);
+  locals.espaceEdition = edition;
 
   let response: Response;
   try {

@@ -18,11 +18,9 @@ const withTabs = edition !== null && !/\/espace\/[^/]+\/(connexion|bienvenue)\/?
 const shellMe = withTabs
   ? ({ firstName: "", lastName: "", photoUrl: null, isOrganizer: false, edition: { slug: edition, title: "" } } as unknown as Me)
   : null;
+// `active="organizer"` ci-dessous : onglet réservé aux organisateurs, jamais rendu ici (isOrganizer faux), donc aucun onglet n'est actif.
 ---
 
----
-
-<!-- `active="organizer"` : onglet réservé aux organisateurs, jamais rendu ici (isOrganizer faux), donc aucun onglet n'est marqué actif. -->
 <AppShell title="Incident" active="organizer" editionSlug={edition ?? ""} me={shellMe}>
   <EditionBanner title={title} subtitle="Votre espace est momentanément indisponible." />
   <EspaceCard>
