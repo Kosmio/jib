@@ -377,3 +377,23 @@ describe('searchDirectory (A-34, F-40 à F-43, T-11)', () => {
     assert.deepEqual(cards, copy);
   });
 });
+
+describe('normalizeLinkedin (D-09)', () => {
+  const normalize = (value) => profile().normalizeLinkedin(value);
+
+  it('écrit l’adresse en https, sans paramètres ni ancre', () => {
+    assert.equal(normalize('linkedin.com/in/lea-ducasse'), 'https://linkedin.com/in/lea-ducasse');
+    assert.equal(normalize('  http://www.LinkedIn.com/in/lea-ducasse?utm=x#top '), 'https://www.linkedin.com/in/lea-ducasse');
+    assert.equal(normalize('https://fr.linkedin.com/company/xylofutur/'), 'https://fr.linkedin.com/company/xylofutur/');
+  });
+
+  it('rien de saisi donne une chaîne vide', () => {
+    for (const value of ['', '   ', null, undefined, 12]) assert.equal(normalize(value), '');
+  });
+
+  it('refuse tout ce qui n’est pas une page de linkedin.com', () => {
+    for (const value of ['https://example.org/in/lea', 'https://linkedin.com.example.org/in/lea', 'notlinkedin.com/in/lea', 'https://www.linkedin.com', 'javascript:alert(1)', 'Léa Ducasse', `linkedin.com/in/${'a'.repeat(200)}`]) {
+      assert.equal(normalize(value), null, value);
+    }
+  });
+});

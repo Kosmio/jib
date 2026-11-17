@@ -113,6 +113,14 @@ const role = person ? [person.jobTitle, person.company].filter(Boolean) : [];
               </p>
             )}
             {person?.bio && <p class="mt-4 text-lg text-ink">{person.bio}</p>}
+            {person?.linkedinUrl && /^https:\/\/([a-z0-9-]+\.)*linkedin\.com\//.test(person.linkedinUrl) && (
+              <p class="mt-3">
+                <a href={person.linkedinUrl} rel="noopener noreferrer" target="_blank" class="inline-flex min-h-11 items-center font-semibold text-title underline">
+                  Page LinkedIn de {firstName(card)}
+                  <span class="sr-only"> (s’ouvre dans un nouvel onglet)</span>
+                </a>
+              </p>
+            )}
             {exhibitor?.description && <p class="mt-4 text-lg text-ink">{exhibitor.description}</p>}
             {exhibitor?.website && /^https?:\/\//.test(exhibitor.website) && (
               <p class="mt-3">

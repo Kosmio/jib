@@ -7,10 +7,8 @@ import {
   fetchMeetings,
   firstName,
   hourLabel,
-  hourRange,
   meetingErrorMessage,
   targetOf,
-  type AgendaSession,
   type Meeting,
   type MeetingsResponse,
 } from "../../lib/espace/meetings";
@@ -18,7 +16,7 @@ import MeetingStatus, { Icon } from "./MeetingStatus";
 import { Avatar } from "./ProfileCardView";
 import SlotPicker from "./SlotPicker";
 
-// E6 (F-60 à F-66) : demandes reçues, frise de la journée, demandes envoyées, historique. Les boutons suivent les `can*` du
+// E6 (F-60 à F-66, D-11) : demandes reçues, mes rendez-vous confirmés (heure, personne, table), demandes envoyées, historique. Les boutons suivent les `can*` du
 // serveur : aucune règle de R-10 à R-19 n'est recalculée ici. Après chaque action, la liste est relue au serveur.
 
 type Props = {
@@ -207,7 +205,9 @@ export default function AgendaBoard({ strapiUrl, editionSlug, themeColor, dayLab
   }
 
   const { received, sent, agenda, closed } = data;
-  const isEmpty = !received.length && !sent.length && !closed.length && !agenda.some(({ type }) => type === "meeting");
+  // « Mes rendez-vous uniquement » : les rendez-vous confirmés, par heure ; les séquences du programme restent sur l'écran Programme.
+  const myMeetings = agenda.flatMap((item) => (item.type === "meeting" && item.meeting.status === "accepted" ? [item.meeting] : []));
+  const isEmpty = !received.length && !sent.length && !closed.length && !myMeetings.length;
   const cardId = (meeting: Meeting) => ({ id: `demande-${meeting.id}`, tabIndex: -1 });
   const marked = (meeting: Meeting) => (meeting.id === highlightId ? "ring-4 ring-title" : "");
   const label = (meeting: Meeting, text: string) => (busy?.id === meeting.id ? busy.label : text);
@@ -309,68 +309,40 @@ export default function AgendaBoard({ strapiUrl, editionSlug, themeColor, dayLab
         </section>
       )}
 
-      {agenda.length > 0 && (
-        <section aria-labelledby="ma-journee" className="mt-8">
-          <h2 id="ma-journee" className={SECTION_TITLE}>
-            Ma journée{dayLabel ? `, ${dayLabel}` : ""}
+      {!isEmpty && (
+        <section aria-labelledby="mes-rendez-vous" className="mt-8">
+          <h2 id="mes-rendez-vous" className={SECTION_TITLE}>
+            Mes rendez-vous{dayLabel ? `, ${dayLabel}` : ""}
           </h2>
-          <ol className="mt-4">
-            {agenda.map((item) => {
-              const meeting = item.type === "meeting" ? item.meeting : null;
-              const session: AgendaSession | null = item.type === "session" ? item : null;
-              const confirmedMeeting = meeting?.status === "accepted";
-              return (
-                <li key={meeting ? `m-${meeting.id}` : `s-${session?.id}`} className="grid grid-cols-[3.5rem_1.25rem_1fr] gap-x-2">
-                  <p className={`text-right font-heading font-medium text-ink ${meeting ? "pt-4" : "pt-1"}`}>
-                    {session ? hourLabel(session.start || session.startsAt) : hourLabel(item.startsAt)}
+          {myMeetings.length === 0 && <p className="mt-3 rounded-xl border border-surface-alt bg-white p-4 text-muted">Aucun rendez-vous confirmé pour l’instant.</p>}
+          <ol className="mt-3 grid gap-3">
+            {myMeetings.map((meeting) => (
+              <li
+                key={meeting.id}
+                {...cardId(meeting)}
+                className={`grid grid-cols-[4.5rem_1fr] gap-x-4 rounded-xl border border-surface-alt bg-white p-4 ${marked(meeting)}`}
+              >
+                <p className="font-heading text-xl leading-snug font-semibold text-title">{hourLabel(meeting.slot.startsAt)}</p>
+                <div className="min-w-0">
+                  <p className="text-lg leading-snug font-bold text-ink">{meeting.counterpart.displayName}</p>
+                  {meeting.counterpart.subtitle && <p className="leading-snug text-muted">{meeting.counterpart.subtitle}</p>}
+                  {meeting.location && <p className="mt-1 text-lg font-bold text-ink">{meeting.location}</p>}
+                  {viaLine(meeting) && <p className="text-sm text-muted">{viaLine(meeting)}</p>}
+                  {meeting.answeredByName && meeting.counterpart.kind === "exhibitor" && (
+                    <p className="text-sm text-muted">Confirmé par {meeting.answeredByName}</p>
+                  )}
+                  <p className="mt-2">
+                    <MeetingStatus status={meeting.status} />
                   </p>
-                  <div className="relative flex justify-center before:absolute before:inset-y-0 before:w-0.5 before:bg-surface-alt">
-                    <span
-                      aria-hidden="true"
-                      className={`relative z-10 size-3.5 rounded-full border-2 ${meeting ? "mt-5" : "mt-2"} ${
-                        confirmedMeeting ? "border-primary bg-primary" : meeting ? "border-gold bg-surface" : "border-accent bg-surface"
-                      }`}
-                    ></span>
-                  </div>
-                  {session && (
-                    <div className="pb-5">
-                      <p className="pt-1 leading-snug font-semibold text-muted">{session.title}</p>
-                      {session.start && session.end && <p className="text-sm text-muted">{hourRange(session.start, session.end)}</p>}
-                    </div>
+                  {meeting.canCancel && (
+                    <button type="button" disabled={busy !== null} onClick={() => setConfirm({ meeting, action: "cancel" })} className={`${DANGER} mt-3`}>
+                      {label(meeting, "Annuler le rendez-vous")}
+                      <span className="sr-only">{` avec ${meeting.counterpart.displayName}`}</span>
+                    </button>
                   )}
-                  {meeting && (
-                    <div className="pb-4">
-                      <div
-                        {...(confirmedMeeting ? cardId(meeting) : {})}
-                        className={`rounded-xl border border-surface-alt bg-white p-4 ${marked(meeting)}`}
-                      >
-                        <p className="text-lg leading-snug font-bold text-ink">{meeting.counterpart.displayName}</p>
-                        {meeting.counterpart.subtitle && <p className="leading-snug text-muted">{meeting.counterpart.subtitle}</p>}
-                        <p className="mt-1 text-ink">{[meeting.location, meeting.slot.sessionTitle].filter(Boolean).join(", ")}</p>
-                        {viaLine(meeting) && <p className="text-sm text-muted">{viaLine(meeting)}</p>}
-                        {meeting.answeredByName && confirmedMeeting && meeting.counterpart.kind === "exhibitor" && (
-                          <p className="text-sm text-muted">Confirmé par {meeting.answeredByName}</p>
-                        )}
-                        <p className="mt-2">
-                          <MeetingStatus status={meeting.status} />
-                        </p>
-                        {meeting.canCancel && confirmedMeeting && (
-                          <button
-                            type="button"
-                            disabled={busy !== null}
-                            onClick={() => setConfirm({ meeting, action: "cancel" })}
-                            className={`${DANGER} mt-3`}
-                          >
-                            {label(meeting, "Annuler le rendez-vous")}
-                            <span className="sr-only">{` avec ${meeting.counterpart.displayName}`}</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </li>
-              );
-            })}
+                </div>
+              </li>
+            ))}
           </ol>
         </section>
       )}

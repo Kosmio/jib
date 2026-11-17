@@ -23,12 +23,16 @@ type Props = {
   initial: Profile &
     Consent & {
       bio: string;
+      linkedinUrl: string;
+      unavailableSessions: string[];
       photoUrl: string | null;
       topics: string[];
       emailPrefs: EmailPrefs;
     };
   /** Sujets de l'édition (`GET /editions/:slug/topics`), tri français. */
   topics: Topic[];
+  /** Plages de rendez-vous B2B de la journée (D-10) ; sans plage, le bloc des disponibilités est omis. */
+  b2bRanges?: { id: string; title: string; hours: string }[];
 };
 
 const FIELDS = [
@@ -68,7 +72,7 @@ const PHOTO_MAX_BYTES = 5 * 1024 * 1024;
 const PHOTO_SIDE = 256;
 const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
-type FieldName = (typeof FIELDS)[number]["name"] | "bio" | "topics" | "emailPrefs";
+type FieldName = (typeof FIELDS)[number]["name"] | "bio" | "linkedinUrl" | "unavailableSessions" | "topics" | "emailPrefs";
 type FieldErrors = Partial<Record<FieldName, string>>;
 
 function Icon({ name }: { name: "alert" | "check" | "info" }) {
@@ -121,7 +125,7 @@ async function squarePhoto(file: File): Promise<Blob> {
   throw new Error("canvas");
 }
 
-export default function ProfileForm({ strapiUrl, editionSlug, initial, topics }: Props) {
+export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b2bRanges = [] }: Props) {
   const [profile, setProfile] = useState<Profile>({
     firstName: initial.firstName,
     lastName: initial.lastName,
@@ -129,6 +133,8 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics }:
     company: initial.company,
   });
   const [bio, setBio] = useState(initial.bio);
+  const [linkedinUrl, setLinkedinUrl] = useState(initial.linkedinUrl);
+  const [awayIds, setAwayIds] = useState<string[]>(initial.unavailableSessions);
   const [topicIds, setTopicIds] = useState<string[]>(initial.topics);
   const [consent, setConsent] = useState<Consent>({
     directoryOptIn: initial.directoryOptIn,
@@ -203,7 +209,15 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics }:
     setFocusField(null);
 
     try {
-      await updateProfile(strapiUrl, { ...profile, bio, topics: topicIds, emailPrefs });
+      await updateProfile(strapiUrl, {
+        ...profile,
+        bio,
+        linkedinUrl,
+        // Seules les plages encore au programme partent : une plage retirée depuis ne bloque pas l'enregistrement.
+        unavailableSessions: awayIds.filter((id) => b2bRanges.some((range) => range.id === id)),
+        topics: topicIds,
+        emailPrefs,
+      });
       if (JSON.stringify(consent) !== JSON.stringify(savedConsent)) {
         await saveConsent(strapiUrl, consent);
         setSavedConsent(consent);
@@ -216,7 +230,7 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics }:
         window.location.assign(loginUrl);
         return;
       }
-      const names: FieldName[] = [...FIELDS.map(({ name }) => name), "bio", "topics", "emailPrefs"];
+      const names: FieldName[] = [...FIELDS.map(({ name }) => name), "linkedinUrl", "bio", "topics", "unavailableSessions", "emailPrefs"];
       const flagged = names.filter((name) => error instanceof EspaceApiError && name in error.fields);
       if (flagged.length) {
         const sent = (error as EspaceApiError).fields;
@@ -224,7 +238,7 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics }:
           FIELDS.find((field) => field.name === name)?.fallback ?? (name === "bio" ? `${BIO_MAX} caractères au plus.` : "Valeur non valable.");
         setErrors(Object.fromEntries(flagged.map((name) => [name, sent[name] || fallback(name)])));
         setFormError("Corrigez les champs signalés pour enregistrer.");
-        setFocusField(flagged[0] === "topics" ? "sujet-0" : flagged[0] === "emailPrefs" ? "emailPrefs-0" : flagged[0]);
+        setFocusField(flagged[0] === "topics" ? "sujet-0" : flagged[0] === "emailPrefs" ? "emailPrefs-0" : flagged[0] === "unavailableSessions" ? "plage-0" : flagged[0]);
       } else {
         setFormError("L’enregistrement a échoué. Vérifiez votre connexion et réessayez.");
         setFocusField("enregistrer"); // le bouton désactivé pendant l'envoi a perdu le focus
@@ -321,6 +335,33 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics }:
         </div>
 
         <div className="mt-4">
+          <label htmlFor="linkedinUrl" className="block font-semibold">
+            Page LinkedIn (facultatif)
+          </label>
+          <input
+            id="linkedinUrl"
+            name="linkedinUrl"
+            type="url"
+            inputMode="url"
+            autoComplete="url"
+            placeholder="linkedin.com/in/votre-nom"
+            maxLength={200}
+            value={linkedinUrl}
+            onChange={(event) => {
+              touch();
+              setLinkedinUrl(event.target.value);
+            }}
+            aria-invalid={errors.linkedinUrl ? "true" : undefined}
+            aria-describedby={`linkedinUrl-aide${errors.linkedinUrl ? " linkedinUrl-erreur" : ""}`}
+            className={`${inputClass("linkedinUrl")} min-h-12`}
+          />
+          <p id="linkedinUrl-aide" className="mt-1 text-sm text-muted">
+            Affichée sur votre fiche de l’annuaire.
+          </p>
+          {errors.linkedinUrl && <FieldError id="linkedinUrl-erreur">{errors.linkedinUrl}</FieldError>}
+        </div>
+
+        <div className="mt-4">
           <label htmlFor="bio" className="block font-semibold">
             Présentation (facultatif)
           </label>
@@ -377,6 +418,36 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics }:
             })}
           </div>
           {errors.topics && <FieldError id="topics-erreur">{errors.topics}</FieldError>}
+        </fieldset>
+      )}
+
+      {b2bRanges.length > 0 && (
+        <fieldset className="min-w-0 rounded-xl bg-surface p-4" aria-describedby={errors.unavailableSessions ? "plages-erreur" : "plages-aide"}>
+          <legend className="float-left w-full font-heading font-semibold text-title">Vos disponibilités pour les rendez-vous</legend>
+          <p id="plages-aide" className="clear-both pt-1 text-sm text-muted">
+            Décochez une plage où vous ne serez pas disponible : ses créneaux ne seront plus proposés. Les rendez-vous déjà pris sont conservés.
+          </p>
+          <div className="mt-2">
+            {b2bRanges.map((range, index) => (
+              <label key={range.id} className="flex min-h-11 items-start gap-3 py-1">
+                <input
+                  id={`plage-${index}`}
+                  type="checkbox"
+                  checked={!awayIds.includes(range.id)}
+                  onChange={(event) => {
+                    touch();
+                    setAwayIds((current) => (event.target.checked ? current.filter((id) => id !== range.id) : [...current, range.id]));
+                  }}
+                  className="mt-0.5 size-5 shrink-0 accent-primary-ink"
+                />
+                <span>
+                  <span className="block font-semibold">{range.hours || range.title}</span>
+                  {range.hours && <span className="block text-sm text-muted">{range.title}</span>}
+                </span>
+              </label>
+            ))}
+          </div>
+          {errors.unavailableSessions && <FieldError id="plages-erreur">{errors.unavailableSessions}</FieldError>}
         </fieldset>
       )}
 

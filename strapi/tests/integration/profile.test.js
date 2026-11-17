@@ -15,7 +15,7 @@ const { UID, link } = require('../helpers/espace-data');
 const W = require('../helpers/meetings-world');
 
 const ME_PHASE_1 = ['company', 'consent', 'edition', 'firstName', 'id', 'isOrganizer', 'jobTitle', 'lastName', 'role'];
-const ME_PHASE_2 = ['bio', 'counts', 'emailPrefs', 'exhibitor', 'hostedTableNumber', 'photoUrl', 'profileCompletion', 'topics'];
+const ME_PHASE_2 = ['bio', 'counts', 'emailPrefs', 'exhibitor', 'hostedTableNumber', 'linkedinUrl', 'photoUrl', 'profileCompletion', 'topics', 'unavailableSessions'];
 
 describe('profil : GET /me, PATCH /me et sujets (lot 9)', { timeout: 600_000 }, () => {
   const espace = useEspace({ overrides: { ORGANIZER_EMAILS: 'organisation@example.org' } });

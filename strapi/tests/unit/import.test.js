@@ -148,6 +148,18 @@ describe('mapItem : champs de l’Attendee (I-11, Q-03)', () => {
     assert.ok(!mapped.company);
   });
 
+  it('D-09 : lit la page LinkedIn du champ nommé par helloassoFieldMap.linkedin et l’écrit en https, sinon null', () => {
+    const withAnswer = (answer) => {
+      const item = regionItem(930020);
+      item.customFields.push({ id: 9010, name: 'Profil LinkedIn', type: 'TextInput', answer });
+      return map(item, { email: 'Email', company: 'Organisation', jobTitle: 'Poste', linkedin: 'Profil LinkedIn' }).linkedinUrl;
+    };
+    assert.equal(withAnswer('www.linkedin.com/in/lea-ducasse/?originalSubdomain=fr'), 'https://www.linkedin.com/in/lea-ducasse/');
+    assert.equal(withAnswer('je n’en ai pas'), null);
+    assert.equal(withAnswer('https://example.org/in/lea'), null);
+    assert.equal(map(regionItem(930021)).linkedinUrl, null, 'sans libellé dans helloassoFieldMap');
+  });
+
   it('lit les libellés dans helloassoFieldMap, jamais en dur (D-03)', () => {
     const item = regionItem(930005, { answers: { Email: 'ignore@example.org', Organisation: 'Ignorée', Poste: 'Ignoré' } });
     item.customFields.push(
@@ -238,7 +250,7 @@ describe('mapItem : champs de l’Attendee (I-11, Q-03)', () => {
   });
 
   describe('minimisation (NF-11)', () => {
-    const allowed = ['helloassoItemId', 'helloassoOrderId', 'firstName', 'lastName', 'email', 'jobTitle', 'company', 'proposedRole', 'decision', 'reason'];
+    const allowed = ['helloassoItemId', 'helloassoOrderId', 'firstName', 'lastName', 'email', 'jobTitle', 'company', 'linkedinUrl', 'proposedRole', 'decision', 'reason'];
     const everyItem = [...defaultItems, ...buildEdgeCaseItems({ padding: 5 })];
 
     it('ne renvoie que les champs de l’Attendee, pour tous les billets du faux', () => {

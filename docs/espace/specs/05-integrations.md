@@ -16,6 +16,7 @@ API v5, base `https://api.helloasso.com/v5`, bac à sable `https://api.helloasso
   | `state` de l'item ou de la commande (annulé, remboursé) | `status = cancelled` |
   | intitulé du tarif (`name`) contenant « Exposant » ou « Intervenant » | `role` proposé, à confirmer par l'organisateur |
   Les libellés exacts des champs personnalisés sont **à relever sur le formulaire réel** en phase 0 et paramétrés dans Edition (`helloassoFieldMap`, json), jamais en dur. Relevé pour Nouvelle-Aquitaine : voir Q-03 dans `11-questions-ouvertes.md`.
+  La clé facultative `linkedin` nomme le champ du formulaire qui porte la page LinkedIn (D-09) : sans elle, rien n'est importé. Seule une adresse de linkedin.com est gardée.
 - **I-12 (P0) Synchronisation.** Tâche planifiée toutes les 15 minutes plus bouton manuel (F-90). Idempotente par `helloassoItemId`. Crée les nouveaux inscrits (puis e-mail `welcome`), met à jour les champs non édités (R-31), passe les annulés en `cancelled` (R-18). Chaque exécution écrit un SyncRun.
 - **I-13 (P1) Notifications.** Route `POST /api/espace/webhooks/helloasso` recevant les notifications de type Order ; elle ne fait pas confiance au contenu reçu : elle déclenche une resynchronisation ciblée de la commande (`GET /orders/{orderId}`). URL configurée côté HelloAsso par l'organisateur.
 - **I-14 (P0) Doublons.** Même e-mail sur deux billets d'une même édition : un seul Attendee (le premier), le second item est rattaché dans `SyncRun.errors` pour arbitrage organisateur.

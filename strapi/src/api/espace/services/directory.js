@@ -191,6 +191,7 @@ module.exports = ({ strapi }) => {
         jobTitle: program ? (speaker.title ?? null) : jobTitle,
         company: program ? (speaker.organisation?.name ?? null) : company,
         bio: full ? (attendee.bio ?? null) : null,
+        linkedinUrl: full ? (attendee.linkedinUrl ?? null) : null,
         sessions: speaker ? await sessionsOf(speaker, edition) : [],
         exhibitor: full && represented ? { id: represented.documentId, name: represented.organisation.name, standNumber: represented.standNumber ?? null } : null,
         isSelf,

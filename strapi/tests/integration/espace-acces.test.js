@@ -32,7 +32,7 @@ const ORGANIZERS = ['organisation@example.org', 'orga.deux@example.org', 'orga.t
 const [ORGANIZER, ORGANIZER_2, ORGANIZER_3, ORGANIZER_4] = ORGANIZERS;
 const ME_KEYS = ['company', 'consent', 'edition', 'firstName', 'id', 'isOrganizer', 'jobTitle', 'lastName', 'role'];
 // Phase 2 (A-36) : `GET /me` ajoute le profil complet et les compteurs ; `counts` ne figure que dans `GET /me`. Le détail est dans profile.test.js.
-const ME_PHASE_2_KEYS = ['bio', 'emailPrefs', 'exhibitor', 'hostedTableNumber', 'photoUrl', 'profileCompletion', 'topics'];
+const ME_PHASE_2_KEYS = ['bio', 'emailPrefs', 'exhibitor', 'hostedTableNumber', 'linkedinUrl', 'photoUrl', 'profileCompletion', 'topics', 'unavailableSessions'];
 const ME_FULL_KEYS = [...ME_KEYS, ...ME_PHASE_2_KEYS, 'counts'].sort();
 
 describe('accès à l’espace (lot 5)', { timeout: 300_000 }, () => {

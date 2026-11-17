@@ -48,6 +48,9 @@ export type Me = {
     consentAt: string | null;
   };
   bio: string | null;
+  linkedinUrl: string | null;
+  /** Plages B2B (documentId de séquence) décochées dans le profil ; vide : disponible sur toutes (D-10). */
+  unavailableSessions: string[];
   photoUrl: string | null;
   topics: Topic[];
   emailPrefs: EmailPrefs;
@@ -67,6 +70,8 @@ export type Profile = {
 /** Corps de PATCH /me de l'écran E3 : les quatre champs importés plus présentation, sujets (documentId) et préférences e-mail. */
 export type ProfileUpdate = Profile & {
   bio: string;
+  linkedinUrl: string;
+  unavailableSessions: string[];
   topics: string[];
   emailPrefs: EmailPrefs;
 };

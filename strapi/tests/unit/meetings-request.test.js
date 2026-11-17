@@ -498,3 +498,42 @@ describe('checkRequest : réservation d’une table dédiée (R-19)', () => {
     assert.equal(verdict(book(host(), { slotId: 'past' })), 'SLOT_PAST');
   });
 });
+
+describe('checkRequest : plages B2B décochées dans le profil (D-10)', () => {
+  /** Créneaux s1 et s2 dans la plage « matin », s3 et s4 dans la plage « midi ». */
+  const ranged = (options) => {
+    const snap = snapshot(options);
+    for (const [id, slot] of snap.slots) slot.sessionId = ['s1', 's2'].includes(id) ? 'matin' : 'midi';
+    return snap;
+  };
+  const away = (id, ...sessions) => person(id, { awaySessionIds: sessions });
+
+  it('la cible a décoché la plage : TARGET_BUSY sur ses créneaux, rien sur les autres plages', () => {
+    const snap = ranged({ people: [person('a'), away('b', 'matin')] });
+    assert.equal(verdict(check(snap, { slotId: 's1' })), 'TARGET_BUSY');
+    assert.equal(verdict(check(snap, { slotId: 's2' })), 'TARGET_BUSY');
+    assert.equal(verdict(check(snap, { slotId: 's3' })), 'OK');
+  });
+
+  it('le demandeur a décoché la plage : SLOT_TAKEN', () => {
+    const snap = ranged({ people: [away('a', 'midi'), person('b')] });
+    assert.equal(verdict(check(snap, { slotId: 's3' })), 'SLOT_TAKEN');
+    assert.equal(verdict(check(snap, { slotId: 's1' })), 'OK');
+  });
+
+  it('un exposant n’a pas de plage : la demande à son stand passe même si un représentant a décoché', () => {
+    const snap = ranged({ exhibitors: [exhibitorEntry('x1', { activeRepIds: ['r1'] })], extraPeople: [person('r1', { role: 'exhibitor_rep', exhibitorId: 'x1', awaySessionIds: ['matin'] })] });
+    assert.equal(verdict(check(snap, { target: X('x1'), slotId: 's1' })), 'OK');
+  });
+
+  it('sans plage décochée, ou sans séance connue pour le créneau, rien ne change', () => {
+    assert.equal(verdict(check(ranged({ people: [person('a'), away('b')] }))), 'OK');
+    assert.equal(verdict(check(snapshot({ people: [person('a'), away('b', 'matin')] }))), 'OK');
+  });
+
+  it('slotStates : les créneaux de la plage décochée, par la cible ou par le visiteur, sont indisponibles', () => {
+    const states = (snap) => [...lib().slotStates(snap, { viewerId: 'a', target: P('b') }).values()];
+    assert.deepEqual(states(ranged({ people: [person('a'), away('b', 'matin')] })), ['unavailable', 'unavailable', 'available', 'available']);
+    assert.deepEqual(states(ranged({ people: [away('a', 'midi'), person('b')] })), ['available', 'available', 'unavailable', 'unavailable']);
+  });
+});

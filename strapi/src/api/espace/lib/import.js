@@ -7,11 +7,13 @@
  * ticket with the same address takes it over and is reactivated, profile and consents kept (A-22).
  */
 
+const { normalizeLinkedin } = require('./profile');
+
 const EMAIL_PATTERN = /^[^\s@<>,;"]+@[^\s@<>,;"]+\.[^\s@<>,;"]+$/;
 const ACTIVE_STATES = ['Processed', 'Registered'];
 const CANCELLED_STATES = ['Canceled', 'Refused', 'Deleted', 'Abandoned'];
 // Imported fields that a synchronization may refresh, unless the participant edited them (R-31).
-const REFRESHED_FIELDS = ['firstName', 'lastName', 'jobTitle', 'company'];
+const REFRESHED_FIELDS = ['firstName', 'lastName', 'jobTitle', 'company', 'linkedinUrl'];
 
 /** Lower case address without surrounding spaces, or null when it is not a single valid address of 254 characters at most. */
 function normalizeEmail(value) {
@@ -44,6 +46,8 @@ function mapItem(item, fieldMap) {
     email: normalizeEmail(answer('email')) ?? normalizeEmail(item.payer?.email),
     jobTitle: answer('jobTitle'),
     company: answer('company'),
+    // D-09: kept only when the answer is a page of linkedin.com.
+    linkedinUrl: normalizeLinkedin(answer('linkedin')) || null,
     proposedRole: /exposant/i.test(tariff) ? 'exhibitor_rep' : /intervenant/i.test(tariff) ? 'speaker' : null,
     ...decide(item),
   };

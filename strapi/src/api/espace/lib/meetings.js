@@ -145,7 +145,7 @@ function buildSnapshot({ edition, now, slots, attendees, exhibitors, meetings })
     ),
     meetings: meetings.map(snapshotMeeting),
     attendees: new Map(
-      attendees.map((a) => [a.documentId, { id: a.documentId, status: a.status, role: a.role, meetingsOptIn: Boolean(a.meetingsOptIn), exhibitorId: a.exhibitor?.documentId ?? null }])
+      attendees.map((a) => [a.documentId, { id: a.documentId, status: a.status, role: a.role, meetingsOptIn: Boolean(a.meetingsOptIn), exhibitorId: a.exhibitor?.documentId ?? null, awaySessionIds: Array.isArray(a.unavailableSessions) ? a.unavailableSessions : [] }])
     ),
     exhibitors: new Map(
       exhibitors.map((x) => [x.documentId, { id: x.documentId, standNumber: x.standNumber ?? null, name: x.organisation?.name ?? '', activeRepIds: activeRepIds.get(x.documentId) ?? [] }])
@@ -172,6 +172,12 @@ const requesterBusy = (snap, requesterId, slotId, ignoreMeetingId, { withPending
       meeting.id !== ignoreMeetingId &&
       ((isActive(meeting, 'accepted') && involves(meeting, requesterId)) || (withPending && isActive(meeting, 'pending') && meeting.requesterId === requesterId))
   );
+
+/** D-10: the person unticked the B2B range (the session) of this slot in the profile. Never an exhibitor. */
+function isAway(snap, attendeeId, slotId) {
+  const sessionId = snap.slots.get(slotId)?.sessionId;
+  return Boolean(sessionId) && Boolean(snap.attendees.get(attendeeId)?.awaySessionIds?.includes(sessionId));
+}
 
 /** R-11.6, R-14, R-19: a person has an accepted meeting, a dedicated table has its table taken, an exhibitor is full (as many meetings as active representatives). */
 function targetBusy(snap, target, slotId, ignoreMeetingId) {
@@ -245,8 +251,8 @@ function checkRequest(snap, { requesterId, target, slotId, ignoreMeetingId }) {
 
   const blocked = requestBlock(snap, requesterId, target);
   if (blocked) return fail(blocked === 'SELF' ? 'TARGET_UNAVAILABLE' : blocked);
-  if (requesterBusy(snap, requesterId, slotId, ignoreMeetingId)) return fail('SLOT_TAKEN');
-  if (targetBusy(snap, target, slotId, ignoreMeetingId)) return fail('TARGET_BUSY');
+  if (requesterBusy(snap, requesterId, slotId, ignoreMeetingId) || isAway(snap, requesterId, slotId)) return fail('SLOT_TAKEN');
+  if (targetBusy(snap, target, slotId, ignoreMeetingId) || (target.kind === 'p' && isAway(snap, target.id, slotId))) return fail('TARGET_BUSY');
 
   if (target.kind === 'p' && snap.hosted.has(target.id)) {
     const upcoming = snap.meetings.some(
@@ -339,7 +345,13 @@ function slotStates(snap, { viewerId, target }) {
   for (const { id } of slots) {
     const together = snap.meetings.find((meeting) => meeting.slotId === id && between(meeting) && (isActive(meeting, 'accepted') || (isActive(meeting, 'pending') && meeting.requesterId === viewerId)));
     if (together) states.set(id, isActive(together, 'accepted') ? 'confirmed' : 'requested');
-    else if (requesterBusy(snap, viewerId, id) || targetBusy(snap, target, id) || (target.kind === 'p' && !snap.hosted.has(target.id) && !freeTables(snap, id).length)) states.set(id, 'unavailable');
+    else if (
+      requesterBusy(snap, viewerId, id) ||
+      targetBusy(snap, target, id) ||
+      isAway(snap, viewerId, id) ||
+      (target.kind === 'p' && (isAway(snap, target.id, id) || (!snap.hosted.has(target.id) && !freeTables(snap, id).length)))
+    )
+      states.set(id, 'unavailable');
     else states.set(id, 'available');
   }
   return states;

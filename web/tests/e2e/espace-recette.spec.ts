@@ -181,7 +181,7 @@ test('Léa : E1, E3, E4, E5, E6, E7 et E8 sur le seed, sans erreur de console', 
     await capture(page, 'E5-exposant');
   });
 
-  await test.step('E6 : agenda, demandes reçues et envoyées, frise de la journée, historique (F-60 à F-66)', async () => {
+  await test.step('E6 : agenda, demandes reçues et envoyées, mes rendez-vous, historique (F-60 à F-66, D-11)', async () => {
     await tab(page, 'Agenda').click();
     await expect(page).toHaveURL(`${baseURL}${ESPACE}/agenda`);
     await hydrated(page);
@@ -196,18 +196,19 @@ test('Léa : E1, E3, E4, E5, E6, E7 et E8 sur le seed, sans erreur de console', 
     await expect(received.getByRole('button', { name: /^Proposer un autre créneau/ })).toBeVisible();
     await expect(received.getByRole('button', { name: /^Refuser/ })).toBeVisible();
 
-    const day = page.getByRole('region', { name: /^Ma journée, jeudi 3 décembre$/ });
-    await expect(day).toContainText('Accueil et ouverture');
+    // D-11 : mes rendez-vous confirmés seulement, sans les séquences du programme ni les demandes en attente.
+    const day = page.getByRole('region', { name: /^Mes rendez-vous, jeudi 3 décembre$/ });
+    await expect(day).not.toContainText('Accueil et ouverture');
     await expect(day).toContainText('Mathis Lagrange');
     await expect(day).toContainText('Table 1');
     await expect(day).toContainText('Sylvadour');
     await expect(day).toContainText('Stand 4');
     await expect(day).toContainText('Confirmé par Benoît Tastet');
-    await expect(day).toContainText('Hélène Marquès');
-    await expect(day).toContainText('En attente de réponse');
+    await expect(day).not.toContainText('Hélène Marquès');
 
     const sent = page.getByRole('region', { name: 'Demandes envoyées' });
     await expect(sent).toContainText('Hélène Marquès');
+    await expect(sent).toContainText('En attente de réponse');
     await expect(sent.getByRole('button', { name: /^Annuler la demande/ })).toBeVisible();
 
     const history = page.locator('details').filter({ hasText: 'Historique (1)' });
@@ -273,7 +274,7 @@ test('Léa accepte la demande d’Inès : e-mail meeting-accepted avec .ics, ren
 
   await expect(page.getByRole('status').filter({ hasText: 'Rendez-vous confirmé' })).toHaveText('Rendez-vous confirmé avec Inès Castaing, Table 1, 13h00.');
   await expect(page.getByRole('region', { name: 'Demandes reçues' })).toHaveCount(0);
-  const day = page.getByRole('region', { name: /^Ma journée/ });
+  const day = page.getByRole('region', { name: /^Mes rendez-vous/ });
   await expect(day).toContainText('Inès Castaing');
   await expect(day.locator('div', { hasText: /^Inès Castaing/ }).last()).toContainText('Table 1');
   await capture(page, 'E6-apres-acceptation');
@@ -308,7 +309,7 @@ test('Inès retrouve le rendez-vous accepté dans son agenda et sur son accueil 
   await tab(page, 'Agenda').click();
   await hydrated(page);
   await expect(page.getByRole('region', { name: 'Demandes envoyées' })).toHaveCount(0);
-  const day = page.getByRole('region', { name: /^Ma journée/ });
+  const day = page.getByRole('region', { name: /^Mes rendez-vous/ });
   await expect(day).toContainText('Léa Ducasse');
   await expect(day).toContainText('Confirmé');
   await expect(day.getByRole('button', { name: /^Annuler le rendez-vous/ })).toBeVisible();
@@ -348,7 +349,7 @@ test('un participant réserve un créneau libre de la table 2 d’Antoine, confi
 
   await tab(page, 'Agenda').click();
   await hydrated(page);
-  const card = page.getByRole('region', { name: /^Ma journée/ }).locator('div', { hasText: /^Antoine Vergnes/ }).last();
+  const card = page.getByRole('region', { name: /^Mes rendez-vous/ }).locator('div', { hasText: /^Antoine Vergnes/ }).last();
   await expect(card).toContainText('Table 2');
   await expect(card).toContainText('Confirmé');
 });

@@ -54,6 +54,7 @@ Maquette : 02-accueil.
 - **F-30 (P0)** Validation : prénom, nom, entreprise obligatoires ; photo JPEG/PNG/WebP ≤ 5 Mo, convertie en WebP 256 × 256.
 - **F-31 (P0)** Message de confirmation « Profil enregistré » ; erreurs affichées sous chaque champ.
 - **F-32 (P0)** Un représentant d'exposant voit en plus le lien vers la fiche de son exposant (lecture seule en v1 ; édition par l'organisateur dans Strapi).
+- **D-09, D-10** Le formulaire porte aussi la page LinkedIn (facultative) et, quand l'édition a des pauses B2B, le bloc « Vos disponibilités pour les rendez-vous » : une case par plage, cochée par défaut.
 - **F-33 (P1)** « Supprimer mes données » : confirmation, puis anonymisation (R-44).
 
 ## E4. Annuaire : `/espace/{edition}/annuaire`
@@ -83,6 +84,7 @@ Maquette : 04-fiche. `type` = `p` (participant ou intervenant) ou `x` (exposant)
 - **F-55 (P0)** Hors fenêtre de prise de rendez-vous (avant `meetingRequestsOpenAt` ou après `meetingRequestsCloseAt`), bloc remplacé par le message adapté.
 - **F-56 (P0)** Conflit détecté à l'envoi (créneau pris entre-temps) : message « Ce créneau vient d'être pris, choisissez-en un autre » et rafraîchissement de la grille.
 - **F-57 (P0)** Fiche exposant : la demande vise l'exposant (R-14), lieu « Stand n ».
+- **D-09** Fiche d'une personne : lien « Page LinkedIn » quand elle l'a renseignée et que la fiche est complète.
 
 ## E6. Mon agenda : `/espace/{edition}/agenda`
 
@@ -97,6 +99,7 @@ Maquette : 05-agenda.
 - **F-64 (P0)** Statuts toujours affichés avec un mot : « Confirmé », « En attente de réponse », « Refusé », « Annulé », « Expiré ».
 - **F-65 (P0)** Export .ics de tous les rendez-vous acceptés et des sessions (I-40) ; un lien d'abonnement calendrier personnel est en P1.
 - **F-66 (P0)** État vide : « Aucun rendez-vous pour l'instant » et bouton vers l'annuaire.
+- **D-11** La frise de la journée est remplacée par la section « Mes rendez-vous » : rendez-vous confirmés seulement, avec l'heure, la personne et la table ou le stand.
 
 ## E7. Messagerie : `/espace/{edition}/messages` et `/messages/{conversationId}`
 

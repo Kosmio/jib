@@ -2,12 +2,13 @@
 
 const fs = require('node:fs');
 const { EspaceError } = require('../lib/errors');
-const { profileCompletion } = require('../lib/profile');
+const { profileCompletion, normalizeLinkedin } = require('../lib/profile');
 
 const ATTENDEE = 'api::espace.attendee';
 const MEETING = 'api::espace.meeting';
 const MESSAGE = 'api::espace.message';
 const TOPIC = 'api::espace.topic';
+const SEQUENCE = 'api::sequence.sequence';
 // The four fields imported from HelloAsso, the ones a participant may correct (R-31).
 const PROFILE_FIELDS = ['firstName', 'lastName', 'jobTitle', 'company'];
 const REQUIRED = { firstName: 'Indiquez votre prénom.', lastName: 'Indiquez votre nom.', company: 'Indiquez votre entreprise.' };
@@ -69,6 +70,9 @@ module.exports = ({ strapi }) => {
   const toFullMe = ({ attendee, edition, isOrganizer, hostedTableNumber, counts }) => ({
     ...toMe({ attendee, edition, isOrganizer }),
     bio: attendee.bio ?? null,
+    linkedinUrl: attendee.linkedinUrl ?? null,
+    // D-10: the B2B ranges (b2b_break sessions) the attendee unticked ; empty = available on all of them.
+    unavailableSessions: Array.isArray(attendee.unavailableSessions) ? attendee.unavailableSessions : [],
     photoUrl: attendee.photo?.url ?? null,
     topics: (attendee.topics ?? []).map(({ documentId, name }) => ({ id: documentId, name })),
     emailPrefs: emailPrefsOf(attendee),
@@ -125,6 +129,17 @@ module.exports = ({ strapi }) => {
     return found.length === ids.length;
   }
 
+  /** D-10: the documentIds given are all B2B ranges (published b2b_break sessions) of the edition. */
+  async function allB2bRanges(edition, ids) {
+    const found = await documents(SEQUENCE).findMany({
+      filters: { edition: { documentId: edition.documentId }, kind: 'b2b_break', documentId: { $in: ids } },
+      status: 'published',
+      fields: ['title'],
+      limit: 100,
+    });
+    return found.length === ids.length;
+  }
+
   return {
     toMe,
     loadAttendee,
@@ -169,6 +184,24 @@ module.exports = ({ strapi }) => {
         else data.topics = ids;
       }
 
+      if (given.linkedinUrl !== undefined) {
+        const address = given.linkedinUrl === null ? '' : normalizeLinkedin(given.linkedinUrl);
+        if (typeof given.linkedinUrl !== 'string' && given.linkedinUrl !== null) fields.linkedinUrl = 'Valeur non valable.';
+        else if (address === null) fields.linkedinUrl = 'Indiquez l’adresse de votre page LinkedIn, par exemple linkedin.com/in/votre-nom.';
+        else if ((address || null) !== (attendee.linkedinUrl ?? null)) {
+          data.linkedinUrl = address || null;
+          // As for the four imported fields (R-31): once corrected here, HelloAsso no longer overwrites it.
+          data.editedFields = [...new Set([...(attendee.editedFields ?? []), 'linkedinUrl'])];
+        }
+      }
+
+      if (given.unavailableSessions !== undefined) {
+        const ids = given.unavailableSessions;
+        if (!Array.isArray(ids) || ids.length > 50 || ids.some((id) => typeof id !== 'string' || !id || id.length > 50)) fields.unavailableSessions = 'Valeur non valable.';
+        else if (new Set(ids).size !== ids.length || (ids.length && !(await allB2bRanges(edition, ids)))) fields.unavailableSessions = 'Plage non valable.';
+        else data.unavailableSessions = ids;
+      }
+
       if (given.emailPrefs !== undefined) {
         const sent = asObject(given.emailPrefs);
         if (given.emailPrefs !== sent || EMAIL_PREFS.some((name) => sent[name] !== undefined && typeof sent[name] !== 'boolean')) fields.emailPrefs = 'Valeur attendue : oui ou non.';
@@ -182,8 +215,8 @@ module.exports = ({ strapi }) => {
           documentId: attendee.documentId,
           data: {
             ...Object.fromEntries(changed.map((name) => [name, profile[name] || null])),
-            ...(changed.length && { editedFields: [...new Set([...(attendee.editedFields ?? []), ...changed])] }),
             ...data,
+            ...((changed.length || data.editedFields) && { editedFields: [...new Set([...(data.editedFields ?? attendee.editedFields ?? []), ...changed])] }),
           },
         });
       }

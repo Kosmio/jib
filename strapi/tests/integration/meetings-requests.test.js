@@ -918,4 +918,63 @@ describe('rendez-vous : demandes et consultation (lot 8)', { timeout: 600_000 },
       assert.deepEqual(W.leaks(response.text), []);
     });
   });
+
+  describe('profil : page LinkedIn et plages B2B disponibles (D-09, D-10)', () => {
+    const ask = async (world, requester, target, label) =>
+      (await as(world.edition, requester)).post('/meetings', { slotId: world.slots[label].documentId, target: `p:${target.documentId}`, message: 'Bonjour, échangeons pendant la pause.' });
+    const rangesOf = async (world, viewer, target) => (await (await as(world.edition, viewer)).get(`/slots?target=p:${target.documentId}`)).json.groups;
+
+    it('PATCH /me enregistre la page LinkedIn en https, la renvoie dans Me et sur la fiche, et la protège de l’import', async () => {
+      const world = await newEdition();
+      const [lea, ines] = [await person(world.edition, { directoryOptIn: true }), await person(world.edition)];
+      const session = await as(world.edition, lea);
+      const response = await session.patch('/me', { linkedinUrl: 'www.linkedin.com/in/lea-ducasse?trk=x' });
+      assert.equal(response.status, 200, response.text);
+      assert.equal(response.json.linkedinUrl, 'https://www.linkedin.com/in/lea-ducasse');
+      const stored = await app().documents(UID.attendee).findOne({ documentId: lea.documentId });
+      assert.ok(stored.editedFields.includes('linkedinUrl'));
+      const card = await (await as(world.edition, ines)).get(`/directory/p/${lea.documentId}`);
+      assert.equal(card.json.linkedinUrl, 'https://www.linkedin.com/in/lea-ducasse');
+
+      const emptied = await session.patch('/me', { linkedinUrl: '' });
+      assert.equal(emptied.json.linkedinUrl, null);
+    });
+
+    it('PATCH /me refuse une adresse qui n’est pas une page LinkedIn : 400 VALIDATION sur linkedinUrl', async () => {
+      const world = await newEdition();
+      const response = await (await as(world.edition, await person(world.edition))).patch('/me', { linkedinUrl: 'https://example.org/in/lea' });
+      expectError(response, 400, 'VALIDATION');
+      assert.ok(response.json.error.fields.linkedinUrl);
+    });
+
+    it('une plage décochée rend ses créneaux indisponibles et refuse la demande ; les autres plages restent ouvertes', async () => {
+      const world = await newEdition();
+      const [lea, ines] = [await person(world.edition), await person(world.edition)];
+      const [morning] = await rangesOf(world, lea, ines);
+      const saved = await (await as(world.edition, ines)).patch('/me', { unavailableSessions: [morning.session.id] });
+      assert.equal(saved.status, 200, saved.text);
+      assert.deepEqual(saved.json.unavailableSessions, [morning.session.id]);
+
+      const groups = await rangesOf(world, lea, ines);
+      assert.ok(groups[0].slots.every((slot) => slot.state === 'unavailable'));
+      assert.ok(groups[1].slots.every((slot) => slot.state === 'available'));
+      expectError(await ask(world, lea, ines, '10h45'), 409, 'TARGET_BUSY');
+      assert.equal((await ask(world, lea, ines, '12h30')).status, 201);
+
+      const back = await (await as(world.edition, ines)).patch('/me', { unavailableSessions: [] });
+      assert.deepEqual(back.json.unavailableSessions, []);
+    });
+
+    it('PATCH /me refuse une plage inconnue ou d’une autre édition : 400 VALIDATION sur unavailableSessions', async () => {
+      const [world, other] = [await newEdition(), await newEdition()];
+      const [lea, ines] = [await person(other.edition), await person(other.edition)];
+      const [foreign] = await rangesOf(other, lea, ines);
+      const session = await as(world.edition, await person(world.edition));
+      for (const ids of [[foreign.session.id], ['inconnue'], 'texte', [12]]) {
+        const response = await session.patch('/me', { unavailableSessions: ids });
+        expectError(response, 400, 'VALIDATION');
+        assert.ok(response.json.error.fields.unavailableSessions);
+      }
+    });
+  });
 });

@@ -6,6 +6,7 @@ import EspaceButton from "../../../components/espace/EspaceButton.astro";
 import ProfileForm from "../../../react-components/espace/ProfileForm";
 import { espaceGet, guardSession, publicStrapiUrl } from "../../../lib/espace/api";
 import type { Topic } from "../../../lib/espace/client";
+import { hourRange } from "../../../lib/espace/meetings";
 
 const slug = Astro.params.edition ?? "";
 const cookie = Astro.request.headers.get("cookie");
@@ -19,12 +20,21 @@ const base = `/espace/${encodeURIComponent(slug)}`;
 const topicsResult = await espaceGet<Topic[]>(`/editions/${encodeURIComponent(slug)}/topics`, cookie).catch(() => null);
 const topics = topicsResult?.ok ? topicsResult.data : [];
 
+// Plages de rendez-vous B2B de la journée (séquences « pause B2B » du programme), pour le choix des disponibilités (D-10).
+type ProgramSession = { id: string; title: string; start: string | null; end: string | null; kind: string };
+const program = await espaceGet<{ sessions: ProgramSession[] }>(`/editions/${encodeURIComponent(slug)}/program`, cookie).catch(() => null);
+const b2bRanges = (program?.ok ? program.data.sessions : [])
+  .filter((session) => session.kind === "b2b_break")
+  .map(({ id, title, start, end }) => ({ id, title, hours: start && end ? hourRange(start, end) : (start ?? "") }));
+
 const initial = {
   firstName: me.firstName,
   lastName: me.lastName,
   jobTitle: me.jobTitle ?? "",
   company: me.company ?? "",
   bio: me.bio ?? "",
+  linkedinUrl: me.linkedinUrl ?? "",
+  unavailableSessions: me.unavailableSessions ?? [],
   photoUrl: me.photoUrl,
   topics: me.topics.map((topic) => topic.id),
   emailPrefs: me.emailPrefs,
@@ -54,7 +64,7 @@ const initial = {
       <noscript>
         <p class="font-semibold">Cette page demande JavaScript. Activez-le ou utilisez un autre navigateur.</p>
       </noscript>
-      <ProfileForm client:load strapiUrl={publicStrapiUrl} editionSlug={slug} initial={initial} topics={topics} />
+      <ProfileForm client:load strapiUrl={publicStrapiUrl} editionSlug={slug} initial={initial} topics={topics} b2bRanges={b2bRanges} />
     </section>
 
     {

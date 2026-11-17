@@ -67,6 +67,8 @@ export type DirectoryPerson = ProfileCard & {
   jobTitle: string | null;
   company: string | null;
   bio: string | null;
+  /** Page LinkedIn, seulement sur une fiche complète (D-09). */
+  linkedinUrl?: string | null;
   /** Séquences de l'intervenant, heures du programme en texte (« 11h15 »). */
   sessions: { title: string; start: string | null; end: string | null }[];
   exhibitor: { id: string; name: string; standNumber?: string | number | null } | null;

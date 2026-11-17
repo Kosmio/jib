@@ -128,6 +128,8 @@ Génération : voir R-01. Unicité (edition, startsAt) garantie par le service d
 | hostedTableNumber | integer | **ajout** (D-04) : facultatif ; si role = speaker, numéro de sa table dédiée (participation « Meeting », R-19), réglé par l'organisateur ; entre 1 et `tablesCount`, unique par édition parmi les Attendee actifs |
 | photo | media | facultatif, recadré carré 256 px |
 | bio | text | 280 caractères max |
+| linkedinUrl | string | **ajout** : page LinkedIn, https et linkedin.com seulement, importée de HelloAsso si `helloassoFieldMap.linkedin` est renseigné (D-09) |
+| unavailableSessions | json | **ajout** : documentId des séquences « pause B2B » décochées dans le profil ; liste vide par défaut, soit disponible partout (D-10) |
 | topics | relation manyToMany → Topic | 0 à 3 |
 | directoryOptIn | boolean | défaut false ; voir R-40 |
 | meetingsOptIn | boolean | défaut false |

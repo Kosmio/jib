@@ -41,6 +41,9 @@
     "company": {
       "type": "string"
     },
+    "linkedinUrl": {
+      "type": "string"
+    },
     "role": {
       "type": "enumeration",
       "enum": ["participant", "speaker", "exhibitor_rep", "organizer"],
@@ -106,6 +109,10 @@
     "emailPrefs": {
       "type": "json",
       "default": { "meetingRequests": true, "messages": true, "reminders": true }
+    },
+    "unavailableSessions": {
+      "type": "json",
+      "default": []
     },
     "editedFields": {
       "type": "json",
