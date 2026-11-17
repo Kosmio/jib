@@ -74,16 +74,16 @@ Trois formes de rendez-vous coexistent : au stand d'un exposant (R-13, R-14, par
 
 - **R-60** Préparation P2 : chaque événement notifiable (demande, réponse, message) est écrit dans une table `Notification` (type, destinataire, lien, `readAt`) qui alimente les badges F-24 et servira aux notifications push.
 - **R-61** Une conversation par paire de participants et par édition. Le premier message à une personne avec `meetingsOptIn = false` est refusé (403 `TARGET_UNAVAILABLE`) sauf si une conversation existe déjà.
-- **R-62** E-mail `new-message` : au plus un par conversation et par destinataire toutes les 30 minutes, envoyé seulement si le message n'a pas été lu 5 minutes après l'envoi et si la préférence `messages` est active.
+- **R-62** E-mail `new-message` : au plus un par conversation et par destinataire toutes les 30 minutes, envoyé seulement si le message n'a pas été lu 2 minutes après l'envoi (R-88, auparavant 5 minutes) et si la préférence `messages` est active.
 - **R-63** Le contenu des messages n'est accessible qu'aux deux participants. Il n'apparaît ni dans le tableau de bord ni dans les exports ; l'organisateur n'a accès qu'aux compteurs.
 - **R-64** Limite : 30 messages par heure et par auteur.
 
 ## Relances
 
 - **R-70** Trois scénarios, envoyés par tâche planifiée à 9h30 heure de Paris, et déclenchables manuellement (F-92) :
-  - a. `reminder-profile` : actifs dont `profileCompletion` < 70 %. Envois : J+2 après activation, puis 27 novembre.
-  - b. `reminder-no-meeting` : actifs sans aucun rendez-vous accepté ni en attente. Envois : ouverture (20 novembre), 27 novembre.
-  - c. `reminder-eve` : tous les actifs, la veille à 16h00 : agenda du lendemain, lieu, accès, demandes expirées.
-  - Inscrits jamais activés : un rappel `welcome` à J+3 après import, puis le 27 novembre.
+  - a. `reminder-profile` : actifs dont `profileCompletion` < 70 %. Envois : J+2 après activation, puis J-6 à 9h30 (R-87 : dates calculées depuis la date de l'édition ; 27 novembre pour l'édition du 3 décembre).
+  - b. `reminder-no-meeting` : actifs sans aucun rendez-vous accepté ni en attente. Envois : J-6 à 9h30 (R-87) ; l'envoi à l'ouverture est remplacé par l'envoi manuel depuis le pilotage (D-12).
+  - c. `reminder-eve` : e-mail de service aux actifs qui ont au moins un rendez-vous accepté, et aux autres actifs si `reminders` est vrai, la veille à 16h00 : agenda du lendemain, lieu, accès, demandes expirées.
+  - Inscrits jamais activés : un rappel `welcome` à J+3 après import, puis à J-6 (R-87), jamais avant le premier envoi des `welcome` (R-85).
 - **R-71** Idempotence : une clé `scenarioKey` (scénario + date prévue) par destinataire dans EmailLog ; un même scénario n'est jamais envoyé deux fois à la même personne pour la même clé, même en cas de relance manuelle.
 - **R-72** Respect des préférences `reminders` ; aucun envoi entre 20h00 et 8h00.
