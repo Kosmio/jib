@@ -59,7 +59,7 @@ export default function WelcomeCard({ edition, strapiUrl }: CardProps) {
       {preview && (
         <details className="mt-4">
           <summary className="cursor-pointer font-semibold text-title">Voir l’aperçu de l’e-mail</summary>
-          <iframe title="Aperçu de l’e-mail de bienvenue" sandbox="" srcDoc={preview.sampleHtml} className="mt-3 h-96 w-full rounded-lg border border-surface-alt bg-white" />
+          <iframe title="Aperçu de l’e-mail de bienvenue" csp="script-src 'none'" srcDoc={preview.sampleHtml} className="mt-3 h-96 w-full rounded-lg border border-surface-alt bg-white" />
         </details>
       )}
       {preview && !confirming && (
