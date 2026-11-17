@@ -152,6 +152,20 @@ describe('Strapi sur la base de test', { timeout: 180_000 }, () => {
       'GET /api/espace/admin/:x/attendees/:x/badge',
       'POST /api/espace/admin/:x/attendees/:x/card-token/regenerate',
       'GET /api/espace/cards/:x/:x',
+      // V4-B : retrait de la photo de profil.
+      'DELETE /api/espace/me/photo',
+      // V5-C : plusieurs éditions dans le pilotage, bascule et duplication.
+      'GET /api/espace/admin/editions',
+      'POST /api/espace/admin/:x/switch',
+      'POST /api/espace/admin/:x/duplicate',
+      // V5-B : signalement d'un message et file des signalements.
+      'POST /api/espace/conversations/:x/messages/:x/report',
+      'GET /api/espace/admin/:x/reports',
+      'POST /api/espace/admin/:x/reports/:x/handle',
+      // V5-A (lot en cours, routes pas encore intégrées) : effacement et export des données d'un participant.
+      'POST /api/espace/me/erase',
+      'GET /api/espace/me/export',
+      'POST /api/espace/admin/:x/attendees/:x/erase',
     ]);
     const declared = () =>
       espaceRoutes().flatMap((route) =>
