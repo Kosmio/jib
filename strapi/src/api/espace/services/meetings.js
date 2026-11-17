@@ -675,7 +675,7 @@ function operations(strapi) {
           conflict: accepted && (slot.closed || Boolean(meeting.tableNumber && slot.blockedTables.includes(meeting.tableNumber))),
           canCancel: ['pending', 'accepted'].includes(meeting.status) && !rules.hasStarted(snap, slot),
           canMove: movable && !slot.closed,
-          freeTables: movable && !slot.closed ? rules.freeTables(snap, slot.id, meeting.documentId) : [],
+          freeTables: movable && !slot.closed ? rules.freeTables(snap, slot.id, meeting.documentId).filter((table) => table !== meeting.tableNumber) : [],
         };
       });
       meetings.sort((a, b) => new Date(a.slot.startsAt) - new Date(b.slot.startsAt) || new Date(a.createdAt) - new Date(b.createdAt));
