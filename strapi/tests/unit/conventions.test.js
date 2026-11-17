@@ -65,3 +65,25 @@ describe('conventions : aucun tiret cadratin', () => {
     });
   }
 });
+
+describe('conventions : les gabarits des relances sont contrôlés (V3-A, critère 6)', () => {
+  const checked = new Set(TARGETS.flatMap(listFiles).map((file) => path.relative(REPO, file)));
+  const NEW_FILES = [
+    'strapi/src/api/espace/lib/mail/templates/reminder-profile.js',
+    'strapi/src/api/espace/lib/mail/templates/reminder-no-meeting.js',
+    'strapi/src/api/espace/lib/mail/templates/reminder-eve.js',
+    'strapi/src/api/espace/lib/reminders.js',
+    'strapi/src/api/espace/services/reminders.js',
+    'strapi/src/api/espace/controllers/reminders.js',
+    'strapi/src/api/espace/routes/reminders.js',
+    'strapi/tests/unit/reminder-templates.test.js',
+    'strapi/tests/integration/espace-relances.test.js',
+  ];
+
+  for (const file of NEW_FILES) {
+    it(`${file} est sous une cible contrôlée`, () => {
+      assert.ok(fs.existsSync(path.join(REPO, file)), 'fichier absent');
+      assert.ok(checked.has(file), 'fichier hors des cibles de conventions.test.js');
+    });
+  }
+});

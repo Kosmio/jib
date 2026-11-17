@@ -137,10 +137,25 @@ describe('config/cron-tasks.js : synchronisation toutes les 15 minutes et purge 
     assert.equal(typeof purge.task, 'function');
   });
 
-  it('ne planifie rien d’autre que la synchronisation, l’expiration des demandes (`*/5`, lot 8) et la purge', () => {
-    // Le lot 14 ajoute les notifications de messages, aussi en `*/5 * * * *` : la règle reste dans l’ensemble admis.
-    const rules = new Set(tasks().map((entry) => entry.rule));
-    assert.deepEqual([...rules].sort(), ['*/15 * * * *', '*/5 * * * *', '0 4 * * *']);
+  it('ne planifie rien d’autre que la synchronisation, l’expiration des demandes (`*/5`, lot 8), les notifications de messages (`* * * * *`, V3-A), les relances (`*/15`, V3-A) et la purge', () => {
+    // V3-A : les notifications de messages passent à une exécution par minute ; les relances partagent la cadence de la synchronisation.
+    const rules = tasks().map((entry) => entry.rule).sort();
+    assert.deepEqual(rules, ['* * * * *', '*/15 * * * *', '*/15 * * * *', '*/5 * * * *', '0 4 * * *']);
+  });
+
+  it('la tâche `espaceMessageNotify` tourne chaque minute en Europe/Paris (V3-A, pour V3-D)', () => {
+    const entry = require('../../config/cron-tasks').espaceMessageNotify;
+    assert.equal(entry.options.rule, '* * * * *');
+    assert.equal(entry.options.tz, 'Europe/Paris');
+    assert.equal(typeof entry.task, 'function');
+  });
+
+  it('la tâche `espaceReminders` tourne toutes les 15 minutes en Europe/Paris (R-87, V3-A)', () => {
+    const entry = require('../../config/cron-tasks').espaceReminders;
+    assert.ok(entry, 'tâche espaceReminders absente');
+    assert.equal(entry.options.rule, '*/15 * * * *');
+    assert.equal(entry.options.tz, 'Europe/Paris');
+    assert.equal(typeof entry.task, 'function');
   });
 });
 
@@ -159,7 +174,11 @@ describe('config/cron-tasks.js : les tâches n’appellent que des services, auc
       if (failWith) throw failWith;
       return 3;
     };
-    const services = { 'api::espace.sync': { runAll: run('sync.runAll') }, 'api::espace.tokens': { purgeExpired: run('tokens.purgeExpired') } };
+    const services = {
+      'api::espace.sync': { runAll: run('sync.runAll') },
+      'api::espace.tokens': { purgeExpired: run('tokens.purgeExpired') },
+      'api::espace.reminders': { runDue: run('reminders.runDue') },
+    };
     const target = { service: (uid) => services[uid], log: { error: (message) => errors.push(String(message)) } };
     const strapi = new Proxy(target, {
       get(object, property) {
@@ -197,6 +216,20 @@ describe('config/cron-tasks.js : les tâches n’appellent que des services, auc
     assert.equal(calls.length, 1, 'la purge doit appeler le service avant d’échouer');
     assert.equal(errors.length, 1);
     assert.match(errors[0], /base indisponible/);
+  });
+
+  it('les relances appellent reminders.runDue() sans argument (l’heure et les plages sont celles du service) et rien d’autre (V3-A)', async () => {
+    const { strapi, calls, errors } = fakeStrapi();
+    await require('../../config/cron-tasks').espaceReminders.task({ strapi });
+    assert.deepEqual(calls, [['reminders.runDue', []]]);
+    assert.deepEqual(errors, []);
+  });
+
+  it('une erreur des relances est journalisée et ne remonte jamais (V3-A)', async () => {
+    const { strapi, errors } = fakeStrapi({ failWith: new Error('Brevo en panne') });
+    await assert.doesNotReject(require('../../config/cron-tasks').espaceReminders.task({ strapi }));
+    assert.equal(errors.length, 1);
+    assert.match(errors[0], /Brevo en panne/);
   });
 
   it('le fichier ne contient plus aucune requête : ni strapi.db, ni query, ni Document Service, ni new Date()', () => {
