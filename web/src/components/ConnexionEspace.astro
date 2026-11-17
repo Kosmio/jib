@@ -1,6 +1,7 @@
 ---
 // Bouton « Se connecter » de l'espace participant, pour une édition dont l'espace est ouvert.
 // Sur téléphone (ou sans JavaScript), le lien mène à la page de connexion, qui envoie le lien magique par e-mail.
+// Fond bleu acier (--color-title) sous texte blanc : contraste de 8,1:1 (F-128), là où le vert d'accueil n'atteignait pas 4,5.
 // Sur grand écran, un clic ouvre une fenêtre avec un QR code vers cette même page : on le scanne avec son téléphone.
 import QRCode from "qrcode";
 
@@ -22,7 +23,7 @@ const id = `espace-qr-${slug}`;
 <a
   href={path}
   data-espace-connexion={id}
-  class={`items-center justify-center gap-2 px-4 py-2 bg-primary hover:bg-primary-dark text-white font-semibold text-sm rounded-lg transition-colors ${triggerClass}`}
+  class={`items-center justify-center gap-2 px-4 py-2 bg-title hover:bg-title/90 text-white font-semibold text-sm rounded-lg transition-colors ${triggerClass}`}
 >
   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
@@ -38,7 +39,7 @@ const id = `espace-qr-${slug}`;
   <div class="mx-auto mt-4 aspect-square w-56 [&>svg]:h-full [&>svg]:w-full" role="img" aria-label="QR code vers la page de connexion de l’espace participant" set:html={svg} />
   <p class="mt-3 break-all text-xs text-gray-500">{url}</p>
   <div class="mt-5 flex flex-col gap-2">
-    <a href={path} class="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-4 font-semibold text-white hover:bg-primary-dark">Continuer sur cet écran</a>
+    <a href={path} class="inline-flex min-h-11 items-center justify-center rounded-lg bg-title px-4 font-semibold text-white hover:bg-title/90">Continuer sur cet écran</a>
     <form method="dialog">
       <button class="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-gray-300 px-4 font-semibold text-gray-700 hover:bg-gray-50">Fermer</button>
     </form>

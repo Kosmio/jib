@@ -4,6 +4,8 @@
 // Avec `shell` (pages à onglets, voir AppShell.astro), la barre d'onglets entre par le slot `nav`, avant `<main>`, et le contenu
 // laisse la place de la barre : en bas sur mobile, à gauche à partir de 1024 px.
 import "../styles/espace.css";
+import { getOpenEdition } from "../lib/espace/api";
+import { bannerColor } from "../lib/espace/format";
 
 export interface Props {
   /** État de la page : « Connexion », « Lien envoyé »… Le gabarit y ajoute le nom de l'espace. */
@@ -14,6 +16,9 @@ export interface Props {
 const { title, shell = false } = Astro.props;
 // Application installable : le manifeste est celui de l'édition de l'URL (pas de manifeste sur /espace/verifier ni sur la page introuvable).
 const edition = Astro.params.edition;
+// F-130 : couleur de la barre du navigateur, celle du manifeste (couleur de l'édition, sinon bleu des titres). Une lecture de plus par page
+// à rendre, mais `getOpenEdition` est déjà appelée par les pages et la page introuvable n'a pas d'édition.
+const themeColor = edition ? ((await getOpenEdition(edition).catch(() => null))?.themeColor ?? null) : null;
 ---
 
 <!DOCTYPE html>
@@ -24,6 +29,7 @@ const edition = Astro.params.edition;
     <meta name="robots" content="noindex" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/assets/favicon-192.png" />
+    <meta name="theme-color" content={bannerColor(themeColor) ?? "#325062"} />
     {edition && <link rel="manifest" href={`/espace/${encodeURIComponent(edition)}/manifest.webmanifest`} />}
     <link rel="preload" as="font" type="font/woff2" href="/fonts/source-sans-3-latin-wght-normal.woff2" crossorigin />
     <title>{title} | Espace participant, Journées de l’Innovation Filière Bois</title>

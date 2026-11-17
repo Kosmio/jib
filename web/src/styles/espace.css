@@ -20,6 +20,18 @@
   font-display: swap;
 }
 
+/* F-126 : Azonix ne dessine pas les lettres accentuées (leur glyphe est celui de la lettre nue). Sous un autre nom de famille, la police
+   n'est déclarée que pour les caractères qu'elle possède (ASCII imprimable, espace insécable, apostrophes et guillemets anglais, euro) :
+   les accentuées retombent sur Space Grotesk puis Sora. Le site public garde sa déclaration d'app.css, inchangée. */
+@font-face {
+  font-family: "Azonix Espace";
+  src: url("/fonts/Azonix.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0020-007E, U+00A0, U+2018-2019, U+201C-201D, U+20AC;
+}
+
 /* Tokens ajoutés par le designer (phase-1-design.md, section 0), contrastes calculés sur blanc :
    ink 11,7:1 (corps), gold-ink 7,3:1 (texte du bouton or), primary-ink 5,3:1 (cases, liens d'action),
    danger 8,2:1 (erreurs, toujours avec icône et texte). */
@@ -28,6 +40,7 @@
   --color-gold-ink: #3a2410;
   --color-primary-ink: #007a5e;
   --color-danger: #9b1c1c;
+  --font-display: "Azonix Espace", "Space Grotesk", "Sora", system-ui, sans-serif;
 }
 
 @layer base {

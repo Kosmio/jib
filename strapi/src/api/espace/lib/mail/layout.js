@@ -61,9 +61,10 @@ function blockText(block) {
 }
 
 /** { subject, html, text } from a template result and its data ({ edition: { slug, title, themeColor }, publicUrl, … }). */
-function renderLayout({ subject, preheader = '', title, blocks, footer, manage = true }, { edition, publicUrl }) {
+function renderLayout({ subject, preheader = '', title, blocks, footer, manage = true }, { edition, publicUrl, manageUrl: actionUrl }) {
   const base = String(publicUrl).replace(/\/+$/, '');
-  const manageUrl = `${base}/espace/${edition.slug}/profil`;
+  // F-127 : « Gérer mes notifications » porte le lien d'action vers le profil quand l'envoi en fournit un (`manageUrl`).
+  const manageUrl = actionUrl || `${base}/espace/${edition.slug}/profil`;
   const footerText = footer ?? `Vous recevez ce message car vous participez à l’édition ${edition.title}.`;
   const color = headerColor(edition.themeColor);
 

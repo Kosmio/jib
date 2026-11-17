@@ -229,14 +229,28 @@ function operations(strapi) {
     };
   }
 
-  /** `meeting-declined` for the requester of `meeting`. */
-  const declinedMail = (ctx, meeting, reason) => ({
-    to: ctx.attendees.get(meeting.requester.documentId),
-    template: 'meeting-declined',
-    scenarioKey: `meeting-declined:${meeting.documentId}`,
-    data: { counterpartName: targetName(ctx, meeting), slotLabel: slotLabelOf(ctx.snap.slots.get(meeting.slot.documentId).startsAt), reason },
-    links: { directoryUrl: `/espace/${ctx.edition.slug}/annuaire` },
-  });
+  /** The card of the target of a meeting in the directory (F-127), or null when the person or the exhibitor no longer exists. */
+  function targetProfilePath(ctx, meeting) {
+    const base = `/espace/${ctx.edition.slug}/annuaire`;
+    if (meeting.targetAttendee) {
+      const target = ctx.attendees.get(meeting.targetAttendee.documentId);
+      return target?.status === 'active' ? `${base}/p/${target.documentId}` : null;
+    }
+    const exhibitor = meeting.targetExhibitor ? ctx.exhibitors.get(meeting.targetExhibitor.documentId) : null;
+    return exhibitor ? `${base}/x/${exhibitor.documentId}` : null;
+  }
+
+  /** `meeting-declined` for the requester of `meeting`. The button leads to the card of the person when she still exists (F-127). */
+  const declinedMail = (ctx, meeting, reason) => {
+    const profilePath = targetProfilePath(ctx, meeting);
+    return {
+      to: ctx.attendees.get(meeting.requester.documentId),
+      template: 'meeting-declined',
+      scenarioKey: `meeting-declined:${meeting.documentId}`,
+      data: { counterpartName: targetName(ctx, meeting), slotLabel: slotLabelOf(ctx.snap.slots.get(meeting.slot.documentId).startsAt), reason },
+      links: { directoryUrl: `/espace/${ctx.edition.slug}/annuaire`, ...(profilePath ? { profileUrl: profilePath } : {}) },
+    };
+  };
 
   /** `meeting-request` for the target side (each active representative of an exhibitor), unless their preference says no (A-33). */
   function requestMails(ctx, meeting, { counter = null } = {}) {
@@ -285,7 +299,8 @@ function operations(strapi) {
     for (const { to, template, scenarioKey, data, links = {}, attachments } of emails) {
       try {
         const urls = {};
-        for (const [name, next] of Object.entries(links)) {
+        // F-127 : « Gérer mes notifications » est un lien d'action vers le profil, comme les boutons.
+        for (const [name, next] of Object.entries({ ...links, manageUrl: `/espace/${edition.slug}/profil` })) {
           const token = await strapi.service('api::espace.tokens').issueLink(to.documentId, { ttlMinutes: ACTION_LINK_MINUTES, now });
           urls[name] = linkUrl({ publicUrl: settings().publicUrl, token, next });
         }
@@ -708,6 +723,7 @@ module.exports = ({ strapi }) => ({
             slotLabel: slotLabelOf(meeting.slot.startsAt),
             counterpartName,
             agendaUrl: linkUrl({ publicUrl, token, next: `/espace/${edition.slug}/agenda` }),
+            manageUrl: linkUrl({ publicUrl, token, next: `/espace/${edition.slug}/profil` }),
           },
         });
       }

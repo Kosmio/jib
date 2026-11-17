@@ -120,7 +120,7 @@ const CARD = "rounded-xl border border-surface-alt bg-white p-4";
 
     <nav aria-label="Sections du programme" class="sticky top-0 z-20 border-b border-surface-alt bg-white">
       <ul class="mx-auto grid max-w-180 grid-cols-[4fr_5fr_6fr] gap-1 px-4 py-2 sm:grid-cols-3">
-        <li><a href="#journee" class={tabClasses.journee}>Journée</a></li>
+        <li><a href="#journee" class={tabClasses.journee} aria-current="page">Journée</a></li>
         <li><a href="#intervenants" class={tabClasses.intervenants}>Intervenants</a></li>
         <li><a href="#infos" class={tabClasses.infos}>Infos pratiques</a></li>
       </ul>
@@ -158,7 +158,7 @@ const CARD = "rounded-xl border border-surface-alt bg-white p-4";
           )
         }
         {
-          program.sessions.length === 0 ? (
+          !result.ok ? null : program.sessions.length === 0 ? (
             <EmptyState title="Le programme sera publié bientôt" />
           ) : (
             <ol class="space-y-3">
@@ -172,7 +172,7 @@ const CARD = "rounded-xl border border-surface-alt bg-white p-4";
                     {session.speakers.map((speaker) => {
                       const href = profileHref(speaker.attendeeId);
                       const label = speaker.organisation ? `${speaker.name}, ${speaker.organisation}` : speaker.name;
-                      return <li>{href ? <a href={href} class="text-title underline">{label}</a> : label}</li>;
+                      return <li>{href ? <a href={href} class="inline-flex min-h-11 items-center text-title underline">{label}</a> : label}</li>;
                     })}
                   </ul>
                 );
@@ -241,7 +241,7 @@ const CARD = "rounded-xl border border-surface-alt bg-white p-4";
       <section id="intervenants" aria-labelledby="intervenants-titre" class="hidden target:block">
         <h2 id="intervenants-titre" class="sr-only">Intervenants</h2>
         {
-          program.speakers.length === 0 ? (
+          !result.ok ? null : program.speakers.length === 0 ? (
             <EmptyState title="Les intervenants seront annoncés bientôt" />
           ) : (
             <ul class="space-y-3">
@@ -279,7 +279,7 @@ const CARD = "rounded-xl border border-surface-alt bg-white p-4";
       <section id="infos" aria-labelledby="infos-titre" class="hidden target:block">
         <h2 id="infos-titre" class="sr-only">Infos pratiques</h2>
         {
-          program.venues.length === 0 ? (
+          !result.ok ? null : program.venues.length === 0 ? (
             <EmptyState title="Les informations pratiques seront publiées bientôt" />
           ) : (
             <ul class="space-y-3">
@@ -311,3 +311,18 @@ const CARD = "rounded-xl border border-surface-alt bg-white p-4";
     </div>
   </div>
 </AppShell>
+
+<script>
+  // F-129 : l'onglet actif est exposé aux technologies d'assistance. Le rendu serveur marque Journée ; l'ancre de l'adresse décide ensuite.
+  const tabs = document.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Sections du programme"] a');
+  const sync = () => {
+    const hash = location.hash;
+    const active = Array.from(tabs).find((tab) => tab.getAttribute("href") === hash && hash !== "#journee") ?? tabs[0];
+    for (const tab of tabs) {
+      if (tab === active) tab.setAttribute("aria-current", "page");
+      else tab.removeAttribute("aria-current");
+    }
+  };
+  window.addEventListener("hashchange", sync);
+  sync();
+</script>
