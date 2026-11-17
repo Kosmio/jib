@@ -4,21 +4,19 @@
 // Avec `shell` (pages à onglets, voir AppShell.astro), la barre d'onglets entre par le slot `nav`, avant `<main>`, et le contenu
 // laisse la place de la barre : en bas sur mobile, à gauche à partir de 1024 px.
 import "../styles/espace.css";
-import { getOpenEdition } from "../lib/espace/api";
 import { bannerColor } from "../lib/espace/format";
 
 export interface Props {
   /** État de la page : « Connexion », « Lien envoyé »… Le gabarit y ajoute le nom de l'espace. */
   title: string;
   shell?: boolean;
+  /** F-130 : couleur de l'édition pour la barre du navigateur, si la page l'a déjà lue ; sinon le bleu des titres (aucune requête ajoutée). */
+  themeColor?: string | null;
 }
 
-const { title, shell = false } = Astro.props;
+const { title, shell = false, themeColor = null } = Astro.props;
 // Application installable : le manifeste est celui de l'édition de l'URL (pas de manifeste sur /espace/verifier ni sur la page introuvable).
 const edition = Astro.params.edition;
-// F-130 : couleur de la barre du navigateur, celle du manifeste (couleur de l'édition, sinon bleu des titres). Une lecture de plus par page
-// à rendre, mais `getOpenEdition` est déjà appelée par les pages et la page introuvable n'a pas d'édition.
-const themeColor = edition ? ((await getOpenEdition(edition).catch(() => null))?.themeColor ?? null) : null;
 ---
 
 <!DOCTYPE html>
