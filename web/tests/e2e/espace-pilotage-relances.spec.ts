@@ -104,7 +104,7 @@ test.describe('pilotage : carte Relances (V3-B, F-92)', () => {
 
     await card.getByRole('button', { name: 'Envoyer à 3 destinataires' }).click();
     const dialog = page.getByRole('alertdialog');
-    await expect(dialog).toContainText(/Confirmer l’envoi à 3 destinataires/);
+    await expect(dialog).toContainText('Confirmer l’envoi à 3 destinataires');
     await dialog.getByRole('button', { name: 'Annuler' }).click();
 
     await expect(dialog).toHaveCount(0);
@@ -186,6 +186,25 @@ test.describe('pilotage : carte Relances (V3-B, F-92)', () => {
     await page.getByRole('alertdialog').getByRole('button', { name: /Confirmer/ }).click();
     await expect(page.getByRole('alert').filter({ hasText: OUTSIDE })).toBeVisible();
     await expect(card.getByRole('button', { name: 'Envoyer à 3 destinataires' })).toBeDisabled();
+  });
+
+  test('critère 1 : second envoi du même scénario le même jour, « 0 envoyé, 3 déjà relancés » (réponses simulées)', async ({ page, baseURL }) => {
+    await openWithFakePreview(page, baseURL, '10:00', 3);
+    let calls = 0;
+    await page.route(SEND, (route) => {
+      calls += 1;
+      return route.fulfill({ status: 200, contentType: 'application/json', json: calls === 1 ? { sent: 3, skipped: 0, failed: 0 } : { sent: 0, skipped: 3, failed: 0 } });
+    });
+    const card = cardOf(page);
+    const sendOnce = async () => {
+      await card.getByRole('button', { name: 'Envoyer à 3 destinataires' }).click();
+      await page.getByRole('alertdialog').getByRole('button', { name: 'Confirmer l’envoi à 3 destinataires' }).click();
+    };
+    await sendOnce();
+    await expect(page.getByRole('status').filter({ hasText: /3\s+envoyés, 0\s+déjà relancé, 0\s+en échec\./ })).toBeVisible();
+    await sendOnce();
+    await expect(page.getByRole('status').filter({ hasText: /0\s+envoyé, 3\s+déjà relancés, 0\s+en échec\./ })).toBeVisible();
+    expect(calls).toBe(2);
   });
 
   test('critère 1 : second envoi du même scénario le même jour, « 0 envoyé, N déjà relancés » (serveur réel)', async ({ page, baseURL }) => {
