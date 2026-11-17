@@ -581,12 +581,8 @@ describe('effacement, export individuel et purge (V5-A : F-33, R-44, NF-12, NF-1
       assert.equal((await row(w.lea)).firstName, 'Participant');
     });
 
-    // DÉFAUT (V5-A) : loadSession (services/auth.js:230, isOpenFor) rend null pour un non-organisateur dès que l'espace est fermé : la
-    // session est refusée (401) avant que la dérogation de lib/guards.js:9 ne soit atteinte. Un participant ne peut donc ni effacer ni
-    // exporter ses données une fois l'espace fermé ; seuls les organisateurs le peuvent. Test `todo` jusqu'à correction.
-    const CLOSED_DEFECT = 'défaut : un participant reçoit 401 sur un espace fermé (services/auth.js:230), l’effacement et l’export lui sont refusés';
 
-    it('espace fermé (participantSpaceEnabled faux) : l’effacement et l’export du participant passent ; rien n’est envoyé (NF-52), les rendez-vous sont annulés', { todo: CLOSED_DEFECT }, async () => {
+    it('espace fermé (participantSpaceEnabled faux) : l’effacement et l’export du participant passent ; rien n’est envoyé (NF-52), les rendez-vous sont annulés', async () => {
       const w = await withMeetings(await world());
       await flip(w.edition, { participantSpaceEnabled: false });
       const since = espace().outbox().length;
@@ -619,7 +615,7 @@ describe('effacement, export individuel et purge (V5-A : F-33, R-44, NF-12, NF-1
       assert.equal((await row(w.organizer)).firstName, 'Participant');
     });
 
-    it('lecture seule et espace fermé à la fois (participant)', { todo: CLOSED_DEFECT }, async () => {
+    it('lecture seule et espace fermé à la fois (participant)', async () => {
       const w = await world();
       await flip(w.edition, { readOnlyAt: '2020-01-01T00:00:00.000Z', participantSpaceEnabled: false });
       assert.equal((await api(w.leaCookie).get('/me/export')).status, 200);
