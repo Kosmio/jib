@@ -36,8 +36,11 @@ const get = (path: string, headers?: HeadersInit) =>
  * `Cookie` de la requête de la page (null pour une route publique). Ne lève que si Strapi ne répond pas : une réponse d'erreur
  * (401, 404…) est rendue dans `error`, à la page d'en décider (redirection, `Astro.rewrite`, repli).
  */
-export async function espaceGet<T>(path: string, cookie: string | null): Promise<EspaceResult<T>> {
-  const response = await get(path, cookie ? { cookie } : undefined);
+export async function espaceGet<T>(path: string, cookie: string | null, clientIp?: string): Promise<EspaceResult<T>> {
+  // `clientIp` : adresse du visiteur, transmise à Strapi dans X-Forwarded-For (une seule entrée) pour que ses limites de débit
+  // (NF-54, carte publique) comptent par visiteur et non par serveur web. Strapi la lit avec IS_PROXIED=true.
+  const headers: Record<string, string> = { ...(cookie && { cookie }), ...(clientIp && { "x-forwarded-for": clientIp }) };
+  const response = await get(path, Object.keys(headers).length ? headers : undefined);
   const body = await response.json().catch(() => null);
   if (response.ok) return { ok: true, status: response.status, data: body as T };
   return {

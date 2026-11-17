@@ -35,7 +35,7 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
 Astro.response.headers.set("Referrer-Policy", "strict-origin");
 Astro.response.headers.set("X-Robots-Tag", "noindex");
 
-const result = await espaceGet<CardResponse>(`/cards/${encodeURIComponent(slug)}/${encodeURIComponent(token)}`, null);
+const result = await espaceGet<CardResponse>(`/cards/${encodeURIComponent(slug)}/${encodeURIComponent(token)}`, null, Astro.clientAddress);
 if (!result.ok && result.status !== 404 && result.status !== 429) throw new Error(`GET /cards : ${result.status}`);
 const found = result.ok ? result.data : null;
 if (!result.ok) Astro.response.status = result.status === 429 ? 429 : 404;
@@ -47,7 +47,8 @@ if (card && cookie) {
   const allowed = await espaceGet(`/directory/p/${encodeURIComponent(card.id)}`, cookie).catch(() => null);
   if (allowed?.ok) return Astro.redirect(profilePath, 303);
 }
-const loginHref = `${base}/connexion?next=${encodeURIComponent(profilePath)}`;
+// F-96, R-41 : une carte réduite (profil masqué) n'a pas de fiche dans l'annuaire pour un autre participant : retour à l'accueil de l'édition.
+const loginHref = `${base}/connexion?next=${encodeURIComponent(card?.reduced ? `${base}/` : profilePath)}`;
 const tag = card ? tagOf(card) : null;
 ---
 
