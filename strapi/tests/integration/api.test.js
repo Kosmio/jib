@@ -94,6 +94,7 @@ describe('Strapi sur la base de test', { timeout: 180_000 }, () => {
       'POST /api/espace/auth/request-link',
       'GET /api/espace/auth/link',
       'POST /api/espace/auth/verify',
+      'POST /api/espace/auth/verify-code',
       'POST /api/espace/auth/logout',
       'GET /api/espace/me',
       'PATCH /api/espace/me',

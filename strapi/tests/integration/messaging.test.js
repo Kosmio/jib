@@ -609,13 +609,21 @@ describe('messagerie (lot 14)', { timeout: 900_000 }, () => {
       assert.match(mails[1].text, /Second message/);
     });
 
-    it('R-62 : un message de moins de 5 minutes attend, il part au passage suivant', async () => {
+    it('R-62, R-88 : un message de moins de 2 minutes attend, il part au passage suivant', async () => {
       const now = new Date();
-      const { p } = await unread({ now, age: 4 });
+      const { p } = await unread({ now, age: 1 });
       const since = espace().outbox().length;
       await notify(now);
       assert.equal(mailsFor(p.lea, since).length, 0);
       await notify(new Date(now.getTime() + 2 * MINUTE));
+      assert.equal(mailsFor(p.lea, since).length, 1);
+    });
+
+    it('R-88 : un message non lu depuis 3 minutes est dû, l’e-mail part sans attendre 5 minutes', async () => {
+      const now = new Date();
+      const { p } = await unread({ now, age: 3 });
+      const since = espace().outbox().length;
+      await notify(now);
       assert.equal(mailsFor(p.lea, since).length, 1);
     });
 

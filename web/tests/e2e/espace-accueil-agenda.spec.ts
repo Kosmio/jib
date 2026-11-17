@@ -74,17 +74,59 @@ async function openProfile(page: Page, email: string, search: string, name: RegE
 
 const slotButton = (page: Page, time: string) => page.getByRole('button', { name: new RegExp(`^${time}`) });
 
-function sql(statement: string) {
+function sql(statement: string): string {
   expect(DATABASE.endsWith('_e2e'), `base e2e attendue, reçu ${DATABASE}`).toBe(true);
-  const result = spawnSync('docker', ['exec', 'jib-postgres', 'psql', '-U', 'strapi', '-d', DATABASE, '-v', 'ON_ERROR_STOP=1', '-c', statement], { encoding: 'utf8' });
+  const result = spawnSync('docker', ['exec', 'jib-postgres', 'psql', '-U', 'strapi', '-d', DATABASE, '-v', 'ON_ERROR_STOP=1', '-t', '-A', '-c', statement], { encoding: 'utf8' });
   expect(result.status, `SQL « ${statement} » : ${result.stderr}`).toBe(0);
+  return result.stdout.trim();
 }
+
+/** Plus grand identifiant de rendez-vous au départ du fichier : ceux que les tests créent ensuite sont supprimés par `afterAll`. */
+let lastSeedMeetingId: number | null = null;
+test.beforeAll(() => {
+  lastSeedMeetingId = Number(sql('select coalesce(max(id), 0) from espace_meetings'));
+});
 
 const setWindow = (openAt: string, closeAt: string) =>
   sql(`update editions set meeting_requests_open_at = '${openAt}', meeting_requests_close_at = '${closeAt}' where slug = 'nouvelle-aquitaine-test'`);
 
+/**
+ * Remet le seed de recette tel quel pour les autres fichiers : la demande d'Inès à Léa redevient en attente (le test du critère 4 l'accepte)
+ * les rendez-vous créés par les tests sont supprimés, et le message d'Inès à Léa redevient non lu (le lien « Écrire à Inès » ouvre le fil et le lit).
+ */
+const restoreInesRequest = () => {
+  sql(`
+    update espace_messages set read_at = null where id in (
+      select l.message_id from espace_messages_author_lnk l
+      join espace_attendees a on a.id = l.attendee_id and a.email = '${INES}'
+      join espace_messages_conversation_lnk c on c.message_id = l.message_id
+      join espace_conversations_participants_lnk p on p.conversation_id = c.conversation_id
+      join espace_attendees b on b.id = p.attendee_id and b.email = '${LEA}')`);
+  sql(`
+    with m as (
+      select r.meeting_id as id from espace_meetings_requester_lnk r
+      join espace_attendees a on a.id = r.attendee_id and a.email = '${INES}'
+      join espace_meetings_target_attendee_lnk t on t.meeting_id = r.meeting_id
+      join espace_attendees b on b.id = t.attendee_id and b.email = '${LEA}'
+    ), gone as (delete from espace_meetings_answered_by_lnk where meeting_id in (select id from m))
+    update espace_meetings set status = 'pending', location = null, table_number = null, table_key = null, answered_at = null
+    where id in (select id from m) and status = 'accepted'`);
+};
+
+const deleteCreatedMeetings = () => {
+  if (lastSeedMeetingId === null) return;
+  for (const link of ['edition', 'slot', 'requester', 'target_attendee', 'target_exhibitor', 'answered_by']) {
+    sql(`delete from espace_meetings_${link}_lnk where meeting_id > ${lastSeedMeetingId}`);
+  }
+  sql(`delete from espace_meetings where id > ${lastSeedMeetingId}`);
+};
+
 test.afterAll(() => {
-  if (sessions.size > 0) setWindow(SEED_OPEN_AT, SEED_CLOSE_AT);
+  if (sessions.size > 0) {
+    deleteCreatedMeetings();
+    restoreInesRequest();
+    setWindow(SEED_OPEN_AT, SEED_CLOSE_AT);
+  }
 });
 
 /** Place `document.visibilityState` : le navigateur de test est toujours visible, l'onglet masqué se simule. */

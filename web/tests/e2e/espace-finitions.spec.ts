@@ -44,6 +44,7 @@ test('F-129 : onglet actif exposé par aria-current, liens d’intervenants de 4
   await hydrated(page);
   const sections = page.getByRole('navigation', { name: 'Sections du programme' });
   const current = sections.locator('[aria-current]');
+  const lengthBefore = await page.evaluate(() => history.length);
 
   await test.step('aria-current suit l’ancre, un seul onglet à la fois', async () => {
     await expect(current).toHaveCount(1);
@@ -54,10 +55,10 @@ test('F-129 : onglet actif exposé par aria-current, liens d’intervenants de 4
     await expect(current).toHaveText('Intervenants');
     await sections.getByRole('link', { name: 'Infos pratiques' }).click();
     await expect(current).toHaveText('Infos pratiques');
-    await page.goBack();
-    await expect(current).toHaveText('Intervenants');
     await sections.getByRole('link', { name: 'Journée' }).click();
     await expect(current).toHaveText('Journée');
+    // F-152 : les onglets remplacent l'entrée d'historique, ils n'en ajoutent pas.
+    expect(await page.evaluate(() => history.length)).toBe(lengthBefore);
   });
 
   await test.step('ouverture directe sur une ancre : l’onglet de l’ancre est l’onglet actif', async () => {
