@@ -148,7 +148,13 @@ test('Léa : E1, E3, E4, E5, E6, E7 et E8 sur le seed, sans erreur de console', 
     const submit = page.getByRole('button', { name: 'Choisissez un créneau' });
     await expect(submit).toBeDisabled();
     await slotButton(page, '13h30').click();
-    await expect(page.getByRole('button', { name: 'Envoyer la demande pour 13h30' })).toBeEnabled();
+    // D-08 : la demande ne part pas sans un mot de présentation.
+    const send = page.getByRole('button', { name: 'Envoyer la demande pour 13h30' });
+    await expect(send).toBeDisabled();
+    const word = page.getByLabel(/Un mot pour présenter votre demande/);
+    await word.fill('Bonjour Mathis.');
+    await expect(send).toBeEnabled();
+    await word.fill('');
     await capture(page, 'E5-personne');
     await expect(page.getByRole('link', { name: /Écrire un message/ })).toBeVisible();
   });

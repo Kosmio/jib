@@ -341,7 +341,7 @@ export default function SlotPicker({
 
               <button
                 type="submit"
-                disabled={!chosen || sending || (mode === "request" && !message.trim())}
+                disabled={!chosen || sending || (mode !== "booking" && !isCounter && !message.trim())}
                 aria-busy={sending}
                 aria-describedby={noteId}
                 className="mt-6 inline-flex min-h-13 w-full items-center justify-center rounded-lg bg-gold px-6 text-lg font-bold text-gold-ink shadow-md shadow-gold/25 hover:bg-gold-light disabled:cursor-not-allowed disabled:opacity-60"
