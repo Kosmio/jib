@@ -165,6 +165,7 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b
   }));
   const [confirmingPhoto, setConfirmingPhoto] = useState(false);
   const savedRef = useRef<HTMLParagraphElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
   const [photoUrl, setPhotoUrl] = useState(initial.photoUrl);
   const [photoState, setPhotoState] = useState<{ busy: boolean; error: string | null; done: boolean; removed: boolean }>({ busy: false, error: null, done: false, removed: false });
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -187,6 +188,18 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b
     };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+
+  // F-146 : la barre collante est opaque ; un champ qui prend le focus (ou que la barre vient recouvrir) est remonté au-dessus d'elle.
+  function keepAboveBar(element: Element | null) {
+    const bar = barRef.current;
+    if (!element || !bar || !bar.hasAttribute("data-barre-enregistrement") || !element.closest("form")) return;
+    const overlap = element.getBoundingClientRect().bottom - bar.getBoundingClientRect().top;
+    if (overlap > -16) window.scrollBy({ top: overlap + 16 });
+  }
+
+  useEffect(() => {
+    if (dirty) keepAboveBar(document.activeElement);
   }, [dirty]);
 
   // F-146 : le focus passe au message de succès, pour que le lecteur d'écran l'annonce et que la barre ne garde pas le focus.
@@ -323,7 +336,7 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b
     `mt-2 w-full rounded-lg border-2 bg-white px-4 text-lg text-ink ${errors[name] ? "border-danger" : "border-accent"}`;
 
   return (
-    <form noValidate onSubmit={submit} className="space-y-6 [&_input]:scroll-mb-44 [&_textarea]:scroll-mb-44">
+    <form noValidate onSubmit={submit} onFocus={(event) => keepAboveBar(event.target)} className="space-y-6 [&_input]:scroll-mb-44 [&_textarea]:scroll-mb-44">
       <section aria-labelledby="photo-titre">
         <h2 id="photo-titre" className="font-heading text-xl font-semibold normal-case">
           Votre photo
@@ -664,6 +677,7 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b
       )}
 
       <div
+        ref={barRef}
         data-barre-enregistrement={dirty ? "" : undefined}
         className={dirty ? "sticky bottom-17 z-30 -mx-5 border-t border-surface-alt bg-white px-5 py-3 shadow-[0_-4px_12px_rgb(0_0_0/0.08)] lg:bottom-0" : ""}
       >
