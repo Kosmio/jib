@@ -12,7 +12,7 @@ import { bannerColor, editionLine } from "../../../lib/espace/format";
 
 const slug = Astro.params.edition ?? "";
 const cookie = Astro.request.headers.get("cookie");
-const guard = await guardSession(slug, cookie);
+const guard = await guardSession(slug, cookie, { pilotage: true });
 if ("redirect" in guard) return Astro.redirect(guard.redirect);
 if ("notFound" in guard) return Astro.rewrite("/espace/introuvable");
 const { edition, me } = guard;
