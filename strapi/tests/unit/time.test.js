@@ -21,6 +21,17 @@ describe('parseProgramTime : formes admises du programme (R-01)', () => {
     ['18h00', { hours: 18, minutes: 0 }],
     ['0h00', { hours: 0, minutes: 0 }],
     ['23h59', { hours: 23, minutes: 59 }],
+    // R-86 : écritures tolérantes, toutes équivalentes à « 10h45 ».
+    ['10:45', { hours: 10, minutes: 45 }],
+    ['10 h 45', { hours: 10, minutes: 45 }],
+    ['10H45', { hours: 10, minutes: 45 }],
+    ['10\u00a0h\u00a045', { hours: 10, minutes: 45 }],
+    ['10\u202fh\u202f45', { hours: 10, minutes: 45 }],
+    ['10\u00a0:\u00a045', { hours: 10, minutes: 45 }],
+    ['  10h45  ', { hours: 10, minutes: 45 }],
+    ['9:15', { hours: 9, minutes: 15 }],
+    ['9 h 15', { hours: 9, minutes: 15 }],
+    ['9 h', { hours: 9, minutes: 0 }],
   ]) {
     it(`lit « ${text} »`, () => {
       assert.deepEqual(time().parseProgramTime(text), expected);
@@ -28,7 +39,7 @@ describe('parseProgramTime : formes admises du programme (R-01)', () => {
   }
 
   // « -- » est la valeur du programme réel pour une séquence sans horaire (11-questions-ouvertes.md).
-  for (const text of ['--', '', ' ', 'bientôt', '9:15', '9 h 15', '25h00', '9h75', 'h30', '9h15h', '10h45-11h15', null, undefined, 915, {}]) {
+  for (const text of ['--', '', ' ', 'bientôt', '10.45', '10,45', '10-45', '10 45', '25h00', '24:00', '9:75', '9h75', '10:4', '10:455', 'h30', '9h15h', '10h45-11h15', null, undefined, 915, {}]) {
     it(`renvoie null pour ${JSON.stringify(text) ?? 'undefined'}`, () => {
       assert.equal(time().parseProgramTime(text), null);
     });
@@ -118,6 +129,65 @@ describe('formatTimeLabel : libellé « 9h45 » en Europe/Paris', () => {
     for (const [text, expected] of [['10h45', '10h45'], ['9h', '9h00'], ['12h30', '12h30'], ['15h45', '15h45']]) {
       const parsed = time().parseProgramTime(text);
       assert.equal(time().formatTimeLabel(time().zonedToUtc('2026-12-03', parsed)), expected);
+    }
+  });
+});
+
+describe('R-86 : les quatre écritures d’une heure donnent les mêmes créneaux', () => {
+  const { computeSlots } = require('../../src/api/espace/lib/slots');
+  const labelsOf = (start, end) =>
+    computeSlots({ date: '2026-12-03', durationMinutes: 15, sessions: [{ documentId: 'p', title: 'Pause', kind: 'b2b_break', start_time: start, end_time: end }] });
+
+  it('10h45, 10:45, 10 h 45 et 10H45 (avec espaces insécables) donnent des créneaux identiques', () => {
+    const reference = labelsOf('10h45', '11h15');
+    assert.equal(reference.slots.length, 2);
+    for (const [start, end] of [['10:45', '11:15'], ['10 h 45', '11 h 15'], ['10H45', '11H15'], ['10\u00a0h\u00a045', '11\u202fh\u202f15']]) {
+      const other = labelsOf(start, end);
+      assert.deepEqual(other.slots, reference.slots, `${start} - ${end}`);
+      assert.deepEqual(other.warnings, []);
+    }
+  });
+
+  it('« 10.45 » n’est pas lue : la séquence est signalée INVALID_TIME, sans créneau', () => {
+    const result = labelsOf('10.45', '11h15');
+    assert.equal(result.slots.length, 0);
+    assert.deepEqual(result.warnings.map(({ code }) => code), ['INVALID_TIME']);
+  });
+});
+
+describe('programTimeRefusal : message de refus d’une pause B2B (R-86)', () => {
+  const refusal = (fields) => time().programTimeRefusal(fields);
+
+  it('refuse un début illisible, en français, avec l’exemple 10h45', () => {
+    const message = refusal({ kind: 'b2b_break', start_time: '10.45', end_time: '11h15' });
+    assert.match(message, /heure de début/);
+    assert.match(message, /10h45/);
+    assert.doesNotMatch(message, /heure de fin/);
+  });
+
+  it('refuse une fin illisible', () => {
+    assert.match(refusal({ kind: 'b2b_break', start_time: '10h45', end_time: '11.15' }), /heure de fin/);
+  });
+
+  it('nomme les deux heures quand les deux sont illisibles', () => {
+    assert.match(refusal({ kind: 'b2b_break', start_time: 'bientôt', end_time: '11.15' }), /heure de début et l’heure de fin/);
+  });
+
+  it('accepte toutes les écritures lisibles', () => {
+    for (const value of ['10h45', '10:45', '10 h 45', '10H45']) {
+      assert.equal(refusal({ kind: 'b2b_break', start_time: value, end_time: '11h15' }), null);
+    }
+  });
+
+  it('ne contrôle pas une heure de fin vide ou absente (signalée plus tard par MISSING_END)', () => {
+    assert.equal(refusal({ kind: 'b2b_break', start_time: '10h45', end_time: '' }), null);
+    assert.equal(refusal({ kind: 'b2b_break', start_time: '10h45' }), null);
+    assert.equal(refusal({ kind: 'b2b_break', start_time: '10h45', end_time: '   ' }), null);
+  });
+
+  it('ne contrôle que la pause b2b_break : talk et other passent même avec « 10.45 »', () => {
+    for (const kind of ['talk', 'other', undefined, null]) {
+      assert.equal(refusal({ kind, start_time: '10.45', end_time: '--' }), null);
     }
   });
 });
