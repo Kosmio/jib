@@ -114,6 +114,9 @@
       "type": "json",
       "default": []
     },
+    "statusLockedAt": {
+      "type": "datetime"
+    },
     "editedFields": {
       "type": "json",
       "default": []

@@ -55,18 +55,20 @@ function mapItem(item, fieldMap) {
 
 /**
  * What a synchronization must do, from the tickets and the Attendees already stored (keys: documentId, helloassoItemId, email,
- * firstName, lastName, jobTitle, company, status, editedFields).
+ * firstName, lastName, jobTitle, company, status, statusLockedAt, editedFields).
  *   create: mapItem results to create ; update: [{ documentId, changes }] ; cancel: [documentId]
  *   errors: [{ itemId, code, email? }] with the codes DUPLICATE_EMAIL (I-14), INVALID_EMAIL, WAITING, UNKNOWN
  * Tickets are handled by ascending id, so the first ticket of an e-mail address wins. Role, links and consents are never touched.
  * A-22: an active unknown ticket whose address is that of an Attendee already `cancelled` when the synchronization starts is
  * attached to this Attendee (ticket ids, status `active`, imported fields not edited). An Attendee is attached once per run:
  * a second active ticket at the same address stays in DUPLICATE_EMAIL.
+ * R-89: an Attendee whose status the organizer decided (`statusLockedAt`) is never cancelled, reactivated or taken over by a ticket:
+ * a new ticket at its address stays in DUPLICATE_EMAIL. Attendees created by hand carry no ticket id and are never planned for removal.
  */
 function planSync({ items, attendees, fieldMap }) {
   const known = new Map(attendees.filter((attendee) => attendee.helloassoItemId != null).map((attendee) => [String(attendee.helloassoItemId), attendee]));
   const taken = new Set(attendees.map((attendee) => normalizeEmail(attendee.email)));
-  const returning = new Map(attendees.filter(({ status }) => status === 'cancelled').map((attendee) => [normalizeEmail(attendee.email), attendee]));
+  const returning = new Map(attendees.filter(({ status, statusLockedAt }) => status === 'cancelled' && !statusLockedAt).map((attendee) => [normalizeEmail(attendee.email), attendee]));
   const plan = { create: [], update: [], cancel: [], errors: [] };
 
   /** Imported fields that changed and that the participant did not edit (R-31) ; a blank value never empties a field. */
@@ -83,10 +85,10 @@ function planSync({ items, attendees, fieldMap }) {
 
     if (mapped.decision === 'ignored') fail(mapped.reason);
     else if (mapped.decision === 'cancelled') {
-      if (attendee && attendee.status !== 'cancelled') plan.cancel.push(attendee.documentId);
+      if (attendee && attendee.status !== 'cancelled' && !attendee.statusLockedAt) plan.cancel.push(attendee.documentId);
     } else if (attendee) {
       const changes = refreshed(attendee, mapped);
-      if (attendee.status === 'cancelled') {
+      if (attendee.status === 'cancelled' && !attendee.statusLockedAt) {
         changes.status = 'active';
         returning.delete(normalizeEmail(attendee.email));
       }
