@@ -217,7 +217,7 @@ module.exports = ({ strapi }) => {
      * Valid: unexpired session token, active attendee, published edition with the space open (NF-52).
      * The expiry slides by 30 days at most once a day, cookie included, and only on a request that can receive the cookie (A-25).
      */
-    async loadSession(ctx, { now = new Date() } = {}) {
+    async loadSession(ctx, { now = new Date(), allowClosed = false } = {}) {
       const token = ctx.cookies.get(COOKIE_NAME, { signed: true });
       if (!token) return null;
 
@@ -227,7 +227,8 @@ module.exports = ({ strapi }) => {
       });
       const attendee = session?.attendee;
       const edition = attendee?.status === 'active' ? await publishedEdition(attendee.edition?.documentId) : null;
-      if (!isOpenFor(edition, attendee)) return null;
+      // R-44, NF-12: `allowClosed` (erasure and export routes only) keeps the session of a participant of a closed edition.
+      if (!(allowClosed && edition) && !isOpenFor(edition, attendee)) return null;
 
       if (new Date(session.expiresAt).getTime() - now.getTime() < SESSION_MS - DAY_MS && canSetCookie(ctx)) {
         await documents(TOKEN).update({ documentId: session.documentId, data: { expiresAt: new Date(now.getTime() + SESSION_MS) } });

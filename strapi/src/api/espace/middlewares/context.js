@@ -34,7 +34,7 @@ module.exports = (config, { strapi }) => async (ctx, next) => {
     if (!['GET', 'HEAD'].includes(ctx.method) && !strapi.config.get('server.espace.corsOrigins').includes(ctx.get('Origin'))) {
       throw new EspaceError(403, 'ORIGIN_REFUSED', 'Origine non autorisée.');
     }
-    ctx.state.espace = await strapi.service('api::espace.auth').loadSession(ctx);
+    ctx.state.espace = await strapi.service('api::espace.auth').loadSession(ctx, { allowClosed: /^\/(api\/)?espace\/me\/(erase|export)$/.test(ctx.path) });
     const edition = ctx.state.espace?.edition;
     if (!['GET', 'HEAD'].includes(ctx.method) && edition && isReadOnly(edition) && !isExemptFromReadOnly(ctx)) {
       throw new EspaceError(409, 'EDITION_READ_ONLY', 'L’édition est terminée, votre espace reste consultable.');
