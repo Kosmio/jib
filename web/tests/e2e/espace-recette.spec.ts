@@ -446,6 +446,7 @@ test('l’organisateur ouvre E9 : indicateurs égaux aux comptes de l’API, auc
   if (page.url().endsWith('/bienvenue')) {
     await hydrated(page);
     await page.getByRole('button', { name: 'Continuer' }).click();
+    await page.getByRole('button', { name: 'Continuer sans apparaître' }).click(); // V2-B : confirmation, annuaire décoché
     await expect(page).toHaveURL(`${baseURL}${ESPACE}/`);
   }
   await page.getByRole('link', { name: 'Organisation' }).click();
@@ -515,6 +516,7 @@ test.describe('E9 : régénérer les créneaux (F-94, R-02)', () => {
       if (page.url().endsWith('/bienvenue')) {
         await hydrated(page);
         await page.getByRole('button', { name: 'Continuer' }).click();
+        await page.getByRole('button', { name: 'Continuer sans apparaître' }).click(); // V2-B : confirmation, annuaire décoché
         await expect(page).toHaveURL(`${baseURL}${ESPACE}/`);
       }
       session = await page.context().cookies();

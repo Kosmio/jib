@@ -83,6 +83,8 @@ test('Tom : E0, lien, vérification, E2, E1, déconnexion, E0', async ({ page, c
     await page.getByLabel('Prénom').fill('');
     await page.getByLabel('Entreprise').fill('');
     await page.getByRole('button', { name: 'Continuer' }).click();
+    // V2-B : l'annuaire est décoché, la confirmation s'intercale avant l'enregistrement ; on la passe pour atteindre la validation des champs.
+    await page.getByRole('button', { name: 'Continuer sans apparaître' }).click();
 
     await expect(page.getByRole('alert')).toHaveText('Corrigez les champs signalés pour continuer.');
     for (const [field, label] of [
