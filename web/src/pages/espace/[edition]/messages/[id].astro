@@ -24,7 +24,7 @@ const { conversation, messages } = thread.data;
 const me = (await getMe(cookie)) ?? guard.me;
 ---
 
-<AppShell title={`Conversation avec ${conversation.counterpart.displayName}`} active="messages" editionSlug={slug} me={me}>
+<AppShell title={`Conversation avec ${conversation.counterpart.displayName}`} active="messages" editionSlug={slug} me={me} readOnly={guard.edition.readOnly}>
   <ChatThread
     client:load
     strapiUrl={publicStrapiUrl}

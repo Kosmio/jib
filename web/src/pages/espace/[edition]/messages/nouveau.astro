@@ -42,7 +42,7 @@ const counterpart: ProfileCard = { kind, id, displayName, subtitle, photoUrl, in
 const firstName = displayName.split(" ")[0];
 ---
 
-<AppShell title={`Message à ${displayName}`} active="messages" editionSlug={slug} me={guard.me}>
+<AppShell title={`Message à ${displayName}`} active="messages" editionSlug={slug} me={guard.me} readOnly={guard.edition.readOnly}>
   {
     canMessage ? (
       <ChatThread

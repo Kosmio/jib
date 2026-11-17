@@ -61,7 +61,7 @@ const tag = card ? tagOf(card) : null;
 const role = person ? [person.jobTitle, person.company].filter(Boolean) : [];
 ---
 
-<AppShell title={title} active="directory" editionSlug={slug} me={me}>
+<AppShell title={title} active="directory" editionSlug={slug} me={me} readOnly={edition.readOnly}>
   <div class="border-b border-surface-alt bg-white">
     <div class="mx-auto max-w-180 px-4 pt-2">
       <a href={backHref} class="inline-flex min-h-11 items-center gap-2 font-heading text-lg font-semibold text-title">

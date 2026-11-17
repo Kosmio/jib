@@ -11,7 +11,7 @@ const cookie = Astro.request.headers.get("cookie");
 const guard = await guardSession(slug, cookie);
 if ("notFound" in guard) return Astro.rewrite("/espace/introuvable");
 if ("redirect" in guard) return Astro.redirect(guard.redirect);
-const { me } = guard;
+const { me, edition } = guard;
 
 const topicsResult = await espaceGet<Topic[]>(`/editions/${encodeURIComponent(slug)}/topics`, cookie).catch(() => null);
 const topics = topicsResult?.ok ? topicsResult.data : [];
@@ -24,7 +24,7 @@ const firstPage = await espaceGet<{ items: ProfileCard[]; nextCursor: string | n
 const initial = firstPage?.ok ? firstPage.data : null;
 ---
 
-<AppShell title="Annuaire" active="directory" editionSlug={slug} me={me}>
+<AppShell title="Annuaire" active="directory" editionSlug={slug} me={me} readOnly={edition.readOnly}>
   <div class="mx-auto max-w-180 px-4 pt-4">
     <h1 class="text-3xl leading-tight">Annuaire</h1>
     <noscript>

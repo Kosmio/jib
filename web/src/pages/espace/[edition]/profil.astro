@@ -14,7 +14,7 @@ const cookie = Astro.request.headers.get("cookie");
 const guard = await guardSession(slug, cookie);
 if ("notFound" in guard) return Astro.rewrite("/espace/introuvable");
 if ("redirect" in guard) return Astro.redirect(guard.redirect);
-const { me } = guard;
+const { me, edition } = guard;
 
 const base = `/espace/${encodeURIComponent(slug)}`;
 // Sans sujets (route absente ou en erreur), le formulaire omet simplement le bloc des sujets.
@@ -28,12 +28,17 @@ const b2bRanges = (program?.ok ? program.data.sessions : [])
   .filter((session) => session.kind === "b2b_break")
   .map(({ id, title, start, end }) => ({ id, title, hours: start && end ? hourRange(start, end) : (start ?? "") }));
 
+// V5-D : GET /me les renvoie ; le type partagé Me ne les déclare pas.
+const b2b = me as typeof me & { lookingFor?: string | null; offering?: string | null; phone?: string | null };
 const initial = {
   firstName: me.firstName,
   lastName: me.lastName,
   jobTitle: me.jobTitle ?? "",
   company: me.company ?? "",
   bio: me.bio ?? "",
+  lookingFor: b2b.lookingFor ?? "",
+  offering: b2b.offering ?? "",
+  phone: b2b.phone ?? "",
   linkedinUrl: me.linkedinUrl ?? "",
   unavailableSessions: me.unavailableSessions ?? [],
   photoUrl: me.photoUrl,
@@ -45,7 +50,7 @@ const initial = {
 };
 ---
 
-<AppShell title="Mon profil" active="profile" editionSlug={slug} me={me}>
+<AppShell title="Mon profil" active="profile" editionSlug={slug} me={me} readOnly={edition.readOnly}>
   <div class="mx-auto max-w-180 space-y-4 px-4 py-4">
     <h1 class="text-2xl leading-tight">Mon profil</h1>
 
@@ -65,7 +70,7 @@ const initial = {
       <noscript>
         <p class="font-semibold">Cette page demande JavaScript. Activez-le ou utilisez un autre navigateur.</p>
       </noscript>
-      <ProfileForm client:load strapiUrl={publicStrapiUrl} editionSlug={slug} initial={initial} topics={topics} b2bRanges={b2bRanges} />
+      <ProfileForm client:load strapiUrl={publicStrapiUrl} editionSlug={slug} initial={initial} topics={topics} b2bRanges={b2bRanges} readOnly={edition.readOnly} />
     </section>
 
     <PrivacyActions client:load strapiUrl={publicStrapiUrl} editionSlug={slug} />

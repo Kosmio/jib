@@ -24,10 +24,10 @@ type Props = {
     Consent & {
       bio: string;
       linkedinUrl: string;
-      /** V5-D : absents, le formulaire les lit lui-même (GET /me) avant d'ouvrir ces trois champs. */
-      lookingFor?: string;
-      offering?: string;
-      phone?: string;
+      /** V5-D : « Je cherche », « Je propose » et le téléphone, lus par la page dans `GET /me`. */
+      lookingFor: string;
+      offering: string;
+      phone: string;
       unavailableSessions: string[];
       photoUrl: string | null;
       topics: string[];
@@ -37,6 +37,8 @@ type Props = {
   topics: Topic[];
   /** Plages de rendez-vous B2B de la journée (D-10) ; sans plage, le bloc des disponibilités est omis. */
   b2bRanges?: { id: string; title: string; hours: string }[];
+  /** NF-70 : édition terminée. Seules les préférences e-mail s'enregistrent encore (PATCH /me limité à `emailPrefs`) ; le reste est désactivé par EspaceLayout. */
+  readOnly?: boolean;
 };
 
 const FIELDS = [
@@ -144,7 +146,7 @@ async function squarePhoto(file: File): Promise<Blob> {
   throw new Error("canvas");
 }
 
-export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b2bRanges = [] }: Props) {
+export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b2bRanges = [], readOnly = false }: Props) {
   const [profile, setProfile] = useState<Profile>({
     firstName: initial.firstName,
     lastName: initial.lastName,
@@ -153,13 +155,9 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b
   });
   const [bio, setBio] = useState(initial.bio);
   const [linkedinUrl, setLinkedinUrl] = useState(initial.linkedinUrl);
-  // V5-D : « Je cherche », « Je propose » et le téléphone ; lus au serveur quand la page ne les a pas fournis (jamais envoyés à vide par erreur).
-  const given: B2b | null =
-    initial.lookingFor !== undefined || initial.offering !== undefined || initial.phone !== undefined
-      ? { lookingFor: initial.lookingFor ?? "", offering: initial.offering ?? "", phone: initial.phone ?? "" }
-      : null;
-  const [b2b, setB2b] = useState<B2b>(given ?? { lookingFor: "", offering: "", phone: "" });
-  const [b2bReady, setB2bReady] = useState(given !== null);
+  // V5-D : « Je cherche », « Je propose » et le téléphone, fournis par la page.
+  const given: B2b = { lookingFor: initial.lookingFor, offering: initial.offering, phone: initial.phone };
+  const [b2b, setB2b] = useState<B2b>(given);
   const [awayIds, setAwayIds] = useState<string[]>(initial.unavailableSessions);
   const [topicIds, setTopicIds] = useState<string[]>(initial.topics);
   const [consent, setConsent] = useState<Consent>({
@@ -174,7 +172,7 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b
     profile: { firstName: initial.firstName, lastName: initial.lastName, jobTitle: initial.jobTitle, company: initial.company },
     bio: initial.bio,
     linkedinUrl: initial.linkedinUrl,
-    b2b: given ?? { lookingFor: "", offering: "", phone: "" },
+    b2b: given,
     awayIds: initial.unavailableSessions,
     topicIds: initial.topics,
     consent: { directoryOptIn: initial.directoryOptIn, meetingsOptIn: initial.meetingsOptIn, newsOptIn: initial.newsOptIn },
@@ -195,23 +193,6 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b
   const photo = photoSrc(strapiUrl, photoUrl);
   const atTopicLimit = topicIds.length >= TOPICS_MAX;
   const dirty = JSON.stringify({ profile, bio, linkedinUrl, b2b, awayIds, topicIds, consent, emailPrefs }) !== JSON.stringify(baseline);
-
-  useEffect(() => {
-    if (b2bReady) return;
-    let alive = true;
-    request<{ lookingFor: string | null; offering: string | null; phone: string | null }>(strapiUrl, "/me", "GET")
-      .then((me) => {
-        if (!alive) return;
-        const loaded = { lookingFor: me.lookingFor ?? "", offering: me.offering ?? "", phone: me.phone ?? "" };
-        setB2b(loaded);
-        setBaseline((current) => ({ ...current, b2b: loaded }));
-        setB2bReady(true);
-      })
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, []);
 
   // F-146 : alerte du navigateur en quittant la page avec des modifications non enregistrées (changement d'onglet, lien, fermeture).
   useEffect(() => {
@@ -319,6 +300,27 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b
     setTopicIds((current) => (checked ? [...current, id] : current.filter((item) => item !== id)));
   }
 
+  /** NF-70 : édition terminée, enregistre les seules préférences e-mail (corps limité à `emailPrefs`, seul PATCH /me encore accepté). */
+  async function savePrefs() {
+    if (saving) return;
+    setSaving(true);
+    setErrors({});
+    setFormError(null);
+    setSaved(false);
+    try {
+      await request<unknown>(strapiUrl, "/me", "PATCH", { emailPrefs });
+      setBaseline((current) => ({ ...current, emailPrefs }));
+      setSaved(true);
+    } catch (error) {
+      if (error instanceof EspaceApiError && error.status === 401) {
+        window.location.assign(loginUrl);
+        return;
+      }
+      setFormError("L’enregistrement a échoué. Vérifiez votre connexion et réessayez.");
+    }
+    setSaving(false);
+  }
+
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     if (saving) return;
@@ -333,7 +335,7 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b
         ...profile,
         bio,
         linkedinUrl,
-        ...(b2bReady && b2b),
+        ...b2b,
         // Seules les plages encore au programme partent : une plage retirée depuis ne bloque pas l'enregistrement.
         unavailableSessions: awayIds.filter((id) => b2bRanges.some((range) => range.id === id)),
         topics: topicIds,
@@ -568,8 +570,7 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b
               name={name}
               rows={3}
               maxLength={B2B_MAX}
-              disabled={!b2bReady}
-              value={b2b[name]}
+                            value={b2b[name]}
               onChange={(event) => {
                 touch();
                 setB2b({ ...b2b, [name]: event.target.value });
@@ -596,8 +597,7 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b
             inputMode="tel"
             autoComplete="tel"
             maxLength={PHONE_MAX}
-            disabled={!b2bReady}
-            value={b2b.phone}
+                        value={b2b.phone}
             onChange={(event) => {
               touch();
               setB2b({ ...b2b, phone: event.target.value });
@@ -729,7 +729,7 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b
         </div>
       </fieldset>
 
-      <fieldset className="min-w-0 rounded-xl bg-surface p-4" aria-describedby={errors.emailPrefs ? "emailPrefs-erreur" : undefined}>
+      <fieldset data-permis-lecture-seule className="min-w-0 rounded-xl bg-surface p-4" aria-describedby={errors.emailPrefs ? "emailPrefs-erreur" : undefined}>
         <legend className="float-left w-full font-heading font-semibold text-title">E-mails que vous recevez</legend>
         <p className="clear-both pt-1 text-sm text-muted">Les e-mails sur un rendez-vous confirmé ou annulé sont toujours envoyés.</p>
         <div className="mt-2">
@@ -760,6 +760,28 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b
           ))}
         </div>
         {errors.emailPrefs && <FieldError id="emailPrefs-erreur">{errors.emailPrefs}</FieldError>}
+        {readOnly && (
+          <div className="mt-3">
+            <button
+              id="enregistrer-preferences"
+              type="button"
+              onClick={savePrefs}
+              disabled={saving || JSON.stringify(emailPrefs) === JSON.stringify(baseline.emailPrefs)}
+              aria-busy={saving}
+              className="inline-flex min-h-13 items-center justify-center rounded-lg bg-gold px-6 text-lg font-bold text-gold-ink hover:bg-gold-light disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {saving ? "Enregistrement…" : "Enregistrer mes préférences"}
+            </button>
+            <div role="status" className="empty:hidden">
+              {saved && (
+                <p ref={savedRef} tabIndex={-1} className="mt-3 flex items-start gap-2 font-semibold text-primary-ink outline-none">
+                  <Icon name="check" />
+                  Préférences enregistrées
+                </p>
+              )}
+            </div>
+          </div>
+        )}
       </fieldset>
 
       {formError && (
@@ -771,6 +793,7 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b
         </p>
       )}
 
+      {!readOnly && (
       <div
         ref={barRef}
         data-barre-enregistrement={dirty ? "" : undefined}
@@ -812,6 +835,7 @@ export default function ProfileForm({ strapiUrl, editionSlug, initial, topics, b
           )}
         </div>
       </div>
+      )}
     </form>
   );
 }

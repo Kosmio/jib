@@ -61,7 +61,7 @@ const targetPath = (card: ProfileCard) => `${base}/annuaire/${pathTypeOf(card)}/
 const headingClass = "font-heading text-lg font-semibold normal-case sm:text-xl";
 ---
 
-<AppShell title="Accueil" active="home" editionSlug={slug} me={me} eventDate={edition?.date ?? null}>
+<AppShell title="Accueil" active="home" editionSlug={slug} me={me} eventDate={edition?.date ?? null} readOnly={edition?.readOnly}>
   <header class="border-b border-surface-alt lg:hidden">
     <div class="mx-auto flex max-w-180 items-center justify-between px-4 py-3">
       <img src="/assets/logo-jib.svg" alt="La Journée de l’Innovation de la Filière Bois" width="649" height="160" class="h-10 w-auto" />
