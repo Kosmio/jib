@@ -170,6 +170,77 @@ describe('photo de profil : POST /me/photo (lot 9)', { timeout: 600_000 }, () =>
     });
   });
 
+  describe('DELETE /me/photo (V4-B, F-147)', () => {
+    const remove = async (edition, who, { query = '', ...options } = {}) => espace().request(`/api/espace/me/photo${query}`, { method: 'DELETE', cookie: await login(edition, who), ...options });
+
+    it('200 { photoUrl: null } : la ligne et le fichier sont supprimés, /me et l’annuaire n’ont plus de photo', async () => {
+      const world = await newEdition();
+      const [lea, ines] = [await person(world.edition), await person(world.edition)];
+      const url = (await upload(world.edition, lea)).json.photoUrl;
+      const id = (await photoOf(lea)).photo.id;
+      assert.ok(onDisk(url));
+      const response = await remove(world.edition, lea);
+      assert.equal(response.status, 200, response.text);
+      assert.deepEqual(response.json, { photoUrl: null });
+      assert.equal((await photoOf(lea)).photo ?? null, null);
+      assert.equal(await fileRow(id), null, 'la ligne du plugin Upload subsiste');
+      assert.equal(onDisk(url), false, 'le fichier subsiste sur le disque');
+      assert.deepEqual(filesOf(lea), []);
+      assert.equal((await api(await login(world.edition, lea)).get('/me')).json.photoUrl, null);
+      const { items } = (await api(await login(world.edition, ines)).get('/directory')).json;
+      assert.equal(items.find((card) => card.id === lea.documentId).photoUrl ?? null, null);
+    });
+
+    it('sans photo : 200 { photoUrl: null }, rien ne casse', async () => {
+      const world = await newEdition();
+      const lea = await person(world.edition);
+      const response = await remove(world.edition, lea);
+      assert.equal(response.status, 200, response.text);
+      assert.deepEqual(response.json, { photoUrl: null });
+    });
+
+    it('une photo peut être rajoutée après la suppression', async () => {
+      const world = await newEdition();
+      const lea = await person(world.edition);
+      await upload(world.edition, lea);
+      await remove(world.edition, lea);
+      const again = await upload(world.edition, lea);
+      assert.equal(again.status, 200, again.text);
+      assert.ok(onDisk(again.json.photoUrl));
+    });
+
+    it('supprime la photo du participant de la session, jamais celle d’un autre (aucun paramètre d’identifiant)', async () => {
+      const world = await newEdition();
+      const [lea, ines] = [await person(world.edition), await person(world.edition)];
+      const inesUrl = (await upload(world.edition, ines)).json.photoUrl;
+      await upload(world.edition, lea);
+      const response = await remove(world.edition, lea, { query: `?attendee=${ines.documentId}` });
+      assert.equal(response.status, 200, response.text);
+      assert.equal((await photoOf(ines)).photo.url, inesUrl);
+      assert.ok(onDisk(inesUrl));
+      assert.equal((await photoOf(lea)).photo ?? null, null);
+    });
+
+    it('401 UNAUTHENTICATED sans session : la photo reste', async () => {
+      const world = await newEdition();
+      const lea = await person(world.edition);
+      const url = (await upload(world.edition, lea)).json.photoUrl;
+      expectError(await espace().request('/api/espace/me/photo', { method: 'DELETE' }), 401, 'UNAUTHENTICATED');
+      assert.equal((await photoOf(lea)).photo.url, url);
+      assert.ok(onDisk(url));
+    });
+
+    it('403 ORIGIN_REFUSED sans Origin admis (NF-04) : la photo reste', async () => {
+      const world = await newEdition();
+      const lea = await person(world.edition);
+      const url = (await upload(world.edition, lea)).json.photoUrl;
+      const cookie = await login(world.edition, lea);
+      expectError(await espace().request('/api/espace/me/photo', { method: 'DELETE', cookie, origin: 'https://pirate.example.org' }), 403, 'ORIGIN_REFUSED');
+      assert.equal((await photoOf(lea)).photo.url, url);
+      assert.ok(onDisk(url));
+    });
+  });
+
   describe('accès', () => {
     it('401 UNAUTHENTICATED sans session', async () => {
       const response = await postFile(espace(), '/api/espace/me/photo', { bytes: makePng(), filename: 'l13-photo-anonyme.png' });
