@@ -4,7 +4,7 @@ const { randomUUID } = require('node:crypto');
 const { EspaceError } = require('../lib/errors');
 const { isReadOnly } = require('../lib/read-only');
 
-// NF-70: after readOnlyAt, every write of the space is refused (409 EDITION_READ_ONLY) but these: sign-in, sign-out, e-mail preferences.
+// NF-70: after readOnlyAt, every write of the space is refused (409 EDITION_READ_ONLY) but these: sign-in, sign-out, e-mail preferences, erasure (R-44).
 // The organizer routes (/espace/admin/...) stay open, and so do the exports (GET). The unsubscription route has no context middleware.
 const READ_ONLY_EXEMPT = ['/espace/auth/'];
 const isEmailPrefsOnly = (ctx) => {
@@ -13,7 +13,8 @@ const isEmailPrefsOnly = (ctx) => {
 };
 const isExemptFromReadOnly = (ctx) => {
   const path = ctx.path.replace(/^\/api/, '');
-  return path.startsWith('/espace/admin/') || READ_ONLY_EXEMPT.some((prefix) => path.startsWith(prefix)) || isEmailPrefsOnly(ctx);
+  // R-44: the right to erasure outlives the edition.
+  return path === '/espace/me/erase' || path.startsWith('/espace/admin/') || READ_ONLY_EXEMPT.some((prefix) => path.startsWith(prefix)) || isEmailPrefsOnly(ctx);
 };
 
 /**

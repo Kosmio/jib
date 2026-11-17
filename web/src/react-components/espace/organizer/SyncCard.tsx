@@ -15,7 +15,7 @@ type Props = CardProps & {
 };
 
 /** F-121 : cas attendus, une information repliée ; tout autre code (doublon, lecture, erreur interne…) est une erreur, en rouge. */
-const INFO_CODES = ["WAITING", "UNKNOWN"];
+const INFO_CODES = ["WAITING", "UNKNOWN", "ERASED"];
 export const isInfoError = ({ code }: SyncError) => INFO_CODES.includes(code);
 
 /** F-120 : une exécution est en échec quand elle n'a rien pu lire ou n'a pas pu s'exécuter, pas quand quelques billets sont refusés. */
@@ -31,6 +31,7 @@ type SyncErrorRow = SyncError & { holderName?: string };
 const INFO_LABELS: Record<string, [string, string]> = {
   WAITING: ["billet en attente, ignoré", "billets en attente, ignorés"],
   UNKNOWN: ["billet à l’état inconnu, ignoré", "billets à l’état inconnu, ignorés"],
+  ERASED: ["billet effacé à la demande, ignoré", "billets effacés à la demande, ignorés"],
 };
 
 /** Motif en français et action attendue d'une erreur, par code. */

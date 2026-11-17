@@ -59,7 +59,7 @@ module.exports = ({ strapi }) => {
 
       // The counterpart is told "Participant supprimé", never the name.
       const anonymous = { ...attendee, ...erasedFields(attendee, now) };
-      await strapi.service('api::espace.meetings').cancelForAttendee(anonymous, { reason: CANCEL_REASON, now });
+      await strapi.service('api::espace.meetings').cancelForAttendee(anonymous, { reason: CANCEL_REASON, now, upcomingOnly: true });
 
       await strapi.service('api::espace.locks').withLock(`attendee:${attendee.edition.documentId}`, async () => {
         const hash = emailHash(attendee.email, secret());

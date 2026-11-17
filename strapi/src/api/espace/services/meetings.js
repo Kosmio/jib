@@ -812,10 +812,11 @@ module.exports = ({ strapi }) => ({
    * active representatives of the targeted exhibitor. Meetings aimed at the exhibitor the attendee represents stay (R-14).
    * NF-52: when the space of the edition is closed, the meetings are cancelled all the same, but no link is issued and nothing is sent.
    * Idempotent: a cancelled meeting is not found again. Phase 2 completes this service.
+   * `upcomingOnly` (R-44, erasure): only the meetings whose slot has not started are cancelled ; the others stay as they are.
    */
-  async cancelForAttendee(attendee, { reason = 'Inscription annulée', now = new Date() } = {}) {
+  async cancelForAttendee(attendee, { reason = 'Inscription annulée', now = new Date(), upcomingOnly = false } = {}) {
     const self = { documentId: attendee.documentId };
-    const meetings = await strapi.documents(MEETING).findMany({
+    let meetings = await strapi.documents(MEETING).findMany({
       filters: { status: { $in: ['pending', 'accepted'] }, $or: [{ requester: self }, { targetAttendee: self }] },
       populate: {
         edition: { fields: ['documentId'] },
@@ -826,6 +827,7 @@ module.exports = ({ strapi }) => ({
       },
       limit: 1000,
     });
+    if (upcomingOnly) meetings = meetings.filter(({ slot }) => slot && new Date(slot.startsAt).getTime() > now.getTime());
     if (!meetings.length) return;
 
     const publicUrl = strapi.config.get('server.espace.publicUrl');
