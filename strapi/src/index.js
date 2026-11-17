@@ -2,6 +2,7 @@
 
 const path = require('path');
 const fs = require('fs');
+const { ensureOrganisationRole } = require('./admin-role');
 
 const SEED_ASSETS_DIR = path.join(__dirname, '..', 'seed-assets');
 
@@ -899,6 +900,13 @@ module.exports = {
     await lockAttendeeFields(strapi);
     await applyAdminConfig(strapi);
 
+    // V5-G: rôle d'administration restreint « Organisation Xylofutur » (idempotent)
+    try {
+      await ensureOrganisationRole(strapi);
+    } catch (err) {
+      strapi.log.error(`[admin-role] failed: ${err.message}`);
+    }
+
     // Apply data migrations (must run before any content-type validation)
     try {
       await runDataMigrations(strapi);
@@ -1467,6 +1475,7 @@ const ADMIN_CONFIG = {
     list: ['lastName', 'firstName', 'company', 'email', 'role', 'status'],
     labels: {
       lastName: ['Nom'], firstName: ['Prénom'], company: ['Entreprise'], email: ['E-mail'], role: ['Rôle'], status: ['Statut'],
+      lookingFor: ['Je cherche'], offering: ['Je propose'], phone: ['Téléphone (visible des interlocuteurs d’un rendez-vous confirmé)'],
     },
   },
   'api::espace.badge-setting': {

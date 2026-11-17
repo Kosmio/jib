@@ -40,4 +40,15 @@ Dans l’administration : « Participant ». La liste affiche nom, prénom, entr
 - Les créneaux, rendez-vous, journaux d’e-mails et exécutions de synchronisation : ils se lisent, ils ne se saisissent pas à la main.
 - Les bases de données, les variables d’environnement et les déploiements : à demander à Kosmio.
 
+## 5. Donner l’accès à un compte Xylofutur
+
+Le rôle « Organisation Xylofutur » existe déjà dans l’administration (il est créé au démarrage). Il permet de lire, créer, modifier et publier les contenus et la médiathèque. Il interdit la suppression d’un contenu de l’espace participant et d’une édition, et ne donne accès ni aux jetons d’API, ni à la gestion des comptes et des rôles, ni au constructeur de types, ni aux webhooks, ni aux réglages.
+
+1. Se connecter à l’administration avec un compte super administrateur (Kosmio).
+2. « Paramètres », « Administration panel », « Users » : « Invite new user » pour un nouveau compte, ou ouvrir le compte existant.
+3. Dans le champ « Roles », choisir « Organisation Xylofutur » (et aucun autre), puis enregistrer.
+4. Pour un nouveau compte, transmettre le lien d’invitation affiché.
+
+Le rôle se rétablit à chaque démarrage : une permission interdite ajoutée à la main est retirée, une permission de base supprimée est remise ; les autres ajouts manuels sont conservés.
+
 En cas de doute, ne rien changer et écrire à Kosmio avec une capture de l’écran concerné.
