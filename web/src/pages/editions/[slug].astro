@@ -338,7 +338,7 @@ const eventJsonLd: Record<string, unknown> = {
             const timeLabel = seq.end_time
               ? `${seq.start_time} – ${seq.end_time}`
               : `À partir de ${seq.start_time}`;
-            const theme = getProgramTheme(seq.theme);
+            const theme = getProgramTheme(seq.theme, seq.title);
             return (
               <div class="flex flex-col md:flex-row gap-4 md:gap-6">
                 <!-- Créneau horaire -->

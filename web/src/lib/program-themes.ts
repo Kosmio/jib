@@ -71,5 +71,21 @@ export const programThemes: Record<ProgramTheme, ThemeStyle> = {
   },
 };
 
-export const getProgramTheme = (theme: string | null | undefined): ThemeStyle | null =>
-  theme && theme in programThemes ? programThemes[theme as ProgramTheme] : null;
+// Repli quand le champ `theme` n'est pas renseigné dans Strapi : le thème se déduit du titre de la séquence.
+// Motifs volontairement étroits (début de titre ou mot propre au thème), pour qu'une remise de prix ou une pause reste neutre.
+const TITLE_HINTS: [RegExp, ProgramTheme][] = [
+  [/coproduit/, "coproduits"],
+  [/en ville|urbain/, "ville"],
+  [/^foret/, "foret"],
+  [/^constru/, "construction"],
+  [/process|\bdatas?\b|\bia\b/, "industrie"],
+];
+
+const plain = (text: string) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+
+/** Style d'une séquence : le thème saisi dans Strapi, sinon celui que son titre laisse deviner, sinon rien (carte neutre). */
+export const getProgramTheme = (theme: string | null | undefined, title?: string | null): ThemeStyle | null => {
+  if (theme && theme in programThemes) return programThemes[theme as ProgramTheme];
+  const guessed = title ? TITLE_HINTS.find(([pattern]) => pattern.test(plain(title)))?.[1] : undefined;
+  return guessed ? programThemes[guessed] : null;
+};

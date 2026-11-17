@@ -165,7 +165,7 @@ const CARD = "rounded-xl border border-surface-alt bg-white p-4";
               {program.sessions.map((session) => {
                 const isBreak = session.kind === "b2b_break";
                 const description = html(session.description);
-                const theme = isBreak ? null : getProgramTheme(session.theme);
+                const theme = isBreak ? null : getProgramTheme(session.theme, session.title);
                 const time = session.startsAt ? <time datetime={session.startsAt}>{timeOf(session)}</time> : timeOf(session);
                 const speakers = session.speakers?.length > 0 && (
                   <ul class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
