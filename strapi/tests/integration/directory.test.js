@@ -145,15 +145,23 @@ describe('annuaire, fiches et suggestions (lot 9)', { timeout: 900_000 }, () => 
       assert.ok(!ids((await search(world, p.lea)).items).includes(organizer.documentId));
     });
 
-    // Relevé au lot 16 (essai du soir) : Léa se voit dans son propre annuaire. Ni F-40, ni R-41, ni R-43, ni A-34 n'excluent le visiteur de
-    // la liste (seul R-50 écrit « hors soi », pour les suggestions) et F-54 prévoit « C'est votre profil » sur sa propre fiche, qu'on n'ouvre
-    // que depuis l'annuaire. Comportement actuel consigné ici ; si l'architecte décide d'exclure le visiteur, ce test change avec la règle.
-    it('F-40, F-54 : un visiteur qui a coché l’annuaire figure dans sa propre liste, et sa fiche porte isSelf (seules les suggestions l’excluent, R-50)', async () => {
+    // F-144 (V4-A, observation O1) : on ne figure pas dans sa propre liste, ni dans `total` ; sa propre fiche reste ouvrable et porte isSelf (F-54).
+    it('F-144 : un visiteur qui a coché l’annuaire est absent de items et de total, et sa fiche porte isSelf', async () => {
       const { world, p } = await scene();
-      const own = (await search(world, p.lea)).items.find((item) => item.id === p.lea.documentId);
-      assert.ok(own, 'le visiteur n’est pas exclu de la liste');
-      assert.equal(own.displayName, 'Léa Ducasse');
+      const own = await search(world, p.lea);
+      assert.ok(!ids(own.items).includes(p.lea.documentId), 'le visiteur ne figure pas dans sa propre liste');
+      assert.equal((await search(world, p.lea, '?q=ducasse')).items.length, 0, 'même en se cherchant par son nom');
       assert.equal((await (await as(world.edition, p.lea)).get(`/directory/p/${p.lea.documentId}`)).json.isSelf, true);
+    });
+
+    it('F-144 : le total d’un autre visiteur compte le premier, pas lui-même, et le visiteur ne retire que sa propre carte', async () => {
+      const { world, p } = await scene();
+      const asLea = await search(world, p.lea);
+      const asInes = await search(world, p.ines);
+      assert.ok(ids(asInes.items).includes(p.lea.documentId), 'Léa figure dans la liste d’Inès');
+      assert.ok(!ids(asInes.items).includes(p.ines.documentId));
+      assert.equal(asLea.total, asLea.items.length);
+      assert.equal(asLea.total, asInes.total, 'chacun retire une carte sur le même ensemble');
     });
 
     it('un représentant sans consentement n’est pas listé ; son exposant l’est', async () => {
