@@ -117,6 +117,17 @@ jobs:
           cat /tmp/.env.secrets | ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} \
             "cat > ~/jib/infra/deploy/overlays/${{ inputs.environment }}/.env.secrets"
 
+      # Chaque build sous une même étiquette laisse l'ancienne image sans étiquette sur le serveur : sans ce ménage, le disque se remplit
+      # et le déploiement s'arrête sur « no space left on device ». Seules les images sans étiquette et sans conteneur sont supprimées.
+      - name: Remove dangling images
+        if: ${{ !inputs.dry_run }}
+        run: |
+          ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} bash << 'EOF' 2>&1 | cat
+            df -h / | tail -1
+            docker image prune -f | tail -1
+            df -h / | tail -1
+          EOF
+
       - name: Pull latest images
         if: ${{ !inputs.dry_run }}
         run: |
