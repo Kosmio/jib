@@ -31,7 +31,7 @@ const PRIVATE_FIELDS = [
   'meetingRequestsOpenAt',
   'meetingRequestsCloseAt',
 ];
-const PUBLIC_EDITION_KEYS = ['city', 'date', 'meetingRequestsCloseAt', 'meetingRequestsOpenAt', 'participantSpaceEnabled', 'slug', 'themeColor', 'title', 'venue'];
+const PUBLIC_EDITION_KEYS = ['city', 'date', 'meetingRequestsCloseAt', 'meetingRequestsOpenAt', 'participantSpaceEnabled', 'readOnly', 'slug', 'themeColor', 'title', 'venue'];
 
 describe('socle de l’espace (lot 2)', { timeout: 180_000 }, () => {
   const espace = useEspace({ overrides: { CORS_ORIGINS: `${FRONT},${SECOND_FRONT}` } });
@@ -44,6 +44,8 @@ describe('socle de l’espace (lot 2)', { timeout: 180_000 }, () => {
       assert.equal(response.status, 200);
       assert.match(response.headers.get('content-type'), /^application\/json/);
       assert.deepEqual(Object.keys(response.json).sort(), PUBLIC_EDITION_KEYS);
+      assert.equal(typeof response.json.readOnly, 'boolean');
+      assert.equal('readOnlyAt' in response.json, false);
       assert.equal(response.json.slug, 'edition-publique');
       assert.equal(response.json.title, 'Édition publique');
       assert.equal(response.json.date, '2026-12-03');

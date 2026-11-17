@@ -73,6 +73,7 @@ describe('messagerie (lot 14)', { timeout: 900_000 }, () => {
       'GET /api/espace/conversations/:x/messages',
       'POST /api/espace/conversations/:x/messages',
     ];
+    const EXTRA_ROUTES = ['POST /api/espace/conversations/:x/messages/:x/report']; // V5-B
     const declared = () =>
       espace()
         .app.server.listRoutes()
@@ -81,7 +82,7 @@ describe('messagerie (lot 14)', { timeout: 900_000 }, () => {
 
     it('routes:list montre les quatre routes de la messagerie, et aucune autre sous /conversations', () => {
       for (const route of ROUTES) assert.ok(declared().includes(route), `route absente : ${route}`);
-      assert.deepEqual(declared().filter((route) => route.includes('/conversations') && !ROUTES.includes(route)), []);
+      assert.deepEqual(declared().filter((route) => route.includes('/conversations') && !ROUTES.includes(route) && !EXTRA_ROUTES.includes(route)), []);
     });
 
     for (const route of ROUTES) {

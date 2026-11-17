@@ -343,6 +343,11 @@
         "type": "datetime",
         "private": true,
         "description": "Réglage de l'espace participant, privé : modifiable mais jamais renvoyé par l'API (impossible de relire la valeur). Fin de la fenêtre de demandes de rendez-vous (date et heure ISO 8601, UTC)."
+      },
+      "readOnlyAt": {
+        "type": "datetime",
+        "private": true,
+        "description": "Réglage de l'espace participant, privé : modifiable mais jamais renvoyé par l'API (impossible de relire la valeur). Instant de bascule de l'espace en lecture seule après l'événement (date et heure ISO 8601, UTC) ; à défaut, la date de l'édition + 7 jours à 00:00 UTC."
       }
     }
   },
