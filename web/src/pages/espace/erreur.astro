@@ -8,13 +8,13 @@ import EspaceCard from "../../components/espace/EspaceCard.astro";
 import EspaceButton from "../../components/espace/EspaceButton.astro";
 import type { Me } from "../../lib/espace/client";
 
-const info = (Astro.locals as { espaceError?: { status: 500 | 503; requestId: string; edition: string | null } }).espaceError;
+const info = (Astro.locals as { espaceError?: { status: 500 | 503; requestId: string; edition: string | null; path?: string } }).espaceError;
 Astro.response.status = info?.status ?? 500;
 
 const edition = info?.edition ?? null;
 const title = "Un incident empêche d’afficher cette page";
 // Les pages d'accès n'ont pas de barre d'onglets : le visiteur n'y est pas encore connecté.
-const withTabs = edition !== null && !/\/espace\/[^/]+\/(connexion|bienvenue)\/?$/.test(Astro.url.pathname);
+const withTabs = edition !== null && !/\/espace\/[^/]+\/(connexion|bienvenue)\/?$/.test(info?.path ?? "");
 const shellMe = withTabs
   ? ({ firstName: "", lastName: "", photoUrl: null, isOrganizer: false, edition: { slug: edition, title: "" } } as unknown as Me)
   : null;

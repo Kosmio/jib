@@ -68,9 +68,10 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
   // Une réécriture (introuvable, erreur) fait perdre `Astro.params` : l'édition de l'URL d'origine voyage par `locals`.
   // Le middleware rejoue sur la réécriture : une valeur déjà posée n'est pas écrasée.
-  const locals = context.locals as { espaceEdition?: string | null };
+  const locals = context.locals as { espaceEdition?: string | null; espacePath?: string };
   const edition = locals.espaceEdition !== undefined ? locals.espaceEdition : editionOf(context.url.pathname);
   locals.espaceEdition = edition;
+  locals.espacePath ??= context.url.pathname;
 
   let response: Response;
   try {
@@ -83,7 +84,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
       JSON.stringify({ level: "error", requestId, status, method: context.request.method, path: context.url.pathname, error: err?.message ?? String(error), stack: err?.stack }),
     );
     try {
-      Object.assign(context.locals, { espaceError: { status, requestId, edition } });
+      Object.assign(context.locals, { espaceError: { status, requestId, edition, path: locals.espacePath } });
       response = await context.rewrite("/espace/erreur");
     } catch {
       // La page d'erreur elle-même a échoué : réponse minimale, sans trace.
