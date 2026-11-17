@@ -2,7 +2,8 @@
 // E1 : accueil (F-20 à F-24, R-50). Carte d'édition avec compte à rebours, carte « Votre profil » (masquée à 100 %), « Prochain rendez-vous »
 // et « Ils partagent vos sujets ». Page serveur sans îlot : tout est rendu avec la session du navigateur (`Cookie` relayé).
 // Sans session valable pour l'édition de l'URL : E0. Sans consentement enregistré : E2. Les rendez-vous (lot 8) et les suggestions (lot 9)
-// sont facultatifs : une réponse d'erreur retire la carte ou la section, jamais la page.
+// sont facultatifs : une réponse d'erreur retire la section des suggestions ; celle des rendez-vous dit qu'elle est indisponible (F-110).
+// F-109 : demandes reçues avant le prochain rendez-vous. F-111 : fenêtre fermée, plus d'accès aux formulaires de demande. F-117 : annuaire.
 import AppShell from "../../../components/espace/AppShell.astro";
 import ProgressBar from "../../../components/espace/ProgressBar.astro";
 import EspaceButton from "../../../components/espace/EspaceButton.astro";
@@ -10,8 +11,8 @@ import Icon from "../../../components/espace/Icon.astro";
 import ProfileCardView from "../../../react-components/espace/ProfileCardView";
 import { espaceGet, guardSession, publicStrapiUrl } from "../../../lib/espace/api";
 import type { ProfileCard } from "../../../lib/espace/client";
-import { pathTypeOf, type Meeting, type MeetingsResponse } from "../../../lib/espace/meetings";
-import { bannerColor, countdown, editionLine, initialsOf, photoSrc, timeLabel } from "../../../lib/espace/format";
+import { pathTypeOf, requestWindow, windowLabel, type Meeting, type MeetingsResponse } from "../../../lib/espace/meetings";
+import { bannerColor, countdown, editionLine, initialsOf, photoSrc, plural, timeLabel } from "../../../lib/espace/format";
 
 const slug = Astro.params.edition ?? "";
 const cookie = Astro.request.headers.get("cookie");
@@ -29,6 +30,10 @@ const [meetingsResult, suggestionsResult] = await Promise.all([
   espaceGet<ProfileCard[]>("/suggestions", cookie).catch(() => null),
 ]);
 const meetings = meetingsResult?.ok ? meetingsResult.data : null;
+const received = meetings?.received ?? [];
+const requestsWindow = requestWindow(edition);
+const requestsOpen = requestsWindow.state === "open";
+const closedText = windowLabel(requestsWindow);
 const suggestions = !over && suggestionsResult?.ok ? suggestionsResult.data.slice(0, 3) : [];
 
 // F-22 : le prochain rendez-vous accepté ; à défaut le prochain en attente de réponse. L'agenda est déjà trié par heure.
@@ -37,7 +42,7 @@ const upcoming = (meetings?.agenda ?? []).flatMap((item) =>
 );
 const next: Meeting | undefined = upcoming.find((meeting) => meeting.status === "accepted") ?? upcoming.find((meeting) => meeting.status === "pending");
 // Nombre affiché sur le lien vers l'agenda : les rendez-vous de l'agenda et les demandes reçues à traiter.
-const meetingCount = upcoming.length + (meetings?.received.length ?? 0);
+const meetingCount = upcoming.length + received.length;
 
 // F-21 : phrase d'aide selon ce qui manque au profil (R-30).
 const missing = [
@@ -130,6 +135,20 @@ const headingClass = "font-heading text-lg font-semibold normal-case sm:text-xl"
     </section>
 
     {
+      !me.consent.directoryOptIn && (
+        <p class="flex items-start gap-3 rounded-xl border-2 border-gold bg-white p-4 text-ink">
+          <Icon name="info" />
+          <span>
+            Vous n’apparaissez pas dans l’annuaire : personne ne peut vous proposer de rendez-vous.
+            <a href={`${base}/profil`} class="inline-flex min-h-11 items-center font-bold text-title underline">
+              Modifier ma visibilité
+            </a>
+          </span>
+        </p>
+      )
+    }
+
+    {
       me.profileCompletion < 100 && (
         <section class="rounded-xl border border-surface-alt bg-white p-5" aria-labelledby="profil-titre">
           <div class="flex flex-wrap items-baseline justify-between gap-x-4">
@@ -150,6 +169,23 @@ const headingClass = "font-heading text-lg font-semibold normal-case sm:text-xl"
     }
 
     {
+      !over && received.length > 0 && (
+        <section class="rounded-xl border-2 border-gold bg-white p-5" aria-labelledby="demandes-titre">
+          <h2 id="demandes-titre" class={headingClass}>
+            {plural(received.length, "demande")} à traiter
+          </h2>
+          <p class="mt-2 text-lg">
+            De <strong>{received[0].counterpart.displayName}</strong>
+            {received.length > 1 && " et d’autres"}
+          </p>
+          <EspaceButton href={`${base}/agenda`} class="mt-4">
+            Répondre dans mon agenda
+          </EspaceButton>
+        </section>
+      )
+    }
+
+    {
       !over && (
         <section class="rounded-xl border border-surface-alt bg-white p-5" aria-labelledby="rdv-titre">
           <div class="flex flex-wrap items-baseline justify-between gap-x-4">
@@ -160,8 +196,16 @@ const headingClass = "font-heading text-lg font-semibold normal-case sm:text-xl"
               Mon agenda{meetingCount > 0 && <>&nbsp;({meetingCount})</>}
             </a>
           </div>
+          {closedText && <p class="mt-2 font-semibold text-ink">{closedText}</p>}
           {
-            next ? (
+            !meetings ? (
+              <div class="mt-2">
+                <p class="text-lg text-muted">Vos rendez-vous sont momentanément indisponibles.</p>
+                <EspaceButton variant="secondary" href={Astro.url.pathname} class="mt-4">
+                  Réessayer
+                </EspaceButton>
+              </div>
+            ) : next ? (
               <div class="mt-3 flex items-start gap-4">
                 <div class="min-w-20 shrink-0 rounded-lg bg-surface px-3 py-2 text-center">
                   <p class="font-heading text-xl font-semibold text-title">{timeLabel(next.slot.startsAt)}</p>
@@ -189,9 +233,11 @@ const headingClass = "font-heading text-lg font-semibold normal-case sm:text-xl"
             ) : (
               <div class="mt-2">
                 <p class="text-lg text-muted">Aucun rendez-vous pour le moment.</p>
-                <EspaceButton variant="secondary" href={`${base}/annuaire`} class="mt-4">
-                  Trouver des interlocuteurs
-                </EspaceButton>
+                {requestsOpen && (
+                  <EspaceButton variant="secondary" href={`${base}/annuaire`} class="mt-4">
+                    Trouver des interlocuteurs
+                  </EspaceButton>
+                )}
               </div>
             )
           }
@@ -208,7 +254,7 @@ const headingClass = "font-heading text-lg font-semibold normal-case sm:text-xl"
           <ul class="space-y-3">
             {suggestions.map((card) => (
               <li>
-                <ProfileCardView card={card} strapiUrl={publicStrapiUrl} action={{ label: "Rencontrer", href: targetPath(card) }} />
+                <ProfileCardView card={card} strapiUrl={publicStrapiUrl} action={{ label: requestsOpen ? "Rencontrer" : "Voir la fiche", href: targetPath(card) }} />
               </li>
             ))}
           </ul>

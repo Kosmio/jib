@@ -84,22 +84,14 @@ export type DirectoryExhibitor = ProfileCard & {
   isMine: boolean;
 };
 
-/** F-56 : texte affiché quand le créneau a été pris entre le chargement de la grille et l'envoi. */
-export const SLOT_TAKEN_MESSAGE = "Ce créneau vient d’être pris, choisissez-en un autre";
-
 /** Échecs d'une création ou d'une contre-proposition qui rendent la grille périmée : elle est rechargée (F-56). */
 const STALE_SLOT_CODES = ["SLOT_TAKEN", "TARGET_BUSY", "NO_TABLE_LEFT", "SLOT_PAST"];
 
 export const isStaleSlotError = (error: unknown): boolean => error instanceof EspaceApiError && STALE_SLOT_CODES.includes(error.code);
 
-/**
- * Texte affichable d'un échec. `error.message` vient du serveur, en français ; seul F-56 a son propre texte, pour les trois
- * conflits qui disent la même chose à l'envoi (créneau, table de l'hôte ou dernière table prise entre-temps).
- */
+/** Texte affichable d'un échec : `error.message` vient du serveur, en français, et s'affiche tel quel (F-115). */
 export function meetingErrorMessage(error: unknown, fallback = "L’opération a échoué. Vérifiez votre connexion et réessayez."): string {
-  if (!(error instanceof EspaceApiError)) return fallback;
-  if (["SLOT_TAKEN", "TARGET_BUSY", "NO_TABLE_LEFT"].includes(error.code)) return SLOT_TAKEN_MESSAGE;
-  return error.message || fallback;
+  return (error instanceof EspaceApiError && error.message) || fallback;
 }
 
 /** Heure de Paris « 10h45 » d'un instant ISO ; une heure déjà lisible (« 10h45 », « 9h ») est rendue telle quelle. */
@@ -156,3 +148,41 @@ export const cancelMeeting = (strapiUrl: string, id: string) =>
 
 /** Adresse de l'export .ics des rendez-vous acceptés et des séquences (F-65, I-40) : un lien, le navigateur télécharge. */
 export const calendarUrl = (strapiUrl: string): string => `${strapiUrl}/api/espace/meetings.ics`;
+
+export type RequestWindow = { state: "open" | "not_open" | "closed"; openAt: string | null; closeAt: string | null };
+
+/**
+ * F-111 : fenêtre des demandes d'une édition (`GET /editions/:slug`), même règle que le serveur (R-17) : une ouverture vide est
+ * ouverte sans borne basse, une fermeture vide est la veille de l'édition à 18h00 à Paris.
+ */
+export function requestWindow(
+  edition: { date: string | null; meetingRequestsOpenAt?: string | null; meetingRequestsCloseAt?: string | null },
+  now: Date = new Date(),
+): RequestWindow {
+  const eve = edition.date ? Date.parse(`${edition.date}T00:00:00Z`) - 86_400_000 : NaN;
+  const eveClosing = [16, 17].map((hour) => new Date(eve + hour * 3_600_000)).find((date) => !Number.isNaN(+date) && hourLabel(date.toISOString()) === "18h00");
+  const openAt = edition.meetingRequestsOpenAt ?? null;
+  const closeAt = edition.meetingRequestsCloseAt ?? eveClosing?.toISOString() ?? null;
+  const state = closeAt && now.getTime() >= Date.parse(closeAt) ? "closed" : openAt && now.getTime() < Date.parse(openAt) ? "not_open" : "open";
+  return { state, openAt, closeAt };
+}
+
+/** « jeudi 26 novembre à 9h00 » d'un instant ISO, heure de Paris. */
+function dateAndHour(iso: string): string {
+  const day = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", timeZone: TIME_ZONE }).format(new Date(iso));
+  return `${day} à ${hourLabel(iso)}`;
+}
+
+/** F-111 : texte de la fenêtre fermée (avant l'ouverture ou après la fermeture), ou null quand elle est ouverte ou sans date. */
+export function windowLabel(window: RequestWindow): string | null {
+  if (window.state === "not_open" && window.openAt) return `Les demandes ouvrent le ${dateAndHour(window.openAt)}.`;
+  if (window.state === "closed" && window.closeAt) return `Les demandes sont closes depuis le ${dateAndHour(window.closeAt)}.`;
+  return null;
+}
+
+/** F-114 : « En cours », « À venir » ou « Passés » d'un rendez-vous, selon l'heure de son créneau. */
+export const PHASES = ["now", "next", "past"] as const;
+export const PHASE_TITLE = { now: "En cours", next: "À venir", past: "Passés" };
+export function phaseOf(meeting: Pick<Meeting, "slot">, now: number): (typeof PHASES)[number] {
+  return now >= Date.parse(meeting.slot.endsAt) ? "past" : now >= Date.parse(meeting.slot.startsAt) ? "now" : "next";
+}

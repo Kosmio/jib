@@ -8,6 +8,10 @@ import {
   firstName,
   hourLabel,
   meetingErrorMessage,
+  pathTypeOf,
+  PHASES,
+  PHASE_TITLE,
+  phaseOf,
   targetOf,
   type Meeting,
   type MeetingsResponse,
@@ -16,7 +20,7 @@ import MeetingStatus, { Icon } from "./MeetingStatus";
 import { Avatar } from "./ProfileCardView";
 import SlotPicker from "./SlotPicker";
 
-// E6 (F-60 à F-66, D-11) : demandes reçues, mes rendez-vous confirmés (heure, personne, table), demandes envoyées, historique. Les boutons suivent les `can*` du
+// E6 (F-60 à F-66, F-112 à F-115, D-11) : demandes reçues, mes rendez-vous confirmés (heure, personne, table), demandes envoyées, historique. Les boutons suivent les `can*` du
 // serveur : aucune règle de R-10 à R-19 n'est recalculée ici. Après chaque action, la liste est relue au serveur.
 
 type Props = {
@@ -50,6 +54,23 @@ const allMeetings = (data: MeetingsResponse): Meeting[] => [
 
 /** « 15h30, pause et B2B » : heure du créneau puis intitulé de la pause. */
 const slotLine = (meeting: Meeting): string => [hourLabel(meeting.slot.startsAt), meeting.slot.sessionTitle].filter(Boolean).join(", ");
+
+/** F-112 : fiche de l'interlocuteur et, pour une personne, conversation (créée à l'envoi du premier message, comme depuis la fiche). */
+function Links({ meeting, base }: { meeting: Meeting; base: string }) {
+  const { counterpart } = meeting;
+  return (
+    <p className="mt-2 flex flex-wrap gap-x-4">
+      <a href={`${base}/annuaire/${pathTypeOf(counterpart)}/${encodeURIComponent(counterpart.id)}`} className={`${QUIET} px-0`}>
+        Voir la fiche<span className="sr-only">{` de ${counterpart.displayName}`}</span>
+      </a>
+      {counterpart.kind === "attendee" && (
+        <a href={`${base}/messages/nouveau?avec=${encodeURIComponent(targetOf(counterpart))}`} className={`${QUIET} px-0`}>
+          Écrire à {firstName(counterpart)}
+        </a>
+      )}
+    </p>
+  );
+}
 
 const viaLine = (meeting: Meeting): string | null =>
   meeting.viaExhibitor
@@ -91,7 +112,7 @@ function ConfirmDialog({ confirm, onConfirm, onClose }: { confirm: Confirm | nul
           ? `La demande à ${name} est retirée.`
           : `Nous prévenons ${name} par e-mail. Le créneau sera de nouveau libre.`,
       yes: meeting?.status === "pending" ? "Oui, annuler la demande" : "Oui, annuler le rendez-vous",
-      no: "Non, la garder",
+      no: meeting?.status === "pending" ? "Non, la garder" : "Non, le garder",
     },
     decline: {
       title: "Refuser cette demande ?",
@@ -143,6 +164,7 @@ export default function AgendaBoard({ strapiUrl, editionSlug, themeColor, dayLab
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   const [counterFor, setCounterFor] = useState<string | null>(null);
   const noticeRef = useRef<HTMLDivElement>(null);
+  const busyRef = useRef(false);
   const base = `/espace/${encodeURIComponent(editionSlug)}`;
 
   // Le message (réussite ou échec) peut être hors de l'écran : le focus l'y amène, ce qui le fait aussi lire.
@@ -163,16 +185,33 @@ export default function AgendaBoard({ strapiUrl, editionSlug, themeColor, dayLab
     return meetingErrorMessage(error);
   }
 
-  async function reload() {
+  // `silent` : relecture de fond (F-113), un échec passager ne change rien à l'écran ; seule une session expirée ramène à la connexion.
+  async function reload(silent = false) {
     try {
       setData(await fetchMeetings(strapiUrl));
     } catch (error) {
-      setNotice({ kind: "alert", text: failure(error) });
+      const text = failure(error);
+      if (!silent) setNotice({ kind: "alert", text });
     }
   }
 
+  // F-113 : relecture au retour au premier plan et toutes les 60 s tant que l'onglet est visible. Les états des panneaux et des
+  // saisies vivent dans les cartes (clés stables) : remplacer `data` ne les perd pas. Rien pendant une action, qui relit déjà.
+  useEffect(() => {
+    const tick = () => {
+      if (document.visibilityState === "visible" && !busyRef.current) void reload(true);
+    };
+    const timer = window.setInterval(tick, 60_000);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", tick);
+    };
+  }, []);
+
   async function run(meeting: Meeting, label: string, call: () => Promise<Meeting>, success: (done: Meeting) => string) {
     if (busy) return;
+    busyRef.current = true;
     setBusy({ id: meeting.id, label });
     setNotice(null);
     try {
@@ -181,6 +220,7 @@ export default function AgendaBoard({ strapiUrl, editionSlug, themeColor, dayLab
       setNotice({ kind: "alert", text: failure(error) });
     }
     await reload(); // l'état du serveur fait foi, même après un échec (demande déjà fermée par R-15, par exemple)
+    busyRef.current = false;
     setBusy(null);
   }
 
@@ -207,6 +247,7 @@ export default function AgendaBoard({ strapiUrl, editionSlug, themeColor, dayLab
   const { received, sent, agenda, closed } = data;
   // « Mes rendez-vous uniquement » : les rendez-vous confirmés, par heure ; les séquences du programme restent sur l'écran Programme.
   const myMeetings = agenda.flatMap((item) => (item.type === "meeting" && item.meeting.status === "accepted" ? [item.meeting] : []));
+  const now = Date.now();
   const isEmpty = !received.length && !sent.length && !closed.length && !myMeetings.length;
   const cardId = (meeting: Meeting) => ({ id: `demande-${meeting.id}`, tabIndex: -1 });
   const marked = (meeting: Meeting) => (meeting.id === highlightId ? "ring-4 ring-title" : "");
@@ -255,6 +296,7 @@ export default function AgendaBoard({ strapiUrl, editionSlug, themeColor, dayLab
                 <p className="mt-3 text-ink">Propose {slotLine(meeting)}</p>
                 {viaLine(meeting) && <p className="text-sm text-muted">{viaLine(meeting)}</p>}
                 {meeting.message && <p className="mt-3 rounded-lg bg-surface p-3 text-ink">« {meeting.message} »</p>}
+                <Links meeting={meeting} base={base} />
                 <div className="mt-4 grid gap-2 sm:grid-cols-2">
                   {meeting.canAccept && (
                     <button type="button" disabled={busy !== null} aria-busy={busy?.id === meeting.id} onClick={() => void accept(meeting)} className={PRIMARY}>
@@ -315,35 +357,49 @@ export default function AgendaBoard({ strapiUrl, editionSlug, themeColor, dayLab
             Mes rendez-vous{dayLabel ? `, ${dayLabel}` : ""}
           </h2>
           {myMeetings.length === 0 && <p className="mt-3 rounded-xl border border-surface-alt bg-white p-4 text-muted">Aucun rendez-vous confirmé pour l’instant.</p>}
-          <ol className="mt-3 grid gap-3">
-            {myMeetings.map((meeting) => (
-              <li
-                key={meeting.id}
-                {...cardId(meeting)}
-                className={`grid grid-cols-[4.5rem_1fr] gap-x-4 rounded-xl border border-surface-alt bg-white p-4 ${marked(meeting)}`}
-              >
-                <p className="font-heading text-xl leading-snug font-semibold text-title">{hourLabel(meeting.slot.startsAt)}</p>
-                <div className="min-w-0">
-                  <p className="text-lg leading-snug font-bold text-ink">{meeting.counterpart.displayName}</p>
-                  {meeting.counterpart.subtitle && <p className="leading-snug text-muted">{meeting.counterpart.subtitle}</p>}
-                  {meeting.location && <p className="mt-1 text-lg font-bold text-ink">{meeting.location}</p>}
-                  {viaLine(meeting) && <p className="text-sm text-muted">{viaLine(meeting)}</p>}
-                  {meeting.answeredByName && meeting.counterpart.kind === "exhibitor" && (
-                    <p className="text-sm text-muted">Confirmé par {meeting.answeredByName}</p>
-                  )}
-                  <p className="mt-2">
-                    <MeetingStatus status={meeting.status} />
-                  </p>
-                  {meeting.canCancel && (
-                    <button type="button" disabled={busy !== null} onClick={() => setConfirm({ meeting, action: "cancel" })} className={`${DANGER} mt-3`}>
-                      {label(meeting, "Annuler le rendez-vous")}
-                      <span className="sr-only">{` avec ${meeting.counterpart.displayName}`}</span>
-                    </button>
-                  )}
+          {PHASES.map((phase) => {
+            const items = myMeetings.filter((meeting) => phaseOf(meeting, now) === phase);
+            return (
+              items.length > 0 && (
+                <div key={phase}>
+                  <h3 className="mt-4 font-semibold text-muted">{PHASE_TITLE[phase]}</h3>
+                  <ol className="mt-2 grid gap-3">
+                    {items.map((meeting) => (
+                      <li
+                        key={meeting.id}
+                        {...cardId(meeting)}
+                        className={`grid grid-cols-[4.5rem_1fr] gap-x-4 rounded-xl border border-surface-alt bg-white p-4 ${marked(meeting)}`}
+                      >
+                        <p className="font-heading text-xl leading-snug font-semibold text-title">
+                          {hourLabel(meeting.slot.startsAt)}
+                          <span className="block text-sm font-medium text-muted">{`à ${hourLabel(meeting.slot.endsAt)}`}</span>
+                        </p>
+                        <div className="min-w-0">
+                          <p className="text-lg leading-snug font-bold text-ink">{meeting.counterpart.displayName}</p>
+                          {meeting.counterpart.subtitle && <p className="leading-snug text-muted">{meeting.counterpart.subtitle}</p>}
+                          {meeting.location && <p className="mt-1 text-lg font-bold text-ink">{meeting.location}</p>}
+                          {viaLine(meeting) && <p className="text-sm text-muted">{viaLine(meeting)}</p>}
+                          {meeting.answeredByName && meeting.counterpart.kind === "exhibitor" && (
+                            <p className="text-sm text-muted">Confirmé par {meeting.answeredByName}</p>
+                          )}
+                          <p className="mt-2">
+                            <MeetingStatus status={meeting.status} />
+                          </p>
+                          <Links meeting={meeting} base={base} />
+                          {meeting.canCancel && (
+                            <button type="button" disabled={busy !== null} onClick={() => setConfirm({ meeting, action: "cancel" })} className={`${DANGER} mt-3`}>
+                              {label(meeting, "Annuler le rendez-vous")}
+                              <span className="sr-only">{` avec ${meeting.counterpart.displayName}`}</span>
+                            </button>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
                 </div>
-              </li>
-            ))}
-          </ol>
+              )
+            );
+          })}
         </section>
       )}
 
@@ -358,9 +414,11 @@ export default function AgendaBoard({ strapiUrl, editionSlug, themeColor, dayLab
                 <Person meeting={meeting} strapiUrl={strapiUrl} />
                 <p className="mt-3 text-ink">{slotLine(meeting)}</p>
                 {viaLine(meeting) && <p className="text-sm text-muted">{viaLine(meeting)}</p>}
+                {meeting.message && <p className="mt-3 rounded-lg bg-surface p-3 text-ink">« {meeting.message} »</p>}
                 <p className="mt-2">
                   <MeetingStatus status={meeting.status} />
                 </p>
+                <Links meeting={meeting} base={base} />
                 {meeting.canCancel && (
                   <button type="button" disabled={busy !== null} onClick={() => setConfirm({ meeting, action: "cancel" })} className={`${DANGER} mt-3`}>
                     {label(meeting, "Annuler la demande")}

@@ -8,6 +8,7 @@ import {
   hourRange,
   isStaleSlotError,
   meetingErrorMessage,
+  windowLabel,
   type Meeting,
   type SlotsResponse,
 } from "../../lib/espace/meetings";
@@ -165,7 +166,7 @@ export default function SlotPicker({
         </>
       );
     } else {
-      blockedText = code === "TARGET_UNAVAILABLE" ? `${targetName} ne reçoit pas de demandes de rendez-vous.` : text;
+      blockedText = code === "TARGET_UNAVAILABLE" ? `${targetName} ne reçoit pas de demandes de rendez-vous.` : (code === "WINDOW_CLOSED" && windowLabel(data.window)) || text;
     }
   }
 
@@ -189,6 +190,11 @@ export default function SlotPicker({
         : `Envoyer la demande pour ${chosen.label}`;
 
   const noteId = `${uid}-note`;
+  const messageId = `${uid}-message`;
+  const counterId = `${uid}-compteur`;
+  const reasonId = `${uid}-raison`;
+  // F-115 : la raison, sous le bouton d'envoi inactif. Sans créneau, le libellé du bouton la porte déjà (F-51).
+  const reason = chosen && mode !== "booking" && !isCounter && !message.trim() ? "Ajoutez un mot de présentation" : null;
   const hasAvailable = data?.groups.some(({ slots }) => slots.some((slot) => stateOf(slot) === "available")) ?? false;
 
   return (
@@ -312,11 +318,12 @@ export default function SlotPicker({
             <>
               {mode !== "booking" && (
                 <div className="mt-6">
-                  <label htmlFor={`${uid}-message`} className="block font-semibold">
+                  <label htmlFor={messageId} className="block font-semibold">
                     {isCounter ? "Un mot pour accompagner votre proposition (facultatif)" : "Un mot pour présenter votre demande (obligatoire)"}
                   </label>
                   <textarea
-                    id={`${uid}-message`}
+                    id={messageId}
+                    aria-describedby={counterId}
                     rows={3}
                     maxLength={MESSAGE_MAX}
                     required={!isCounter}
@@ -324,7 +331,7 @@ export default function SlotPicker({
                     onChange={(event) => setMessage(event.target.value)}
                     className="mt-2 min-h-24 w-full rounded-lg border-2 border-accent-dark bg-white px-4 py-3 text-lg text-ink"
                   />
-                  <p aria-hidden="true" className="mt-1 text-right text-sm text-muted">
+                  <p id={counterId} className="mt-1 text-right text-sm text-muted">
                     {message.length}/{MESSAGE_MAX}
                   </p>
                 </div>
@@ -343,11 +350,16 @@ export default function SlotPicker({
                 type="submit"
                 disabled={!chosen || sending || (mode !== "booking" && !isCounter && !message.trim())}
                 aria-busy={sending}
-                aria-describedby={noteId}
+                aria-describedby={reason ? `${noteId} ${reasonId}` : noteId}
                 className="mt-6 inline-flex min-h-13 w-full items-center justify-center rounded-lg bg-gold px-6 text-lg font-bold text-gold-ink shadow-md shadow-gold/25 hover:bg-gold-light disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {sending ? "Envoi…" : buttonLabel}
               </button>
+              {reason && (
+                <p id={reasonId} className="mt-2 text-center text-sm font-semibold text-ink">
+                  {reason}
+                </p>
+              )}
               <p id={noteId} className="mt-2 text-center text-sm text-muted">
                 {hint}
               </p>
