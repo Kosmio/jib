@@ -208,7 +208,6 @@ test.describe('carte publique : régénération du jeton (T-64) et retour après
   });
 
   test('F-96 : après connexion, si R-41 masque la fiche visée, le scanneur arrive sur l’accueil (E1) et non sur une page d’erreur', async ({ page, baseURL }) => {
-    test.fail(true, 'défaut : le bouton de la carte mène à next=/annuaire/p/{id} sans condition, la connexion y renvoie, et la fiche masquée répond 404 au lieu d’amener sur E1 (F-96)');
     await page.goto(cardPath(tokens!.clara.token));
     await page.getByRole('link', { name: LOGIN_BUTTON }).click();
     await signInFromLoginPage(page, MANON);
@@ -219,7 +218,7 @@ test.describe('carte publique : régénération du jeton (T-64) et retour après
 
 test.describe('NF-54 : limitation de débit', () => {
   test('la page de la carte lit Strapi avec l’adresse du visiteur : 35 visiteurs différents en une minute ne sont pas limités ensemble', async ({ page, baseURL }) => {
-    test.fail(true, 'le rendu serveur appelle Strapi sans X-Forwarded-For : tous les scans partagent l’IP du serveur web, donc 30 scans par minute pour tout le monde');
+    test.fail(true, 'défaut D5 : Astro.clientAddress ignore X-Forwarded-For tant que security.allowedDomains n’est pas réglé (astro/dist/core/app/node.js:88), donc tous les scans gardent l’IP du proxy ou du serveur web et partagent la limite');
     await loadTokens(page, baseURL);
     const statuses: number[] = [];
     for (let visitor = 1; visitor <= 35; visitor += 1) {
@@ -227,5 +226,16 @@ test.describe('NF-54 : limitation de débit', () => {
       statuses.push(response.status());
     }
     expect(statuses.filter((status) => status === 429)).toEqual([]);
+
+  });
+
+  test('un client direct qui forge X-Forwarded-For n’échappe pas à la limite : Strapi lit la dernière entrée, posée par le proxy', async ({ page }) => {
+    const forged: number[] = [];
+    for (let attempt = 1; attempt <= 35; attempt += 1) {
+      const response = await page.context().request.get(`${STRAPI_URL}/api/espace/cards/${EDITION}/${tokens!.lea.token}`, { headers: { 'X-Forwarded-For': `10.99.0.${attempt}, 10.99.1.1` }, maxRedirects: 0 });
+      forged.push(response.status());
+    }
+    expect(forged.slice(0, 30)).not.toContain(429);
+    expect(forged.slice(30)).toContain(429);
   });
 });
