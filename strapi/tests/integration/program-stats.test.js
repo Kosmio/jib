@@ -281,13 +281,13 @@ describe('programme et tableau de bord (lot 14)', { timeout: 900_000 }, () => {
       assert.deepEqual(Object.keys(response.json).sort(), STATS_KEYS);
     });
 
-    it('attendees : total, actifs, annulés et par rôle, l’organisateur n’étant pas un inscrit', async () => {
+    it('attendees : total, actifs, annulés ; byRole ne compte que les actifs (F-125), l’organisateur n’étant pas un inscrit', async () => {
       const { edition, p } = await statsScene();
       const { attendees } = (await statsOf(edition, p.boss)).json;
       assert.equal(attendees.total, 7, '3 participants, 2 intervenants, 1 représentant, 1 annulé');
       assert.equal(attendees.active, 6);
       assert.equal(attendees.cancelled, 1);
-      assert.deepEqual(attendees.byRole, { participant: 4, speaker: 2, exhibitor_rep: 1 });
+      assert.deepEqual(attendees.byRole, { participant: 3, speaker: 2, exhibitor_rep: 1 }, 'le participant annulé n’est pas compté (F-125)');
     });
 
     it('activated, consented, directoryOptIn et profilesComplete, comptés sur les inscrits actifs', async () => {
@@ -434,6 +434,11 @@ describe('programme et tableau de bord (lot 14)', { timeout: 900_000 }, () => {
       assert.equal(participants.status, 200, participants.text);
       const rows = lines(participants.text);
       assert.ok(rows[0].startsWith('Nom;Prénom;E-mail;'), rows[0]);
+      const headers = rows[0].split(';');
+      for (const column of ['Statut', 'Activé le', 'Dernière connexion', 'Actualités des prochaines éditions']) assert.ok(headers.includes(column), column);
+      assert.ok(!headers.includes('Inscription'), 'F-123 : « Inscription » devient « Statut »');
+      assert.equal(headers[headers.indexOf('Statut') + 1], 'Espace activé');
+      assert.ok(participants.headers.get('content-disposition').includes(`filename="participants-${edition.slug}-`), 'F-123 : nom de fichier avec l’édition et la date');
       const leaRow = rows.find((row) => row.startsWith('Ducasse;Léa;'));
       assert.ok(leaRow, 'ligne de Léa');
       assert.ok(leaRow.includes('"Atelier; Fictif"'));

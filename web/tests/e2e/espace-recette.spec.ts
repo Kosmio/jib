@@ -546,6 +546,8 @@ test.describe('E9 : régénérer les créneaux (F-94, R-02)', () => {
   const orphaned = (label: string, meetings: number) =>
     `Le créneau de ${label} ne correspond plus à aucune pause, mais porte encore ${meetings}${NBSP}rendez-vous accepté${meetings > 1 ? 's' : ''} ou en attente${NBSP}: il est conservé.`;
   const textOf = (locator: Locator) => () => locator.textContent();
+  /** F-122 : dès qu'il y a des créneaux à créer ou à supprimer, la régénération attend la confirmation du dialogue. */
+  const confirm = (page: Page) => page.getByRole('alertdialog').getByRole('button', { name: 'Confirmer la régénération' }).click();
 
   test('le seed est à jour : « 0 créneau créé, 10 conservés, 0 supprimé », rien ne bouge et le bouton se libère (F-94, R-02)', async ({ page, baseURL }) => {
     const { button, status, alert, groups } = await openCard(page, baseURL);
@@ -574,6 +576,7 @@ test.describe('E9 : régénérer les créneaux (F-94, R-02)', () => {
     await expect(groups).toHaveCount(3);
 
     await button.click();
+    await confirm(page);
     await expect.poll(textOf(status)).toBe(regenerated(2, before, 0));
     await expect(alert).toHaveCount(0);
     await expect(groups).toHaveCount(4);
@@ -589,6 +592,7 @@ test.describe('E9 : régénérer les créneaux (F-94, R-02)', () => {
 
     editProgram({ op: 'update-sequence', match: { title: CAFE }, data: { end_time: '9h15' } });
     await button.click();
+    await confirm(page);
     await expect.poll(textOf(status)).toBe(regenerated(0, before - 1, 1));
     await expect(alert).toHaveCount(0);
     await expect(groups.first()).toHaveText(`${CAFE}, 9h00 (1 créneau)`);
@@ -602,6 +606,7 @@ test.describe('E9 : régénérer les créneaux (F-94, R-02)', () => {
 
     editProgram({ op: 'update-sequence', match: { title: CAFE }, data: { end_time: null } });
     await button.click();
+    await confirm(page);
     await expect.poll(textOf(alert.locator('p'))).toBe(regenerated(0, before - 1, 1));
     expect(await alert.locator('li').allTextContents()).toEqual([discarded(CAFE, 'pas d’heure de fin')]);
     await expect(status).toHaveCount(0);
