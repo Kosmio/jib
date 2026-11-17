@@ -39,11 +39,7 @@ test.describe('pilotage : ouverture contrôlée et état du service (V1-C)', () 
       await page.context().addCookies(session);
     } else {
       await openSpace(page, ORGANIZER);
-      if (page.url().endsWith('/bienvenue')) {
-        await hydrated(page);
-        await page.getByRole('button', { name: 'Continuer' }).click();
-        await expect(page).toHaveURL(`${baseURL}${ESPACE}/`);
-      }
+      // F-124 (V2-D) : l'organisateur de ORGANIZER_EMAILS n'a pas à passer la bienvenue (V2-B y intercale une confirmation) : il va droit au pilotage.
       session = await page.context().cookies();
     }
     await page.goto(`${ESPACE}/organisateur`);

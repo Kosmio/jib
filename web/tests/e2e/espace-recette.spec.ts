@@ -614,17 +614,15 @@ test.describe('E9 : régénérer les créneaux (F-94, R-02)', () => {
     expect(await slotsOf(page)).toHaveLength(before - 1);
   });
 
-  test('les autres motifs d’écart : horaires invalides, plus courte qu’un créneau, chevauchement d’une autre pause (F-94, R-01)', async ({ page, baseURL }) => {
+  test('les autres motifs d’écart : plus courte qu’un créneau, chevauchement d’une autre pause (F-94, R-01)', async ({ page, baseURL }) => {
     test.setTimeout(120_000);
     const { button, status, alert } = await openCard(page, baseURL);
     const before = (await slotsOf(page)).length;
     const tooShort = `${TEST_PAUSE_PREFIX} Trop courte`;
-    const unreadable = `${TEST_PAUSE_PREFIX} Heures illisibles`;
     const overlapping = `${TEST_PAUSE_PREFIX} Chevauchement`;
 
     editProgram(
       { op: 'create-sequence', data: { title: tooShort, start_time: '9h00', end_time: '9h10', kind: 'b2b_break' } },
-      { op: 'create-sequence', data: { title: unreadable, start_time: '9:15', end_time: '9:45', kind: 'b2b_break' } },
       // « Pause et B2B » de 10h45 à 11h15 est antérieure : c'est celle-là qui garde ses créneaux.
       { op: 'create-sequence', data: { title: overlapping, start_time: '10h50', end_time: '11h10', kind: 'b2b_break' } },
     );
@@ -634,12 +632,19 @@ test.describe('E9 : régénérer les créneaux (F-94, R-02)', () => {
       [
         discarded(CAFE, 'pas d’heure de fin'),
         discarded(tooShort, 'plus courte qu’un créneau'),
-        discarded(unreadable, 'horaires invalides'),
         discarded(overlapping, 'chevauche une autre pause B2B'),
       ].sort(),
     );
     await expect(status).toHaveCount(0);
     expect(await slotsOf(page)).toHaveLength(before);
+  });
+
+  test('une heure illisible sur une pause B2B est refusée à l’enregistrement, « 9:15 » est lisible (R-86)', async () => {
+    test.setTimeout(120_000);
+    const title = `${TEST_PAUSE_PREFIX} Heures illisibles`;
+    expect(() => editProgram({ op: 'create-sequence', data: { title, start_time: '9.15', end_time: '9h45', kind: 'b2b_break' } })).toThrow(/pas lisible/);
+    // Écriture tolérante : acceptée, puis supprimée pour ne pas changer les créneaux des tests suivants.
+    editProgram({ op: 'create-sequence', data: { title, start_time: '9:15', end_time: '9:45', kind: 'b2b_break' } }, { op: 'delete-sequences', titlePrefix: title });
   });
 
   test('un créneau qui porte un rendez-vous n’est jamais supprimé : alerte « il est conservé », même au second clic (F-94, R-02)', async ({ page, baseURL }) => {
@@ -692,7 +697,9 @@ test.describe('E9 : régénérer les créneaux (F-94, R-02)', () => {
     const { button } = await openCard(page, baseURL);
     await page.context().clearCookies();
     await button.click();
-    await expect(page).toHaveURL(`${baseURL}${ESPACE}/connexion`);
+    await expect(page).toHaveURL(/\/connexion\?next=%2Fespace%2F[^&]+%2Forganisateur&expire=1$/);
+    expect(new URL(page.url()).pathname).toBe(`${ESPACE}/connexion`);
+    await expect(page.getByText('Votre session a expiré')).toBeVisible();
   });
 });
 

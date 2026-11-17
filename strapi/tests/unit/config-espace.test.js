@@ -19,8 +19,8 @@ const server = (vars = {}) => require('../../config/server')({ env: makeEnv(vars
 const middlewares = (vars = {}) => require('../../config/middlewares')({ env: makeEnv(vars) });
 
 describe('config/server.js : section espace (A-05, I-23, NF-06)', () => {
-  it('donne les valeurs locales par défaut : localhost:4321, aucun organisateur', () => {
-    assert.deepEqual(server().espace, { publicUrl: 'http://localhost:4321', organizerEmails: [], corsOrigins: ['http://localhost:4321'] });
+  it('donne les valeurs locales par défaut : localhost:4321, aucun organisateur, 60 liens par IP', () => {
+    assert.deepEqual(server().espace, { publicUrl: 'http://localhost:4321', organizerEmails: [], linkRateIpMax: 60, corsOrigins: ['http://localhost:4321'] });
   });
 
   it('lit PUBLIC_URL, ORGANIZER_EMAILS et CORS_ORIGINS (listes séparées par des virgules, espaces retirés)', () => {
