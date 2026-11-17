@@ -10,7 +10,7 @@
  * `tests/fixtures/existing-schemas.json`, relevée au commit a70a56e), et ne reçoivent que des champs scalaires :
  * 9 champs privés sur `edition`, `kind` sur `sequence`. Toute relation nouvelle part d'un type nouveau `api::espace.*`.
  *
- * Modèle du lot 2 (tests d'abord) : les types nouveaux (10 au lot 2, 11 avec `badge-setting` du lot V4-D1, 12 avec `message-report` du lot V5-B, 13 avec `erased-email` du lot V5-A), leurs relations et leurs champs clés.
+ * Modèle du lot 2 (tests d'abord) : les types nouveaux (10 au lot 2, 11 avec `badge-setting` du lot V4-D1, 12 avec `message-report` du lot V5-B, 13 avec `erased-email` du lot V5-A, 14 avec `calendar-feed` du lot V5-E), leurs relations et leurs champs clés.
  */
 
 const { describe, it } = require('node:test');
@@ -115,7 +115,7 @@ describe('types de l’espace : règles communes (A-03, 02-modele-donnees.md)', 
   }
 });
 
-describe('modèle du lot 2 : les 13 types nouveaux (section 3 du plan, plus badge-setting du lot V4-D1, message-report du lot V5-B et erased-email du lot V5-A)', () => {
+describe('modèle du lot 2 : les 14 types nouveaux (section 3 du plan, plus badge-setting du lot V4-D1, message-report du lot V5-B, erased-email du lot V5-A et calendar-feed du lot V5-E)', () => {
   const EXPECTED = {
     topic: { table: 'espace_topics', relations: { edition: 'api::edition.edition', sessions: 'api::sequence.sequence' } },
     slot: { table: 'espace_slots', relations: { edition: 'api::edition.edition', session: 'api::sequence.sequence' } },
@@ -152,9 +152,11 @@ describe('modèle du lot 2 : les 13 types nouveaux (section 3 du plan, plus badg
     'message-report': { table: 'espace_message_reports', relations: { edition: 'api::edition.edition', message: 'api::espace.message', author: 'api::espace.attendee' } },
     // V5-A (F-33, R-44) : empreinte salée de l'e-mail d'une personne effacée, une entrée par édition ; l'import ignore ses billets.
     'erased-email': { table: 'espace_erased_emails', relations: { edition: 'api::edition.edition' } },
+    // V5-E (I-42) : flux d'abonnement calendrier d'un participant, jeton révocable dont seule l'empreinte est stockée.
+    'calendar-feed': { table: 'espace_calendar_feeds', relations: { attendee: 'api::espace.attendee' } },
   };
 
-  it('contient exactement ces 13 types (Notification est P2 : non créée)', () => {
+  it('contient exactement ces 14 types (Notification est P2 : non créée)', () => {
     assert.deepEqual(espaceTypes().sort(), Object.keys(EXPECTED).sort());
   });
 
@@ -183,6 +185,19 @@ describe('modèle du lot 2 : les 13 types nouveaux (section 3 du plan, plus badg
     assert.equal(attributes.erasedAt.required, true);
     assert.equal(attributes.edition.required, true);
     assert.ok(!options.draftAndPublish);
+  });
+
+  it('calendar-feed (V5-E, I-42) : tokenHash obligatoire et unique, revokedAt facultatif, attendee obligatoire, sans brouillon, aucun champ de jeton en clair', () => {
+    const { attributes, options } = readSchema('espace', 'calendar-feed');
+    assert.equal(attributes.tokenHash.type, 'string');
+    assert.equal(attributes.tokenHash.required, true);
+    assert.equal(attributes.tokenHash.unique, true);
+    assert.equal(attributes.revokedAt.type, 'datetime');
+    assert.ok(!attributes.revokedAt.required);
+    assert.equal(attributes.attendee.relation, 'manyToOne');
+    assert.equal(attributes.attendee.required, true);
+    assert.ok(!options.draftAndPublish);
+    assert.deepEqual(Object.keys(attributes).filter((key) => /^token$|^path$|^url$/i.test(key)), [], 'jeton ou adresse stockés en clair');
   });
 
   it('A-15 : Topic.sessions est une relation manyToMany unidirectionnelle vers sequence', () => {

@@ -166,6 +166,11 @@ describe('Strapi sur la base de test', { timeout: 180_000 }, () => {
       'POST /api/espace/me/erase',
       'GET /api/espace/me/export',
       'POST /api/espace/admin/:x/attendees/:x/erase',
+      // V5-E : abonnement calendrier (I-42, jeton révocable) et notification HelloAsso (I-13).
+      'POST /api/espace/me/calendar-feed',
+      'DELETE /api/espace/me/calendar-feed',
+      'GET /api/espace/calendar/:x',
+      'POST /api/espace/webhooks/helloasso',
     ]);
     const declared = () =>
       espaceRoutes().flatMap((route) =>
