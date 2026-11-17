@@ -71,8 +71,10 @@ Champs ajoutés, tous avec `private: true` (absents de l'API REST publique, donc
 | tablesCount | integer | défaut 20 |
 | meetingRequestsOpenAt | datetime | ouverture de la prise de RDV |
 | meetingRequestsCloseAt | datetime | défaut : veille 18h00 heure de Paris |
+| welcomeStartedAt | datetime | **ajout V1-C** (R-85) : posé par le premier envoi des `welcome` depuis le pilotage ; vide, la synchronisation n'envoie aucun `welcome`. Non modifiable à la main (guide organisateur) |
+| readOnlyAt | datetime | **ajout V4-F** (NF-70) : passé cet instant, l'espace est en lecture seule ; vide, la valeur est calculée (date de l'édition plus sept jours) et jamais stockée |
 
-Ces champs ne prennent effet qu'une fois l'édition **publiée** dans Strapi.
+Ces champs ne prennent effet qu'une fois l'édition **publiée** dans Strapi. Les gardes de V1-D (NF-64, NF-65) refusent à l'enregistrement : une fermeture passée quand des demandes attendent, une ouverture postérieure à la fermeture, `tablesCount` sous la plus grande table attribuée, un changement de `slotDurationMinutes` dès qu'un rendez-vous existe, un changement de `slug` dès qu'un participant existe. La suppression ou la dépublication d'une édition qui a des participants est refusée (NF-63).
 
 ### Session : type existant `sequence`, à étendre
 
@@ -108,8 +110,10 @@ Le thème d'une séquence n'est pas un champ de `sequence` : il est porté par `
 | session | relation manyToOne → sequence (`kind = b2b_break`) | requis |
 | startsAt, endsAt | datetime | durée = `slotDurationMinutes` |
 | label | string | ex. « 13h00 », calculé en heure de Paris |
+| blockedTables | json | **ajout V3-F** (R-90) : numéros des tables bloquées sur ce créneau (liste d'entiers de 1 à `tablesCount`, vide par défaut) ; l'attribution (R-13) les traite comme occupées |
+| closed | boolean | **ajout V3-F** (R-90) : défaut faux ; vrai, le créneau est indisponible dans la grille et une demande répond 409 `SLOT_CLOSED` |
 
-Génération : voir R-01. Unicité (edition, startsAt) garantie par le service de génération.
+Génération : voir R-01. Unicité (edition, startsAt) garantie par le service de génération. Depuis V1-D (NF-66), le type est masqué du gestionnaire de contenu.
 
 ### Attendee (nouveau, `api::espace.attendee`)
 
@@ -139,9 +143,17 @@ Génération : voir R-01. Unicité (edition, startsAt) garantie par le service d
 | lastSeenAt | datetime | |
 | status | enumeration `active`, `cancelled` | cancelled si commande annulée côté HelloAsso |
 | emailPrefs | json | `{ meetingRequests: true, messages: true, reminders: true }` |
-| editedFields | json | **ajout** : liste des champs importés modifiés par le participant (R-31) |
+| editedFields | json | **ajout** : liste des champs importés modifiés par le participant (R-31) ou corrigés par l'organisateur (R-89) |
+| statusLockedAt | datetime | **ajout V3-E** (R-89) : posé par une désinscription ou une réinscription faite depuis le pilotage ; la synchronisation ne change plus alors le statut |
+| cardTokenHash | string, unique, privé | **ajout V4-D1** (R-80, NF-55) : `sha256` du jeton de carte, seul stocké. Le jeton est dérivé : `base64url(HMAC-SHA256(clé dérivée des APP_KEYS, documentId + ":" + cardTokenCreatedAt))`, 256 bits |
+| cardTokenCreatedAt | datetime, privé | **ajout V4-D1** : posé à la première génération d'un badge ; « Régénérer » le change, donc change le jeton (R-83) |
+| lookingFor | text, 300 caractères | **ajout V5-D** : « Je cherche » ; visible comme R-42 |
+| offering | text, 300 caractères | **ajout V5-D** : « Je propose » ; visible comme R-42 |
+| phone | string, 30 caractères, privé | **ajout V5-D** : facultatif, format libre ; visible seulement des interlocuteurs d'un rendez-vous accepté (R-42 amendé), jamais dans l'annuaire, les exports partagés, la liste du pilotage ni la carte de badge |
 
 Champ calculé exposé par l'API : `profileCompletion` (R-30).
+
+Gestionnaire de contenu (NF-66, V1-D) : `editedFields`, `emailPrefs`, `unavailableSessions`, `consentAt`, `activatedAt`, `lastSeenAt`, `directoryOptIn`, `meetingsOptIn`, `newsOptIn`, `helloassoItemId`, `helloassoOrderId` y sont affichés non modifiables. Effacement (R-44, V5-A) : l'e-mail est remplacé par une adresse technique non routable et son empreinte est écrite dans `erased-email`.
 
 ### Exhibitor (nouveau, `api::espace.exhibitor`)
 
@@ -187,8 +199,20 @@ Message (`api::espace.message`) : `conversation`, `author`, `body` (2 000 caract
 ### Techniques
 
 - **MagicToken** (`api::espace.magic-token`) : `attendee`, `kind` (**ajout**, enumeration `link`, `session`), `tokenHash` (SHA-256, unique), `expiresAt`, `usedAt`, `ip`. `link` : lien de connexion valable 30 minutes (I-20) ou lien d'action valable 72 heures (I-21), à usage unique. `session` : session ouverte par le cookie (I-22), 30 jours glissants, supprimée à la déconnexion. Un seul type pour les deux : même hachage, même recherche, même purge.
-- **EmailLog** (`api::espace.email-log`) : `attendee`, `template`, `scenarioKey`, `sentAt`, `providerMessageId`, `status`. Sert à l'idempotence des relances (R-71).
-- **SyncRun** (`api::espace.sync-run`) : `edition`, `startedAt`, `endedAt`, `created`, `updated`, `cancelled`, `errors` (json).
+- **EmailLog** (`api::espace.email-log`) : `attendee`, `template`, `scenarioKey`, `sentAt`, `providerMessageId`, `status` (`sent`, `failed`), `error` (**ajout V1-C**, NF-62 : text, 300 caractères au plus, première ligne du motif d'échec, sans autre donnée personnelle que celle du destinataire). Sert à l'idempotence des relances (R-71, `scenarioKey = <scénario>:<date prévue AAAA-MM-JJ>`), au plafond de trois liens par heure du pilotage et aux trois échecs de R-85. Purgé après 12 mois (NF-13).
+- **SyncRun** (`api::espace.sync-run`) : `edition`, `startedAt`, `endedAt`, `created`, `updated`, `cancelled`, `errors` (json). Purgé après 12 mois (NF-13).
+- Visibilité dans le gestionnaire de contenu (NF-66) : `message`, `conversation`, `magic-token`, `slot`, `message-report` et `erased-email` en sont masqués (`pluginOptions`) ; `email-log`, `sync-run` et `badge-setting` restent visibles.
+
+### Types ajoutés par la finalisation
+
+| Type | Lot | Champs | Règle |
+|---|---|---|---|
+| **BadgeSetting** (`api::espace.badge-setting`, table `espace_badge_settings`) | V4-D1 | `edition` (manyToOne → edition, requis), `plan` (média image, facultatif), `accent` (string `#rrggbb`, facultatif) | une entrée par édition : plan du lieu au verso du badge et couleur du bandeau de type. Remplace `badgePlan` et `badgeAccent` de F-99, puisque A-15 interdit d'ajouter un média à l'édition |
+| **MessageReport** (`api::espace.message-report`, table `espace_message_reports`) | V5-B | `edition` (requis), `message` (manyToOne → message), `author` (manyToOne → attendee, requis : qui signale), `reason` (text, 500 caractères, requis), `status` (`open`, `handled`, défaut `open`), `handledAt` (datetime) | F-75, R-63 : un signalement par message et par personne (garanti par le service) ; masqué du gestionnaire de contenu |
+| **ErasedEmail** (`api::espace.erased-email`, table `espace_erased_emails`) | V5-A | `edition` (requis), `emailHash` (string privé, requis : sha256 de l'adresse en minuscules salé par une clé dérivée des `APP_KEYS`), `erasedAt` (datetime, requis) | R-44 : l'import ignore un billet dont l'empreinte est présente pour l'édition ; masqué du gestionnaire de contenu |
+| **CalendarFeed** (`api::espace.calendar-feed`) | V5-E | `attendee` (manyToOne → attendee), `tokenHash` (string, sha256 du jeton), `createdAt`, `revokedAt` (datetime) | I-42 : flux d'abonnement `.ics` ; révoqué, il répond 404 |
+
+Aucun de ces types n'a de route CRUD ni d'entrée dans `strapi/mcp/content-types.json` (types de l'espace, refusés par les outils de suppression du MCP depuis V5-F).
 - **Notification** (R-60, P2) : préparée ici, **non créée en v1**. Champs prévus : `edition`, `recipient` (Attendee), `type` (`meeting-request`, `meeting-answer`, `message`), `link`, `readAt`. En v1, les compteurs des badges F-24 sont calculés à partir de Meeting et Message.
 
 ## Permissions Strapi

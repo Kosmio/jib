@@ -128,7 +128,11 @@ Ajoutées par l'espace (Strapi) :
 | `ORGANIZER_EMAILS` | e-mails des organisateurs, séparés par des virgules (I-23) | phase 1 |
 | `CORS_ORIGINS` | origines admises par CORS et par le contrôle `Origin`, défaut `http://localhost:4321` | phase 1 |
 | `IS_PROXIED` | `proxy.koa` de Strapi : `true` derrière Traefik (dev, prod) | phase 1 |
-| `CRON_ENABLED` | tâches planifiées : `false` en local et en test, `true` en dev et prod | phase 1 |
+| `CRON_ENABLED` | tâches planifiées : `false` en local et en test, `true` en dev et prod ; liste des tâches (`espaceSync`, `espaceMeetingExpiry`, `espaceMessageNotify` à la minute, `espaceReminders`, `espaceTokenPurge`, `espacePurge`) dans `specs/06-api.md`, section Tâches planifiées | phase 1 |
+| `LINK_RATE_IP_MAX` | plafond de demandes de lien par adresse IP et par 15 min (NF-61, D-16), défaut 60 ; lu dans `strapi/config/server.js` (`server.espace.linkRateIpMax`) ; variable GitHub de l'environnement en dev et prod | V1-A, V1-B |
+| `SMTP_HOST`, `SMTP_PORT` | serveur de capture de `EMAIL_PROVIDER=smtp` (preprod), port par défaut 1025 | preprod |
+| `ADMIN_RESET` | `email:motdepasse` : au démarrage, fixe le mot de passe de ce compte d'administration ou le crée en super administrateur ; vide par défaut, toujours vide en prod (secret `SECRET_ADMIN_RESET`) | avant la finalisation |
+| `SPEAKER_TEST_ACCOUNTS` | slugs d'éditions séparés par des virgules : crée un compte de participant à adresse fictive pour chaque intervenant du programme ; preprod et essais seulement | avant la finalisation |
 
 Outillage, jamais lues par l'application :
 
@@ -161,6 +165,9 @@ Déploiement : chaque variable de Strapi est listée une à une dans `infra/depl
 - Ne jamais changer le type d'une relation existante : la table de liaison est recréée vide au déploiement, et la prod est éditée directement. Sur un type existant, on n'ajoute que des champs scalaires ; toute nouvelle relation est déclarée sur un type nouveau `api::espace.*` (A-15).
 - Les images Docker sont étiquetées par `VERSION` (0.1.0, la version de prod) : changer `VERSION` avant de construire une image depuis la branche.
 - Données fictives uniquement, adresses en `@example.org`.
+- **IP vue par Strapi depuis le rendu serveur d'Astro.** Un appel du rendu serveur arrive à Strapi depuis le conteneur du front : sans précaution, toutes les limites par IP compteraient l'IP d'Astro. La page carte (`P/[edition]/carte/[token].astro`) transmet donc à Strapi, dans `X-Forwarded-For`, la dernière entrée de l'en-tête reçu (celle que Traefik ajoute, qu'un client ne peut pas forger), à défaut `Astro.clientAddress` ; `Astro.clientAddress` seul ignore `X-Forwarded-For` sans `security.allowedDomains`. Côté Strapi, `IS_PROXIED=true` et `maxIpsCount: 1` font lire cette dernière entrée. Toute nouvelle route limitée par IP et appelée par le rendu serveur reprend ce schéma (NF-54, V4-D1).
+- **Aperçu d'e-mail dans une iframe.** Les cartes « E-mail de bienvenue » et « Relances » isolent l'aperçu par l'attribut `csp="script-src 'none'"` de l'iframe, pas par `sandbox` (qui produisait une erreur de console). Seul Chromium applique cet attribut ; le HTML des aperçus ne contient aucun script, mais ne pas y compter pour un contenu saisi par un tiers.
+- **e2e qui modifient la base par SQL.** Un test de bout en bout qui écrit dans `strapi_e2e` par SQL (`docker exec jib-postgres psql …`, ou par l'API d'un organisateur) pour fabriquer un état (fenêtre fermée, demande en attente, champ vidé) doit restaurer l'état initial à la fin, même en échec (`finally` ou `afterEach`) : les autres fichiers de la suite partagent la base et ne doivent pas dépendre de l'ordre d'exécution.
 
 ## Architecture de l'espace
 
