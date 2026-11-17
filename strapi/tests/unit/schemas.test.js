@@ -23,6 +23,7 @@ const frozen = require('../fixtures/existing-schemas.json');
 const API_DIR = path.resolve(__dirname, '../../src/api');
 const STRUCTURAL = new Set(['relation', 'media', 'component', 'dynamiczone']);
 const EDITION_FIELDS = [
+  'welcomeStartedAt',
   'participantSpaceEnabled',
   'helloassoOrgSlug',
   'helloassoFormType',

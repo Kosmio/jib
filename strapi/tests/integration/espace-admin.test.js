@@ -364,9 +364,9 @@ describe('routes organisateur (lots 2, 4 et 5)', { timeout: 600_000 }, () => {
       assert.equal(afterFirst.length, first.json.created);
       await sleep(800);
       const logsAfterFirst = await app.db.query(UID.emailLog).findMany({ where: { template: 'welcome', attendee: { edition: { documentId: edition.documentId } } } });
-      assert.equal(logsAfterFirst.length, first.json.created, 'un welcome par Attendee créé');
+      assert.equal(logsAfterFirst.length, 0, 'V1-C, R-85 : aucun welcome tant que welcomeStartedAt est vide');
       const welcomeMails = () => outbox().slice(since).filter((mail) => /espace participant est prêt/.test(mail.subject));
-      assert.equal(welcomeMails().length, first.json.created, 'un welcome par Attendee créé dans la boîte de sortie');
+      assert.equal(welcomeMails().length, 0, 'aucun welcome dans la boîte de sortie');
       const tokensAfterFirst = fake.stats().tokenRequests;
 
       // 2. Seconde synchronisation, plus d'une seconde après : le jeton mis en cache a expiré.
@@ -384,7 +384,7 @@ describe('routes organisateur (lots 2, 4 et 5)', { timeout: 600_000 }, () => {
       assert.ok(runs.every((run) => run.endedAt), '2 SyncRun clos');
       await sleep(500);
       assert.equal((await app.db.query(UID.emailLog).findMany({ where: { template: 'welcome', attendee: { edition: { documentId: edition.documentId } } } })).length, logsAfterFirst.length, 'aucun welcome de plus');
-      assert.equal(welcomeMails().length, first.json.created, 'aucun welcome de plus dans la boîte de sortie');
+      assert.equal(welcomeMails().length, 0, 'aucun welcome de plus dans la boîte de sortie');
       assert.ok(fake.stats().tokenRequests > tokensAfterFirst, 'jeton renouvelé après expiration (I-10)');
 
       // 3. T-06 : deux Attendee annulés côté HelloAsso (Canceled et paiement Refunded), avec rendez-vous et session ouverte.

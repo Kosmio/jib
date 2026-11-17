@@ -5,7 +5,7 @@ import { ESPACE, expect, hydrated, openSpace, readOutbox, test, watchConsole } f
 
 /**
  * Pilotage de l'édition, lot V1-C (A-39, F-105, R-85, F-106) : carte « État du service » en tête, carte « E-mail de bienvenue »,
- * cartes existantes inchangées après la découpe en composants (critère 7). Tests d'abord : `test.fixme` jusqu'à la livraison du lot.
+ * cartes existantes inchangées après la découpe en composants (critère 7).
  *
  * Données : le seed pose un EmailLog `welcome` à chaque inscrit. Pour avoir des inscrits jamais invités, le test supprime ces lignes
  * pour trois participants de la base e2e (`psql` dans le conteneur jib-postgres), à l'état de départ de chaque test qui en a besoin.
@@ -51,7 +51,7 @@ test.describe('pilotage : ouverture contrôlée et état du service (V1-C)', () 
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Pilotage de l’édition');
   }
 
-  test.fixme('critère 7 : les cartes existantes sont toujours là après la découpe, et « État du service » ouvre la page (A-39, F-106)', async ({ page, baseURL }) => {
+  test('critère 7 : les cartes existantes sont toujours là après la découpe, et « État du service » ouvre la page (A-39, F-106)', async ({ page, baseURL }) => {
     const consoleWatch = watchConsole(page);
     await openPilotage(page, baseURL);
 
@@ -66,15 +66,16 @@ test.describe('pilotage : ouverture contrôlée et état du service (V1-C)', () 
     consoleWatch.expectClean();
   });
 
-  test.fixme('F-106 : la carte « État du service » d’une recette bien réglée ne montre aucune ligne rouge (fournisseur console, expéditeur et HelloAsso réglés)', async ({ page, baseURL }) => {
+  test('F-106 : la carte « État du service » d’une recette bien réglée ne montre aucune anomalie d’e-mail ni de HelloAsso (fournisseur console, expéditeur et HelloAsso réglés)', async ({ page, baseURL }) => {
     await openPilotage(page, baseURL);
     const card = page.getByRole('region', { name: 'État du service' }).or(page.locator('section, div').filter({ has: page.getByRole('heading', { level: 2, name: 'État du service' }) }).last());
     await expect(card).toBeVisible();
-    await expect(card.getByRole('alert')).toHaveCount(0);
-    await expect(card).toContainText('console');
+    await expect(card.getByRole('listitem').filter({ hasText: /expéditeur|e-mail|HelloAsso/i })).toHaveCount(0);
+    await expect(card).toContainText('Espace participant ouvert');
+    await expect(card).not.toContainText(/expédition|HelloAsso n’est pas|échec/i);
   });
 
-  test.fixme('F-105 : l’aperçu, le bouton « Envoyer à 3 inscrits », la confirmation qui répète 3, puis le résultat (R-85)', async ({ page, baseURL }) => {
+  test('F-105 : l’aperçu, le bouton « Envoyer à 3 inscrits », la confirmation qui répète 3, puis le résultat (R-85)', async ({ page, baseURL }) => {
     test.skip(parisHour() < 8 || parisHour() >= 20, 'envoi réel : hors de 8h à 20h (Paris), le serveur le refuse (409)');
     forgetWelcomes();
     const consoleWatch = watchConsole(page);
@@ -105,7 +106,7 @@ test.describe('pilotage : ouverture contrôlée et état du service (V1-C)', () 
     consoleWatch.expectClean();
   });
 
-  test.fixme('F-105 : hors de la plage d’envoi, le message du serveur (409 OUTSIDE_SENDING_HOURS) s’affiche et rien ne part', async ({ page, baseURL }) => {
+  test('F-105 : hors de la plage d’envoi, le message du serveur (409 OUTSIDE_SENDING_HOURS) s’affiche et rien ne part', async ({ page, baseURL }) => {
     forgetWelcomes();
     await openPilotage(page, baseURL);
     await page.route('**/api/espace/admin/*/welcome/send', (route) =>
@@ -124,19 +125,19 @@ test.describe('pilotage : ouverture contrôlée et état du service (V1-C)', () 
     await expect(card.getByRole('button', { name: /Envoyer à 3 inscrits/ })).toBeEnabled();
   });
 
-  test.fixme('F-106 : une ligne rouge dit ce qu’il faut faire quand le service signale une anomalie (expéditeur absent)', async ({ page, baseURL }) => {
+  test('F-106 : une ligne rouge dit ce qu’il faut faire quand le service signale une anomalie (expéditeur absent)', async ({ page, baseURL }) => {
     await openPilotage(page, baseURL);
     await page.unroute('**/api/espace/admin/*/service').catch(() => undefined);
     await page.route('**/api/espace/admin/*/service', async (route) => {
       const response = await route.fetch();
       const body = await response.json();
-      body.mail = { ...body.mail, senderConfigured: false };
+      body.mail = { ...body.mail, provider: 'brevo', senderConfigured: false };
       await route.fulfill({ response, json: body });
     });
     await page.reload();
     await hydrated(page);
     const card = page.locator('section, div').filter({ has: page.getByRole('heading', { level: 2, name: 'État du service' }) }).last();
-    await expect(card.getByRole('alert').first()).toContainText(/expéditeur/i);
+    await expect(card.getByRole('listitem').filter({ hasText: /expédition/i })).toContainText(/EMAIL_FROM/);
   });
 });
 

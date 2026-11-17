@@ -2,7 +2,7 @@
 
 /**
  * Ouverture contrôlée et état du service, lot V1-C (docs/espace/specs/14-lots-finalisation.md) : F-105, R-85, NF-62, F-106.
- * Tests d'abord : chaque groupe porte `pending('V1-C')`, à retirer à la livraison du lot.
+ * Livré et actif.
  *
  * Routes (organisateur de l'édition, 403 sinon) :
  *   POST /api/espace/admin/:edition/welcome/preview  -> { recipients, sampleHtml }
@@ -25,7 +25,6 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 
 const defaultItems = require('../../scripts/espace/fixtures/helloasso-items.json');
-const { pending } = require('../helpers/pending');
 const { sleep, useEspace } = require('../helpers/espace');
 const { UID, createAttendee, createEdition, link } = require('../helpers/espace-data');
 
@@ -68,7 +67,7 @@ async function withBrokenOutbox(espace, action) {
   }
 }
 
-describe('ouverture contrôlée : e-mail de bienvenue et état du service (V1-C : F-105, R-85, NF-62, F-106)', pending('V1-C', { timeout: 600_000 }), () => {
+describe('ouverture contrôlée : e-mail de bienvenue et état du service (V1-C : F-105, R-85, NF-62, F-106)', { timeout: 600_000 }, () => {
   const espace = useEspace({ fake: true });
   let counter = 0;
 
@@ -381,7 +380,7 @@ describe('ouverture contrôlée : e-mail de bienvenue et état du service (V1-C 
   });
 });
 
-describe('critère 5 (F-106, NF-62) : expéditeur absent', pending('V1-C', { timeout: 300_000 }), () => {
+describe('critère 5 (F-106, NF-62) : expéditeur absent', { timeout: 300_000 }, () => {
   const espace = useEspace({ fake: true, overrides: { EMAIL_FROM: '' } });
 
   it('service.mail.senderConfigured vaut false ; un envoi en échec renseigne EmailLog.error et apparaît dans service.mail', async () => {

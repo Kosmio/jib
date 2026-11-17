@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Lot V1-C (F-105, R-85, NF-62, F-106), ce qui ne demande pas Strapi. Tests d'abord : `pending('V1-C')`.
+ * Lot V1-C (F-105, R-85, NF-62, F-106), ce qui ne demande pas Strapi.
  *   - schémas : `welcomeStartedAt` (date et heure, privé) sur l'édition, `error` (texte) sur EmailLog ;
  *   - `services/mailer.js` : un envoi en échec écrit `error` (première ligne, 300 caractères au plus), un envoi réussi non ;
  *   - fichiers livrés : services, contrôleurs et routes du lot.
@@ -14,13 +14,12 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const { pending } = require('../helpers/pending');
 
 const API = path.resolve(__dirname, '../../src/api');
 const ESPACE = path.join(API, 'espace');
 const readJson = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
 
-describe('V1-C : schémas', pending('V1-C'), () => {
+describe('V1-C : schémas', () => {
   it('l’édition a un champ welcomeStartedAt de type datetime, privé', () => {
     const field = readJson(path.join(API, 'edition/content-types/edition/schema.json')).attributes.welcomeStartedAt;
     assert.equal(field?.type, 'datetime');
@@ -35,7 +34,7 @@ describe('V1-C : schémas', pending('V1-C'), () => {
   });
 });
 
-describe('V1-C : fichiers du lot', pending('V1-C'), () => {
+describe('V1-C : fichiers du lot', () => {
   for (const file of ['services/welcome.js', 'services/service-status.js', 'controllers/welcome.js', 'controllers/service-status.js', 'routes/welcome.js']) {
     it(`src/api/espace/${file} existe`, () => {
       assert.ok(fs.existsSync(path.join(ESPACE, file)));
@@ -54,7 +53,7 @@ describe('V1-C : fichiers du lot', pending('V1-C'), () => {
   });
 });
 
-describe('V1-C : NF-62, services/mailer.js écrit EmailLog.error', pending('V1-C'), () => {
+describe('V1-C : NF-62, services/mailer.js écrit EmailLog.error', () => {
   let directory;
   let created;
 

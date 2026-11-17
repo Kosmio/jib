@@ -64,6 +64,12 @@ describe('synchronisation d’une base fraîchement seedée (4.4, critère 1 du 
     assert.equal(await welcomeLogs(), logsBefore);
   });
 
+  it('V1-C, R-85 : welcomeStartedAt reste vide après le seed et la synchronisation, donc aucun welcome automatique à l’ouverture', async () => {
+    await run();
+    const published = await edition();
+    assert.equal(published.welcomeStartedAt ?? null, null);
+  });
+
   it('ne touche à aucun Attendee : 17 en tout, Lucas Darrigade toujours cancelled, les 16 autres actifs', async () => {
     await run();
     const attendees = await espace().app.documents(UID.attendee).findMany({ filters: { edition: { slug: SLUG } }, limit: 100 });

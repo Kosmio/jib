@@ -347,15 +347,18 @@ describe('synchronisation HelloAsso contre le faux (lot 4)', { timeout: 300_000 
     });
   });
 
-  describe('A-17 : e-mail welcome', () => {
+  describe('A-17, R-85 : e-mail welcome, une fois le premier envoi fait (welcomeStartedAt posé), entre 8h et 20h', () => {
+    // V1-C : les welcome ne partent qu'après le premier envoi, posé ici d'avance, et entre 8h et 20h (Paris).
+    const AT_14H = { now: new Date('2026-11-18T13:00:00.000Z') };
+    const newStarted = (options = {}) => newEdition({ ...options, settings: { welcomeStartedAt: '2026-11-17T10:00:00.000Z' } });
     const welcomeMails = (edition, attendees, since) => espace().outbox().slice(since).filter((mail) => attendees.some((attendee) => attendee.email === mail.to.email) && /\/espace\/verifier/.test(mail.text));
 
     it('part une fois vers chaque Attendee créé quand l’espace est ouvert, avec un lien de 72 heures vers l’accueil de l’édition', async () => {
       useItems(defaultItems);
-      const edition = await newEdition();
+      const edition = await newStarted();
       const since = espace().outbox().length;
-      const t0 = Date.now();
-      await run(edition);
+      const t0 = AT_14H.now.getTime();
+      await run(edition, AT_14H);
       const attendees = await attendeesOf(edition);
       await sleep(500);
       const mails = welcomeMails(edition, attendees, since);
@@ -377,14 +380,14 @@ describe('synchronisation HelloAsso contre le faux (lot 4)', { timeout: 300_000 
 
     it('ne part pas deux fois : la seconde synchronisation n’envoie rien de plus (EmailLog et boîte de sortie)', async () => {
       useItems(defaultItems);
-      const edition = await newEdition();
+      const edition = await newStarted();
       const since = espace().outbox().length;
-      await run(edition);
+      await run(edition, AT_14H);
       await sleep(500);
       const attendees = await attendeesOf(edition);
       const sent = welcomeMails(edition, attendees, since).length;
       assert.equal(sent, 16);
-      await run(edition);
+      await run(edition, AT_14H);
       await sleep(500);
       assert.equal(welcomeMails(edition, attendees, since).length, sent);
       assert.equal((await logsOf(edition, 'welcome')).length, 16);
@@ -393,16 +396,16 @@ describe('synchronisation HelloAsso contre le faux (lot 4)', { timeout: 300_000 
     it('ne part pas quand l’espace est fermé, mais part à la première synchronisation après l’ouverture', async () => {
       useItems(defaultItems);
       const { app } = espace();
-      const edition = await newEdition({ enabled: false });
+      const edition = await newStarted({ enabled: false });
       const since = espace().outbox().length;
-      await run(edition);
+      await run(edition, AT_14H);
       await sleep(500);
       assert.deepEqual(welcomeMails(edition, await attendeesOf(edition), since), [], 'e-mail envoyé alors que l’espace est fermé');
       assert.equal((await logsOf(edition, 'welcome')).length, 0);
 
       await app.documents(UID.edition).update({ documentId: edition.documentId, data: { participantSpaceEnabled: true } });
       await app.documents(UID.edition).publish({ documentId: edition.documentId });
-      const reopened = await run(edition);
+      const reopened = await run(edition, AT_14H);
       assert.deepEqual(counts(reopened), [0, 0, 0]);
       await sleep(500);
       assert.equal((await logsOf(edition, 'welcome')).length, 16);
@@ -411,11 +414,11 @@ describe('synchronisation HelloAsso contre le faux (lot 4)', { timeout: 300_000 
     it('ne part pas vers un organisateur ni vers un Attendee annulé', async () => {
       useItems(defaultItems);
       const { app } = espace();
-      const edition = await newEdition();
+      const edition = await newStarted();
       const organizer = await createAttendee(app, edition, { email: 'responsable.xylofutur@example.org', role: 'organizer' });
       const cancelled = await createAttendee(app, edition, { email: 'ancien.inscrit@example.org', status: 'cancelled' });
       const since = espace().outbox().length;
-      await run(edition);
+      await run(edition, AT_14H);
       await sleep(500);
       assert.deepEqual(welcomeMails(edition, [organizer, cancelled], since), []);
       assert.equal((await logsOf(edition, 'welcome')).filter((log) => [organizer.email, cancelled.email].includes(log.attendee.email)).length, 0);
@@ -424,31 +427,41 @@ describe('synchronisation HelloAsso contre le faux (lot 4)', { timeout: 300_000 
     it('ne renvoie rien à qui a déjà un EmailLog welcome au statut sent (seed, synchronisation antérieure)', async () => {
       useItems(defaultItems);
       const { app } = espace();
-      const edition = await newEdition();
+      const edition = await newStarted();
       const known = await createAttendee(app, edition, { email: 'lea.ducasse@example.org', helloassoItemId: '100001', firstName: 'Léa', lastName: 'Ducasse' });
       await app.documents(UID.emailLog).create({ data: { attendee: link(known), template: 'welcome', status: 'sent', sentAt: new Date().toISOString(), scenarioKey: 'welcome' } });
       const since = espace().outbox().length;
-      await run(edition);
+      await run(edition, AT_14H);
       await sleep(500);
       assert.deepEqual(welcomeMails(edition, [known], since), []);
     });
 
     it('un envoi en échec est retenté à la synchronisation suivante', async () => {
       useItems(defaultItems);
-      const edition = await newEdition();
+      const edition = await newStarted();
       const outbox = espace().outboxFile;
       fs.rmSync(outbox, { force: true });
       fs.mkdirSync(outbox, { recursive: true }); // le fournisseur console ne peut plus écrire : tous les envois échouent
       try {
-        await run(edition);
+        await run(edition, AT_14H);
         await sleep(500);
         assert.equal((await logsOf(edition, 'welcome')).filter((log) => log.status === 'sent').length, 0);
       } finally {
         fs.rmSync(outbox, { recursive: true, force: true });
       }
-      await run(edition);
+      await run(edition, AT_14H);
       await sleep(500);
       assert.equal((await logsOf(edition, 'welcome')).filter((log) => log.status === 'sent').length, 16);
+    });
+
+    it('sans welcomeStartedAt, la synchronisation n’envoie aucun welcome et n’en journalise aucun (R-85)', async () => {
+      useItems(defaultItems);
+      const edition = await newEdition();
+      const since = espace().outbox().length;
+      await run(edition, AT_14H);
+      await sleep(500);
+      assert.deepEqual(welcomeMails(edition, await attendeesOf(edition), since), []);
+      assert.equal((await logsOf(edition, 'welcome')).length, 0);
     });
   });
 
