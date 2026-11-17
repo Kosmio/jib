@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Garde-fous de l'administration (V1-D, tests d'abord) : NF-63 à NF-67 par le Document Service, la base et l'API d'admin.
+ * Garde-fous de l'administration (V1-D, tests d'abord, activés) : NF-63 à NF-67 par le Document Service, la base et l'API d'admin.
  *   - NF-63 : suppression ou dépublication refusées (participant, exposant, créneau porteurs d'un rendez-vous `pending` ou
  *     `accepted`, séquence `b2b_break` dont un créneau en porte un, édition ayant des participants), message en français ;
  *   - NF-64 : fenêtre de demandes, tablesCount, slotDurationMinutes à l'enregistrement d'une édition ;
@@ -9,7 +9,7 @@
  *   - NF-66 : types masqués du gestionnaire de contenu, champs de l'attendee non modifiables ;
  *   - NF-67 : GET /meetings répond 200 quand un rendez-vous a perdu son demandeur, sa cible ou son créneau.
  *
- * Tous les groupes portent pending('V1-D') : le tester retire le marqueur quand le lot est livré. Données fictives (@example.org).
+ * Marqueurs pending retirés à la livraison du lot. Données fictives (@example.org).
  */
 
 const { describe, it } = require('node:test');
@@ -19,7 +19,6 @@ const { queryDatabase } = require('../helpers/database');
 const { testDatabaseName } = require('../helpers/env');
 const { useEspace } = require('../helpers/espace');
 const { UID, createAttendee, createEdition, createProgram, link } = require('../helpers/espace-data');
-const { pending } = require('../helpers/pending');
 
 const DATABASE = testDatabaseName();
 const sql = (text, params) => queryDatabase(DATABASE, text, params).then((result) => result.rows);
@@ -58,7 +57,7 @@ describe('garde-fous de l’administration (V1-D)', { timeout: 300_000 }, () => 
   const pair = (edition) => Promise.all([1, 2].map(() => createAttendee(espace().app, edition, { meetingsOptIn: true })));
   const exists = async (uid, documentId) => Boolean(await espace().app.documents(uid).findOne({ documentId }));
 
-  describe('NF-63 : suppression et dépublication', pending('V1-D'), () => {
+  describe('NF-63 : suppression et dépublication', () => {
     for (const status of ['pending', 'accepted']) {
       it(`refuse de supprimer un participant porteur d’un rendez-vous ${status}, message en français, données intactes`, async () => {
         const { app } = espace();
@@ -155,7 +154,7 @@ describe('garde-fous de l’administration (V1-D)', { timeout: 300_000 }, () => 
     });
   });
 
-  describe('NF-64 : enregistrement d’une édition', pending('V1-D'), () => {
+  describe('NF-64 : enregistrement d’une édition', () => {
     const save = (edition, data) => espace().app.documents(UID.edition).update({ documentId: edition.documentId, data });
     const PAST = '2020-01-01T10:00:00.000Z';
 
@@ -208,12 +207,12 @@ describe('garde-fous de l’administration (V1-D)', { timeout: 300_000 }, () => 
     });
   });
 
-  describe('NF-65 : slug d’une édition', pending('V1-D'), () => {
+  describe('NF-65 : slug d’une édition', () => {
     it('critère 3 : refuse de changer le slug d’une édition qui a un participant', async () => {
       const { app } = espace();
       const edition = await newEdition();
       await createAttendee(app, edition);
-      await assert.rejects(app.documents(UID.edition).update({ documentId: edition.documentId, data: { slug: `${edition.slug}-bis` } }), /slug|adresse/i);
+      await assert.rejects(app.documents(UID.edition).update({ documentId: edition.documentId, data: { slug: `${edition.slug}-bis` } }), /identifiant URL/);
       const after = await app.documents(UID.edition).findOne({ documentId: edition.documentId });
       assert.equal(after.slug, edition.slug);
     });
@@ -234,15 +233,25 @@ describe('garde-fous de l’administration (V1-D)', { timeout: 300_000 }, () => 
     });
   });
 
-  describe('NF-66 : gestionnaire de contenu', pending('V1-D'), () => {
-    /** Jeton d'un super-admin créé dans la base de test, pour interroger /content-manager comme l'interface d'admin. */
+  describe('NF-66 : gestionnaire de contenu', () => {
+    /** Super-admin créé dans la base de test, connecté par /admin/login : interroge /content-manager comme l'interface d'admin. */
+    let jwt;
     async function adminGet(path) {
       const { app, baseUrl } = espace();
-      const roles = await app.db.query('admin::role').findMany({ where: { code: 'strapi-super-admin' } });
-      const user = await app.db.query('admin::user').create({
-        data: { email: `admin.gardes@example.org`, firstname: 'Admin', lastname: 'Fictif', isActive: true, roles: roles.map((role) => role.id) },
-      }).catch(async () => app.db.query('admin::user').findOne({ where: { email: 'admin.gardes@example.org' } }));
-      const jwt = app.service('admin::token').createJwtToken(user);
+      if (!jwt) {
+        const role = await app.db.query('admin::role').findOne({ where: { code: 'strapi-super-admin' } });
+        await app.service('admin::user').create({
+          email: 'admin.gardes@example.org', firstname: 'Admin', lastname: 'Fictif', password: 'Gardes-Fictif-2026!', isActive: true, roles: [role.id],
+        });
+        const login = await fetch(`${baseUrl}/admin/login`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ email: 'admin.gardes@example.org', password: 'Gardes-Fictif-2026!' }),
+        });
+        const loginText = await login.text();
+        assert.equal(login.status, 200, loginText);
+        jwt = JSON.parse(loginText).data.token;
+      }
       const response = await fetch(`${baseUrl}${path}`, { headers: { authorization: `Bearer ${jwt}` } });
       return { status: response.status, json: await response.json().catch(() => undefined) };
     }
@@ -250,9 +259,10 @@ describe('garde-fous de l’administration (V1-D)', { timeout: 300_000 }, () => 
     it('critère 5 : l’API d’admin ne liste plus message, conversation, magic-token ni slot, et garde email-log et sync-run', async () => {
       const { status, json } = await adminGet('/content-manager/content-types');
       assert.equal(status, 200);
-      const uids = json.data.map((type) => type.uid);
-      for (const uid of HIDDEN_TYPES) assert.ok(!uids.includes(uid), `${uid} encore listé`);
-      for (const uid of VISIBLE_TYPES) assert.ok(uids.includes(uid), `${uid} disparu`);
+      // L'API renvoie tous les types ; le gestionnaire de contenu n'affiche que ceux dont `isDisplayed` est vrai (pluginOptions visible).
+      const displayed = new Set(json.data.filter((type) => type.isDisplayed).map((type) => type.uid));
+      for (const uid of HIDDEN_TYPES) assert.ok(!displayed.has(uid), `${uid} encore affiché`);
+      for (const uid of VISIBLE_TYPES) assert.ok(displayed.has(uid), `${uid} masqué`);
     });
 
     it('les schémas portent pluginOptions content-manager visible = false pour les quatre types', () => {
@@ -268,7 +278,7 @@ describe('garde-fous de l’administration (V1-D)', { timeout: 300_000 }, () => 
     });
   });
 
-  describe('NF-67 : rendez-vous aux parties disparues', pending('V1-D'), () => {
+  describe('NF-67 : rendez-vous aux parties disparues', () => {
     const signedIn = async (edition, viewer) => espace().signIn(edition.slug, viewer.email);
     const list = (cookie) => espace().request('/api/espace/meetings', { cookie });
 
@@ -335,7 +345,7 @@ describe('garde-fous de l’administration (V1-D)', { timeout: 300_000 }, () => 
       } finally {
         app.log.warn = original;
       }
-      assert.equal(logged.filter((line) => /rendez-vous/i.test(line)).length, 1, logged.join('\n'));
+      assert.equal(logged.filter((line) => /ignored/i.test(line)).length, 1, logged.join('\n'));
     });
   });
 });
