@@ -30,12 +30,18 @@ export const MESSAGE_COUNTER_FROM = 1800;
 /** Délai d'interrogation d'un fil ouvert (F-71, A-37). */
 export const POLL_INTERVAL_MS = 20_000;
 
+/** Délai de rechargement de la liste des conversations (F-133), le même que celui des badges (F-132). */
+export const LIST_POLL_INTERVAL_MS = 60_000;
+
 /** Cible d'une nouvelle conversation, `p:{documentId}` (A-37) : l'identifiant du paramètre `avec`, ou null s'il est mal formé. */
 export function parseTarget(text: string | null): string | null {
   return text && /^p:[A-Za-z0-9_-]+$/.test(text) ? text : null;
 }
 
 const enc = encodeURIComponent;
+
+/** GET /conversations : la liste de l'écran E7, dernier message d'abord. */
+export const getConversations = (baseUrl: string) => request<ConversationSummary[]>(baseUrl, "/conversations", "GET");
 
 /** Le fil entier à chaque interrogation : « Lu » se met à jour sur des messages anciens, qu'un `after=` ne renverrait pas. */
 export const getThread = (baseUrl: string, conversationId: string) =>

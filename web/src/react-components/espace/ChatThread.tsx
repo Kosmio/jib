@@ -91,6 +91,7 @@ export default function ChatThread({
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [offline, setOffline] = useState(false);
   const inFlight = useRef(false);
   const stickToBottom = useRef(true);
   const field = useRef<HTMLTextAreaElement>(null);
@@ -113,9 +114,11 @@ export default function ChatThread({
       setMessages(thread.messages);
       setMeeting(thread.conversation.meeting);
       setGetsEmail(thread.conversation.counterpartGetsEmail);
+      setOffline(false);
     } catch (failure) {
       if (failure instanceof EspaceApiError && failure.status === 401) window.location.assign(loginUrl);
-      // Autre échec : le fil affiché reste valable, la prochaine interrogation réessaie.
+      // Autre échec : le fil affiché reste valable, la prochaine interrogation réessaie ; la ligne « Hors connexion » le dit.
+      else setOffline(true);
     } finally {
       inFlight.current = false;
     }
@@ -293,6 +296,11 @@ export default function ChatThread({
               {error}
             </p>
           )}
+          {offline && (
+            <p role="status" className="mb-3 text-sm font-semibold text-ink">
+              Hors connexion, nouvelle tentative…
+            </p>
+          )}
           {getsEmail && (
             <p className="mb-3 flex items-center gap-2 text-sm text-muted">
               <Icon name="mail" />
@@ -311,7 +319,7 @@ export default function ChatThread({
               maxLength={MESSAGE_MAX_LENGTH}
               value={draft}
               placeholder="Écrire un message"
-              aria-describedby={length > MESSAGE_COUNTER_FROM ? "message-compteur" : undefined}
+              aria-describedby={length > MESSAGE_COUNTER_FROM ? "message-aide message-compteur" : "message-aide"}
               onChange={(event) => {
                 setDraft(event.target.value);
                 resize();
@@ -332,6 +340,9 @@ export default function ChatThread({
               <span className="sr-only">{sending ? "Envoi en cours" : "Envoyer"}</span>
             </button>
           </div>
+          <p id="message-aide" className="mt-2 text-sm text-muted">
+            Ctrl ou Cmd + Entrée pour envoyer
+          </p>
           {length > MESSAGE_COUNTER_FROM && (
             <p
               id="message-compteur"

@@ -4,8 +4,8 @@ const { EspaceError } = require('./errors');
 
 const MINUTE_MS = 60 * 1000;
 
-// R-62: an e-mail goes out for a message still unread 5 minutes after it was sent, at most one per conversation and recipient every 30 minutes.
-const UNREAD_DELAY_MS = 5 * MINUTE_MS;
+// R-62, R-88: an e-mail goes out for a message still unread 2 minutes after it was sent, at most one per conversation and recipient every 30 minutes.
+const UNREAD_DELAY_MS = 2 * MINUTE_MS;
 const QUIET_DELAY_MS = 30 * MINUTE_MS;
 // R-64: 30 messages per hour and per author.
 const MESSAGE_LIMIT = 30;
@@ -32,7 +32,7 @@ const pairKey = (conversationId, recipientId) => `${conversationId}:${recipientI
  *    `recipientId` is the participant who is not the author.
  *  - `notifiedAt`: Map (or object) `"{conversationId}:{recipientId}"` -> instant of the last e-mail for that pair.
  *  - `prefs`: Map (or object) `recipientId` -> `emailPrefs` ({ messages }) ; an unknown recipient wants the e-mails.
- * A message is due when it is unread for 5 minutes and was never notified. A pair that got an e-mail within 30 minutes waits ;
+ * A message is due when it is unread for 2 minutes and was never notified. A pair that got an e-mail within 30 minutes waits ;
  * its messages stay due and are taken by a later run. -> `[{ conversationId, recipientId, messageIds }]`, messageIds oldest first.
  */
 function notificationsDue({ messages, notifiedAt = new Map(), prefs = new Map(), now = new Date() }) {

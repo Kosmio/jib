@@ -19,9 +19,11 @@ export interface Props {
   me: Me | null;
   /** F-130 : couleur de l'édition, déjà lue par la page (`edition.themeColor`), relayée à EspaceLayout pour la balise theme-color. */
   themeColor?: string | null;
+  /** V3-C : date de l'événement (`edition.date`), relayée à EspaceLayout pour l'expiration des copies hors connexion. */
+  eventDate?: string | null;
 }
 
-const { title, active, editionSlug, me, themeColor = null } = Astro.props;
+const { title, active, editionSlug, me, themeColor = null, eventDate = null } = Astro.props;
 const base = `/espace/${encodeURIComponent(editionSlug)}`;
 
 // Icônes en trait (stroke 2 px) en SVG en ligne, décoratives : le libellé voisin porte le sens.
@@ -36,13 +38,14 @@ const ICONS: Record<string, string> = {
   organizer: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />',
 };
 
-const tabs: { id: ShellTab; label: string; href: string; count?: number; countLabel?: (n: number) => string }[] = [
+const tabs: { id: ShellTab; label: string; href: string; count?: number; live?: string; countLabel?: (n: number) => string }[] = [
   { id: "home", label: "Accueil", href: `${base}/` },
   { id: "directory", label: "Annuaire", href: `${base}/annuaire` },
   {
     id: "agenda",
     label: "Agenda",
     href: `${base}/agenda`,
+    live: "pendingReceived",
     count: me?.counts?.pendingReceived,
     countLabel: (n) => `${n} ${n > 1 ? "demandes reçues en attente" : "demande reçue en attente"}`,
   },
@@ -50,6 +53,7 @@ const tabs: { id: ShellTab; label: string; href: string; count?: number; countLa
     id: "messages",
     label: "Messages",
     href: `${base}/messages`,
+    live: "unreadMessages",
     count: me?.counts?.unreadMessages,
     countLabel: (n) => `${n} ${n > 1 ? "messages non lus" : "message non lu"}`,
   },
@@ -66,14 +70,17 @@ const linkClass = (id: ShellTab) =>
   `${linkBase} ${id === active ? "border-primary text-primary-ink lg:bg-surface" : "border-transparent text-muted hover:text-title lg:hover:bg-surface"}`;
 ---
 
-<EspaceLayout title={title} shell={me !== null} themeColor={themeColor}>
+<EspaceLayout title={title} shell={me !== null} themeColor={themeColor} eventDate={eventDate}>
   {
     me && (
       <nav
         slot="nav"
         aria-label="Espace participant"
+        data-live-nav
+        data-strapi-url={publicStrapiUrl}
         class="fixed inset-x-0 bottom-0 z-40 border-t border-surface-alt bg-white lg:inset-y-0 lg:right-auto lg:flex lg:w-64 lg:flex-col lg:justify-between lg:border-t-0 lg:border-r lg:p-4"
       >
+        <p class="sr-only" role="status" aria-live="polite" aria-atomic="true" data-live-announce></p>
         <div class="lg:flex lg:flex-col lg:gap-6">
           <img
             src="/assets/logo-jib.svg"
@@ -98,18 +105,24 @@ const linkClass = (id: ShellTab) =>
                       stroke-linejoin="round"
                       set:html={ICONS[tab.id]}
                     />
-                    {tab.count ? (
+                    {tab.countLabel && (
                       <span
                         aria-hidden="true"
-                        class="absolute -top-2 -right-3 flex h-5 min-w-5 items-center justify-center rounded-full bg-gold px-1 text-xs font-bold text-gold-ink"
+                        data-live-badge={tab.live}
+                        data-count={tab.count ?? 0}
+                        class={`${tab.count ? "flex" : "hidden"} absolute -top-2 -right-3 h-5 min-w-5 items-center justify-center rounded-full bg-gold px-1 text-xs font-bold text-gold-ink`}
                       >
-                        {tab.count > 99 ? "99+" : tab.count}
+                        {(tab.count ?? 0) > 99 ? "99+" : tab.count}
                       </span>
-                    ) : null}
+                    )}
                   </span>
                   {/* Sous 360 px, une colonne fait moins de 72 px : « Programme » en 14 px déborderait de l'écran. */}
                   <span class={organizerInBar ? "max-lg:text-xs" : "max-xs:text-xs"}>{tab.label}</span>
-                  {tab.count && tab.countLabel ? <span class="sr-only">, {tab.countLabel(tab.count)}</span> : null}
+                  {tab.countLabel && (
+                    <span class="sr-only" data-live-sr={tab.live}>
+                      {tab.count ? `, ${tab.countLabel(tab.count)}` : ""}
+                    </span>
+                  )}
                 </a>
               </li>
             ))}
@@ -186,3 +199,9 @@ const linkClass = (id: ShellTab) =>
   }
   <slot />
 </EspaceLayout>
+
+<script>
+  // F-132 : badges mis à jour toutes les 60 s onglet visible (module sans React, voir LiveBadges.tsx).
+  import { initLiveBadges } from "../../react-components/espace/LiveBadges";
+  initLiveBadges();
+</script>
