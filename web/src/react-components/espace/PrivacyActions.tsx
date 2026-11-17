@@ -78,7 +78,7 @@ export default function PrivacyActions({ strapiUrl, editionSlug }: Props) {
         Mes données
       </h2>
       <p className="mt-2 text-muted">Téléchargez une copie de vos données, ou supprimez-les définitivement.</p>
-      <div className="mt-4 flex flex-wrap gap-3">
+      <div data-permis-lecture-seule className="mt-4 flex flex-wrap gap-3">
         <button type="button" onClick={exportData} disabled={busy} className={buttonClass}>
           Télécharger mes données
         </button>
@@ -96,8 +96,8 @@ export default function PrivacyActions({ strapiUrl, editionSlug }: Props) {
       </div>
 
       {confirming && (
-        <div role="alertdialog" aria-labelledby="suppression-titre" aria-describedby="suppression-texte" className="mt-4 rounded-lg border-2 border-danger bg-white p-4">
-          <p id="suppression-titre" className="font-semibold">
+        <div data-permis-lecture-seule role="alertdialog" aria-labelledby="suppression-titre" aria-describedby="suppression-texte" className="mt-4 rounded-lg border-2 border-danger bg-white p-4">
+          <p id="suppression-titre" role="heading" aria-level={3} className="font-semibold">
             Supprimer mes données ?
           </p>
           <ul id="suppression-texte" className="mt-2 list-disc space-y-1 pl-6 text-muted">
