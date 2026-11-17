@@ -443,9 +443,32 @@ V1-D (gardes) ──> V3-F
 
 **Tests** bout en bout `espace-jour-j.spec.ts`.
 
-## V4-D. Badges (conditionnel, D-13)
+## V4-D. Badges (D-13 tranché le 17 novembre : réalisés)
 
-Périmètre, exigences et critères : `12-badges.md` en entier (F-95 à F-99, R-80 à R-84, I-43, NF-54 à NF-57, T-60 à T-69). **Effort** L, deux à trois jours. Le superviseur découpe en deux lots sans fichier commun : génération (PDF, QR, routes `cards`) et intégration au pilotage (`R/organizer/BadgesCard.tsx`). Préalable : réponses aux quatre questions ouvertes de `12-badges.md` et choix des bibliothèques, validé par le superviseur avant toute installation.
+Périmètre, exigences et critères : `12-badges.md` en entier (F-95 à F-99, R-80 à R-84, I-43, NF-54 à NF-57, T-60 à T-69). **Effort** L, deux à trois jours. Deux lots sans fichier commun, V4-D2 s'intègre après V4-D1. Questions ouvertes de `12-badges.md` : réponses par défaut de `13-orchestration.md`, section 8 (D-13).
+
+**Choix du superviseur**
+- Bibliothèques (I-43) : `pdfkit` (PDF vectoriel, polices embarquées, aucun appel réseau) et `qrcode` (seulement sa matrice, `QRCode.create(url, { errorCorrectionLevel: 'M' })`, dessinée en rectangles vectoriels par pdfkit). Ajoutées à `strapi/package.json` par V4-D1.
+- Jeton de carte (R-80, NF-55) : dérivé, pour qu'un badge réimprimé garde son QR. `token = base64url(HMAC-SHA256(clé, documentId de l'Attendee + ":" + cardTokenCreatedAt))`, 256 bits ; la clé dérive des `APP_KEYS` de Strapi. Seul `cardTokenHash = sha256(token)` est stocké, pour la recherche. Le jeton est créé à la première génération d'un badge (pas de migration ni de changement de l'import) ; « Régénérer » change `cardTokenCreatedAt`, donc le jeton, et l'ancien cesse aussitôt.
+- Polices : celles du site (`web/public/fonts`), copiées dans `strapi/src/api/espace/lib/badges/assets/` ; logo : celui du site en attendant le vectoriel des JIB.
+
+### V4-D1. Badges, génération et carte
+
+**Fichiers possédés** `E/lib/badges/**` (nouveau : mise en page, QR, jeton), `E/services/badges.js`, `E/controllers/badges.js`, `E/routes/badges.js`, `E/services/cards.js`, `E/controllers/cards.js`, `E/routes/cards.js` (nouveaux), `E/content-types/attendee/schema.json` (`cardTokenHash`, `cardTokenCreatedAt`), `strapi/src/api/edition/content-types/edition/schema.json` (`badgePlan`, `badgeAccent`), `strapi/package.json`, `strapi/pnpm-lock.yaml`, `P/[edition]/carte/[token].astro` (nouveau), `P/[edition]/connexion.astro` (retour de F-96 seulement si `next` ne le couvre pas déjà).
+
+**Contrat consommé par V4-D2, figé** : routes de `12-badges.md` (`POST /api/espace/admin/{edition}/badges` corps `{ types?: string[], sort?: 'name'|'company' }` → `application/pdf` avec en-tête `X-Badges-Count` et `X-Badges-Reduced` ; `GET /api/espace/admin/{edition}/attendees/{id}/badge` → `application/pdf` ; `POST /api/espace/admin/{edition}/attendees/{id}/card-token/regenerate` → `{ regeneratedAt }` ; `GET /api/espace/cards/{edition}/{token}` public).
+
+**Tests** unitaire `badges.test.js` (mise en page, troncature T-66, QR décodé T-65), intégration `espace-badges.test.js` (T-60 à T-65, T-68), bout en bout `espace-carte.spec.ts` (T-60, T-61, T-67) ; `conventions.test.js` étendu (T-69).
+
+### V4-D2. Badges dans le pilotage
+
+**Fichiers possédés** `R/organizer/BadgesCard.tsx` (nouveau), `R/organizer/AttendeeSheet.tsx` (boutons « Badge à l'unité » et « Régénérer le jeton »), `R/OrganizerPanel.tsx` (montage de la carte).
+
+**Exigences** F-97 (filtre par type, tri, compte rendu : nombre de badges, profils en carte réduite), F-98. Le PDF se télécharge, il ne s'ouvre pas dans l'onglet de l'espace. Confirmation avant régénération : « L'ancien badge ne fonctionnera plus, il faudra le réimprimer ».
+
+**Tests** bout en bout `espace-pilotage-badges.spec.ts`.
+
+**Ordre en vague 4** : V4-F possède aussi le schéma de l'édition ; il s'intègre après V4-D1 et part de sa tête.
 
 ## V4-E. Charge
 
@@ -478,6 +501,95 @@ Lots à détailler par le superviseur au moment de les lancer, selon le même mo
 | V5-E | Flux d'abonnement calendrier ; webhook HelloAsso | I-42, I-13 | M chacun |
 | V5-F | MCP : README en français propre au projet, jeton à droits limités passé en en-tête, suppression protégée, `content-types.json` complété des réglages d'édition | | S |
 | V5-G | Rôle d'administration restreint pour Xylofutur (pas de suppression des types de l'espace, pas de jetons d'API) | | M |
+
+Détail arrêté par le superviseur le 17 novembre (consigne de Mathieu : coder toutes les vagues à la suite). Répartition des fichiers chauds en vague 5 : schéma `attendee` à V5-D, `sync.js` et `lib/import.js` à V5-A, `lib/mail/**` et `OrganizerPanel.tsx` à V5-B, `strapi/src/index.js` à V5-G, `cron-tasks.js` à V5-A. V5-E (webhook) part de la tête intégrée de V5-A.
+
+## V5-A. Effacement, export individuel et purge
+
+**Exigences**
+- **F-33, R-44** « Supprimer mes données » dans le profil : confirmation qui nomme les effets (rendez-vous à venir annulés avec notification, messages gardés chez l'interlocuteur sous « Participant supprimé », reconnexion impossible), puis anonymisation : prénom « Participant », nom « supprimé », entreprise, fonction, présentation, photo, LinkedIn, sujets et préférences vidés, `directoryOptIn` et `meetingsOptIn` à faux, statut `cancelled`, e-mail remplacé par une adresse technique non routable, session close. Même action depuis la fiche d'un inscrit du pilotage (« Anonymiser »).
+- Empreinte : nouveau type `api::espace.erased-email` (édition, `emailHash` = sha256 de l'e-mail en minuscules salé par une clé dérivée des `APP_KEYS`, `erasedAt`). L'import ignore une ligne HelloAsso dont l'empreinte est présente pour l'édition, sans erreur rouge (information repliée « effacé à la demande »).
+- **NF-12 (P1)** Export individuel : `GET /api/espace/me/export` → JSON du profil, des préférences, des rendez-vous (avec interlocuteur, créneau, table) et des messages envoyés par la personne ; téléchargé depuis le profil.
+- **NF-13, R-44** Tâche planifiée `espacePurge`, quotidienne à 4h00 : supprime `EmailLog` et `SyncRun` de plus de 12 mois, et toutes les données de l'espace (participants, rendez-vous, conversations, messages, jetons, empreintes) d'une édition dont la date est passée de 12 mois. L'édition et son programme restent.
+- Routes : `POST /api/espace/me/erase` `{ confirm: true }` ; `POST /api/espace/admin/{edition}/attendees/{id}/erase` (garde organisateur) ; `GET /api/espace/me/export`.
+
+**Fichiers possédés** `E/lib/erase.js`, `E/services/privacy.js`, `E/controllers/privacy.js`, `E/routes/privacy.js`, `E/content-types/erased-email/schema.json` (nouveaux), `E/services/sync.js`, `E/lib/import.js`, `strapi/config/cron-tasks.js`, `R/PrivacyActions.tsx` (nouveau, monté dans le profil), `P/[edition]/profil.astro`, `R/organizer/AttendeeSheet.tsx`.
+
+**Critères d'acceptation** 1. Après effacement, l'annuaire, les suggestions, les exports et les fiches ne montrent plus rien de la personne ; l'interlocuteur voit ses messages sous « Participant supprimé ». 2. Ses rendez-vous à venir sont annulés, tables libérées, interlocuteurs notifiés. 3. Dix synchronisations ne la réimportent pas. 4. L'export JSON ne contient aucune donnée d'un autre participant hors prénom, nom et entreprise des interlocuteurs. 5. Horloge à date + 12 mois et un jour : la purge vide l'espace de l'édition et garde le programme ; une seconde exécution ne fait rien.
+
+**Tests** unitaire `erase.test.js`, intégration `espace-effacement.test.js`, bout en bout `espace-effacement.spec.ts`.
+
+## V5-B. Signalement d'un message
+
+**Exigences**
+- **F-75** Dans un fil, chaque message reçu porte « Signaler » : motif court obligatoire (500 caractères au plus), confirmation, puis « Signalement transmis à l'organisation ». Un même message ne se signale qu'une fois par personne.
+- Nouveau type `api::espace.message-report` (édition, message, auteur du signalement, motif, statut `open` ou `handled`, `handledAt`). Les organisateurs reçoivent l'e-mail `message-report` (sans le contenu du message ; lien vers le pilotage).
+- **R-63** `ReportsCard` dans le pilotage : signalements ouverts puis traités, avec auteur du signalement, personne signalée, date, motif et le **seul** texte du message signalé ; aucun autre message n'est exposé. Action « Marquer comme traité ».
+- Routes : `POST /api/espace/conversations/{id}/messages/{messageId}/report` `{ reason }` ; `GET /api/espace/admin/{edition}/reports` ; `POST /api/espace/admin/{edition}/reports/{id}/handle`.
+
+**Fichiers possédés** `E/content-types/message-report/schema.json`, `E/services/reports.js`, `E/controllers/reports.js`, `E/routes/reports.js` (nouveaux), `E/lib/mail/**` (gabarit `message-report` et son enregistrement), `R/ChatThread.tsx`, `R/organizer/ReportsCard.tsx` (nouveau), `R/OrganizerPanel.tsx`.
+
+**Critères d'acceptation** 1. On ne peut signaler que ses messages reçus, dans ses conversations (sinon 404). 2. La route d'administration ne renvoie aucun autre message de la conversation. 3. Deux signalements du même message par la même personne : le second répond 409. 4. Participant non organisateur : 403.
+
+**Tests** intégration `espace-signalements.test.js`, bout en bout `espace-signalements.spec.ts`.
+
+## V5-C. Plusieurs éditions dans le pilotage
+
+**Exigences**
+- Sélecteur d'édition en tête du pilotage : éditions que la personne connectée peut piloter (adresse dans `ORGANIZER_EMAILS`, ou Attendee de rôle `organizer` avec la même adresse dans l'édition). Passer à une autre édition ouvre une session pour celle-ci sans nouveau lien, si et seulement si la personne en est organisatrice.
+- Un organisateur de `ORGANIZER_EMAILS` est organisateur de toutes les éditions, même sans Attendee.
+- « Dupliquer cette édition » : nouvelle édition en brouillon (titre, `slug`, date saisis), qui reprend les réglages de l'espace (créneaux, tables, durée, sujets) et les séquences du programme en brouillon ; ni participants, ni exposants, ni rendez-vous, ni formulaire HelloAsso, `participantSpaceEnabled` à faux.
+- Routes : `GET /api/espace/admin/editions` ; `POST /api/espace/admin/{edition}/switch` → 303 vers le pilotage de la cible ; `POST /api/espace/admin/{edition}/duplicate` `{ title, slug, date }`.
+
+**Fichiers possédés** `E/services/admin-editions.js`, `E/controllers/admin-editions.js`, `E/routes/admin-editions.js` (nouveaux), `P/[edition]/organisateur.astro`, `R/organizer/EditionSwitcher.tsx`, `R/organizer/DuplicateEditionCard.tsx` (nouveaux, montés par `organisateur.astro` hors de `OrganizerPanel`).
+
+**Critères d'acceptation** 1. Un organisateur de deux éditions passe de l'une à l'autre sans e-mail. 2. Un participant ou l'organisateur d'une seule édition ne peut pas basculer vers une autre (403). 3. L'édition dupliquée a ses séquences et ses réglages, aucune donnée personnelle, et n'est pas publiée. 4. `slug` déjà pris : 409.
+
+**Tests** intégration `espace-multi-editions.test.js`, bout en bout `espace-multi-editions.spec.ts`.
+
+## V5-D. Profil B2B
+
+**Exigences**
+- Nouveaux champs scalaires de l'Attendee : `lookingFor` et `offering` (texte, 300 caractères), `phone` (facultatif, format libre de 30 caractères).
+- **R-42 amendé** : « Je cherche » et « Je propose » suivent R-42 (visibles des profils visibles). Le téléphone n'est visible que des interlocuteurs d'un rendez-vous **accepté** avec la personne, dans l'agenda et la fiche, jamais dans l'annuaire, les exports partagés ni la carte de badge. Le superviseur reporte l'amendement dans `04-regles-metier.md`.
+- **R-50 étendu** : les suggestions comptent aussi les mots significatifs communs entre mon « Je cherche » et leur « Je propose » (et inversement), après les sujets communs.
+- Profil : deux zones de texte et le téléphone, avec l'aide « Visible seulement des personnes avec qui vous avez un rendez-vous confirmé ».
+
+**Fichiers possédés** `E/content-types/attendee/schema.json`, `E/lib/profile.js`, `E/services/me.js`, `E/controllers/me.js`, `E/lib/cards.js`, `E/lib/suggestions.js`, `E/services/directory.js`, `E/lib/directory.js`, `R/ProfileForm.tsx`, `R/ProfileCardView.tsx`, `P/[edition]/annuaire/[type]/[id].astro`, `R/AgendaBoard.tsx` (téléphone sur la carte d'un rendez-vous accepté).
+
+**Critères d'acceptation** 1. Le téléphone n'apparaît dans aucune réponse d'API pour un tiers sans rendez-vous accepté. 2. Il apparaît pour l'interlocuteur d'un rendez-vous accepté, et disparaît si le rendez-vous est annulé. 3. Une suggestion fondée sur « Je cherche / Je propose » apparaît quand aucun sujet n'est commun. 4. `profile.test.js`, `directory.test.js` et `suggestions.test.js` restent verts.
+
+**Tests** unitaire `suggestions.test.js` complété, intégration `espace-profil-b2b.test.js`.
+
+## V5-E. Abonnement calendrier et webhook HelloAsso
+
+**Exigences**
+- **I-42** Nouveau type `api::espace.calendar-feed` (Attendee, `tokenHash`, `createdAt`, `revokedAt`). `GET /api/espace/calendar/{token}.ics` public, limité en débit, 404 uniforme : rendez-vous acceptés de la personne (même contenu que les `.ics` des e-mails). Dans l'agenda : « S'abonner à mon agenda » qui crée le flux et affiche l'URL une seule fois (`webcal://` et copie), « Révoquer ». Routes : `POST /api/espace/me/calendar-feed`, `DELETE /api/espace/me/calendar-feed`.
+- **I-13** `POST /api/espace/webhooks/helloasso` : n'accepte que `eventType = Order` ; ne fait pas confiance au contenu, relit la commande (`GET /orders/{orderId}`) puis l'importe par le même chemin que la synchronisation ; répond 200 vite et traite en tâche de fond ; limité en débit ; ignoré si l'édition n'a pas de formulaire HelloAsso correspondant. Documenté dans `docs/espace/exploitation.md` par le superviseur.
+
+**Fichiers possédés** `E/content-types/calendar-feed/schema.json`, `E/services/calendar-feed.js`, `E/controllers/calendar-feed.js`, `E/routes/calendar-feed.js`, `E/services/webhooks.js`, `E/controllers/webhooks.js`, `E/routes/webhooks.js` (nouveaux), `E/lib/helloasso.js`, `P/[edition]/agenda.astro`, `R/CalendarFeed.tsx` (nouveau). Consomme en lecture `services/sync.js` (importer une commande) : la fonction manquante est ajoutée par ce lot, qui part de la tête intégrée de V5-A.
+
+**Critères d'acceptation** 1. Le flux ne contient que les rendez-vous acceptés de son propriétaire. 2. Jeton révoqué ou régénéré : 404. 3. Webhook avec une commande inventée dans le corps : seule la version relue sur le faux HelloAsso est importée. 4. Webhook d'un autre type : 200 sans effet.
+
+**Tests** intégration `espace-calendrier.test.js`, `espace-webhook.test.js` (contre le faux HelloAsso).
+
+## V5-F. MCP
+
+**Exigences** `strapi/mcp/README.md` en français, propre au projet ; le jeton d'API passe uniquement par l'en-tête `Authorization` (aucun jeton dans l'URL ni dans les journaux) ; les outils de suppression exigent un paramètre de confirmation explicite et refusent les types de l'espace (`api::espace.*`) ; `content-types.json` complété des réglages d'édition de l'espace et des champs ajoutés par les vagues 1 à 5.
+
+**Fichiers possédés** `strapi/mcp/**`, `web/public/llms.txt`, `web/public/.well-known/mcp.json`.
+
+**Tests** unitaire `mcp.test.js` (outils, confirmation, refus des types de l'espace, synchronisation de `content-types.json` avec les schémas).
+
+## V5-G. Rôle d'administration restreint
+
+**Exigences** À l'amorçage, création idempotente d'un rôle d'administration « Organisation Xylofutur » : gestionnaire de contenu en lecture, création et modification sur tous les types ; suppression interdite sur les types de l'espace (`api::espace.*`) et sur l'édition ; ni jetons d'API, ni jetons de transfert, ni gestion des utilisateurs et des rôles, ni constructeur de types, ni réglages. Le rôle existant n'est jamais écrasé dans ses ajouts manuels : seules les permissions interdites sont retirées. Documenté dans `docs/espace/guide-organisateur.md` par le superviseur.
+
+**Fichiers possédés** `strapi/src/index.js`, `strapi/src/admin-role.js` (nouveau).
+
+**Critères d'acceptation** 1. Deux démarrages : un seul rôle, mêmes permissions. 2. Un utilisateur de ce rôle reçoit 403 sur la suppression d'un participant et sur la création d'un jeton d'API.
+
+**Tests** intégration `espace-role-admin.test.js`.
 
 # Dette documentaire, à la charge du superviseur
 
