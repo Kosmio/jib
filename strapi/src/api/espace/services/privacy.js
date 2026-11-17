@@ -9,6 +9,7 @@ const CONVERSATION = 'api::espace.conversation';
 const REPORT = 'api::espace.message-report';
 const ERASED_EMAIL = 'api::espace.erased-email';
 const MAGIC_TOKEN = 'api::espace.magic-token';
+const CALENDAR_FEED = 'api::espace.calendar-feed';
 const EMAIL_LOG = 'api::espace.email-log';
 const SYNC_RUN = 'api::espace.sync-run';
 const EDITION = 'api::edition.edition';
@@ -70,6 +71,8 @@ module.exports = ({ strapi }) => {
         await strapi.db.query(MAGIC_TOKEN).deleteMany({
           where: { attendee: { documentId: attendee.documentId }, ...(keepSessionDocumentId && { documentId: { $ne: keepSessionDocumentId } }) },
         });
+        // I-42: the subscription feeds of the person go with the data.
+        await strapi.db.query(CALENDAR_FEED).deleteMany({ where: { attendee: { documentId: attendee.documentId } } });
       });
       if (attendee.photo) await removeFile(attendee.photo);
       return { erased: true };
@@ -122,6 +125,7 @@ module.exports = ({ strapi }) => {
           await strapi.db.query(CONVERSATION).deleteMany({ where: scope }),
           await strapi.db.query(MEETING).deleteMany({ where: scope }),
           await strapi.db.query(MAGIC_TOKEN).deleteMany({ where: inEdition }),
+          await strapi.db.query(CALENDAR_FEED).deleteMany({ where: inEdition }),
           await strapi.db.query(EMAIL_LOG).deleteMany({ where: inEdition }),
           await strapi.db.query(ERASED_EMAIL).deleteMany({ where: scope }),
           await strapi.db.query(ATTENDEE).deleteMany({ where: scope }),
