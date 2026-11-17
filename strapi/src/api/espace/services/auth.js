@@ -4,12 +4,16 @@ const { EspaceError } = require('../lib/errors');
 const { normalizeEmail } = require('../lib/import');
 const { createRateLimiter } = require('../lib/rate-limit');
 const { COOKIE_NAME, safeNextPath, sessionCookieOptions } = require('../lib/session');
-const { generateToken, hashToken, linkUrl } = require('../lib/tokens');
+const { CODE_PREFIX, generateToken, hashCode, hashToken, linkUrl, normalizeCode, sameHash, spacedCode } = require('../lib/tokens');
 
 const TOKEN = 'api::espace.magic-token';
 const ATTENDEE = 'api::espace.attendee';
 const LINK_MINUTES = 30;
 const SENT_COOKIE = 'jib_espace_sent';
+// I-44: wrong tries before a code is void, and the ceilings of code tries per IP and per address in a 15-minute window (NF-03).
+const CODE_MAX_FAILURES = 5;
+const CODE_IP_MAX = 30;
+const CODE_EMAIL_MAX = 10;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const SESSION_MS = 30 * DAY_MS;
 
@@ -19,9 +23,15 @@ const ORGANIZER_PROFILE = { firstName: 'Organisateur', lastName: 'JIB', company:
 module.exports = ({ strapi }) => {
   const documents = (uid) => strapi.documents(uid);
   const settings = () => strapi.config.get('server.espace');
+  // Secret of the code hashes (I-44): the first application key, which Strapi already requires.
+  const codeSecret = () => strapi.config.get('server.app.keys')[0];
   // One pair of limiters per Strapi instance (NF-03): a Strapi restarted by the tests starts from zero. NF-61: the IP ceiling comes from the settings.
   const emailLimiter = createRateLimiter();
   const ipLimiter = createRateLimiter({ max: settings().linkRateIpMax });
+  const codeIpLimiter = createRateLimiter({ max: CODE_IP_MAX });
+  const codeEmailLimiter = createRateLimiter({ max: CODE_EMAIL_MAX });
+  // Wrong tries per code row (I-44), in memory like the limiters: a restart gives a fresh count, never a longer lease than the rows themselves.
+  const codeFailures = new Map();
 
   const isListed = (email) => settings().organizerEmails.some((listed) => listed.trim().toLowerCase() === email.toLowerCase());
   const isOrganizer = (attendee) => attendee.role === 'organizer' || isListed(attendee.email);
@@ -77,7 +87,9 @@ module.exports = ({ strapi }) => {
     if (attendee?.status !== 'active' || !isOpenFor(edition, attendee)) return;
 
     const { publicUrl } = settings();
-    const token = await strapi.service('api::espace.tokens').issueLink(attendee.documentId, { ttlMinutes: LINK_MINUTES, ip, now });
+    const { token, code } = await strapi
+      .service('api::espace.tokens')
+      .issueLoginLink(attendee.documentId, { ttlMinutes: LINK_MINUTES, ip, now, secret: codeSecret() });
     await strapi.service('api::espace.mailer').send({
       attendee,
       template: 'access-link',
@@ -87,9 +99,26 @@ module.exports = ({ strapi }) => {
         firstName: attendee.firstName,
         url: linkUrl({ publicUrl, token, next: safeNextPath(next, edition.slug) }),
         validityMinutes: LINK_MINUTES,
+        code: spacedCode(code),
       },
       now,
     });
+  }
+
+  /** I-22: session token of an attendee who proved their address (by the link or by the code) -> { attendee, edition, isOrganizer, sessionToken }. */
+  async function openSession({ attendee: who, edition, ip, now }) {
+    const sessionToken = generateToken();
+    await documents(TOKEN).create({
+      data: {
+        attendee: { documentId: who.documentId },
+        kind: 'session',
+        tokenHash: hashToken(sessionToken),
+        expiresAt: new Date(now.getTime() + SESSION_MS),
+        ip,
+      },
+    });
+    const attendee = await documents(ATTENDEE).update({ documentId: who.documentId, data: { lastSeenAt: now, activatedAt: who.activatedAt ?? now } });
+    return { attendee, edition, isOrganizer: isOrganizer(attendee), sessionToken };
   }
 
   return {
@@ -136,22 +165,51 @@ module.exports = ({ strapi }) => {
       const { link, edition } = loaded;
       const { count } = await strapi.db.query(TOKEN).updateMany({ where: { id: link.id, usedAt: null, expiresAt: { $gt: now } }, data: { usedAt: now } });
       if (!count) throw invalid;
+      // I-44: the code of this request dies with its link.
+      await strapi.db.query(TOKEN).updateMany({ where: { tokenHash: { $startsWith: `${CODE_PREFIX}${link.documentId}:` }, usedAt: null }, data: { usedAt: now } });
+      return openSession({ attendee: link.attendee, edition, ip, now });
+    },
 
-      const sessionToken = generateToken();
-      await documents(TOKEN).create({
-        data: {
-          attendee: { documentId: link.attendee.documentId },
-          kind: 'session',
-          tokenHash: hashToken(sessionToken),
-          expiresAt: new Date(now.getTime() + SESSION_MS),
-          ip,
-        },
+    /**
+     * I-44, F-142: opens a session with the six-digit code of an e-mail -> same result as verify ; 400 CODE_INVALID otherwise, 429 RATE_LIMITED past the ceilings.
+     * The answer is the same for an unknown address, an unregistered one, a wrong code and a void one (F-02). The counters are incremented before any lookup.
+     * The link row is the single gate, as in verify: the code and the link of a request cannot both open a session. Five wrong tries void the codes of the address.
+     */
+    async verifyCode({ editionSlug, email, code, ip, now = new Date() }) {
+      const invalid = new EspaceError(400, 'CODE_INVALID', 'Ce code n’est pas valable. Vérifiez-le ou demandez un nouveau lien.');
+      const address = normalizeEmail(email);
+      if (![codeIpLimiter.hit(ip), codeEmailLimiter.hit(address || '')].every(Boolean)) {
+        throw new EspaceError(429, 'RATE_LIMITED', 'Trop d’essais, réessayez dans quelques minutes.');
+      }
+      const digits = normalizeCode(code);
+      const edition = address && typeof editionSlug === 'string' ? await strapi.service('api::espace.editions').findPublished(editionSlug) : null;
+      const attendee = edition ? await findAttendee(edition.documentId, address) : null;
+      if (!digits || !attendee || attendee.status !== 'active' || !isOpenFor(edition, attendee)) throw invalid;
+
+      const rows = await documents(TOKEN).findMany({
+        filters: { attendee: { documentId: attendee.documentId }, kind: 'link', usedAt: { $null: true }, expiresAt: { $gt: now }, tokenHash: { $startsWith: CODE_PREFIX } },
       });
-      const attendee = await documents(ATTENDEE).update({
-        documentId: link.attendee.documentId,
-        data: { lastSeenAt: now, activatedAt: link.attendee.activatedAt ?? now },
-      });
-      return { attendee, edition, isOrganizer: isOrganizer(attendee), sessionToken };
+      const secret = codeSecret();
+      const match = rows.find((row) => sameHash(row.tokenHash, hashCode(digits, { linkDocumentId: row.tokenHash.split(':')[1], secret })));
+      if (!match) {
+        for (const row of rows) {
+          const failures = (codeFailures.get(row.documentId) ?? 0) + 1;
+          codeFailures.set(row.documentId, failures);
+          if (failures >= CODE_MAX_FAILURES) {
+            await strapi.db.query(TOKEN).updateMany({ where: { id: row.id, usedAt: null }, data: { usedAt: now } });
+            codeFailures.delete(row.documentId);
+          }
+        }
+        throw invalid;
+      }
+
+      const { count } = await strapi.db
+        .query(TOKEN)
+        .updateMany({ where: { documentId: match.tokenHash.split(':')[1], kind: 'link', usedAt: null, expiresAt: { $gt: now } }, data: { usedAt: now } });
+      if (!count) throw invalid;
+      await strapi.db.query(TOKEN).updateMany({ where: { id: match.id, usedAt: null }, data: { usedAt: now } });
+      codeFailures.delete(match.documentId);
+      return openSession({ attendee, edition, ip, now });
     },
 
     /**

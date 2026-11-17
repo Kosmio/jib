@@ -9,6 +9,7 @@ module.exports = {
     { method: 'POST', path: '/espace/auth/request-link', handler: 'auth.requestLink', config },
     { method: 'GET', path: '/espace/auth/link', handler: 'auth.link', config },
     { method: 'POST', path: '/espace/auth/verify', handler: 'auth.verify', config },
+    { method: 'POST', path: '/espace/auth/verify-code', handler: 'auth.verifyCode', config },
     { method: 'POST', path: '/espace/auth/logout', handler: 'auth.logout', config },
     { method: 'GET', path: '/espace/me', handler: 'me.show', config },
     { method: 'PATCH', path: '/espace/me', handler: 'me.update', config },

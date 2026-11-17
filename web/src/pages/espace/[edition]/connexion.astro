@@ -1,13 +1,13 @@
 ---
-// E0 : connexion par lien magique (F-01, F-02). Page serveur sans îlot : le formulaire part vers Strapi, qui répond par un 303
-// vers cette page avec ?envoye=1, ?erreur=trop ou ?erreur=email ; ?deconnecte=1 vient de la déconnexion.
+// E0 : connexion par lien magique (F-01, F-02) ou par code à six chiffres (F-142, I-44). Page serveur sans îlot : le formulaire part vers Strapi, qui répond par un 303
+// vers cette page avec ?envoye=1, ?erreur=trop ou ?erreur=email (?envoye=1&erreur=code ou =trop après un code refusé) ; ?deconnecte=1 vient de la déconnexion.
 import EspaceLayout from "../../../layouts/EspaceLayout.astro";
 import EditionBanner from "../../../components/espace/EditionBanner.astro";
 import EspaceCard from "../../../components/espace/EspaceCard.astro";
 import EspaceButton from "../../../components/espace/EspaceButton.astro";
 import Notice from "../../../components/espace/Notice.astro";
 import RequestLinkForm from "../../../components/espace/RequestLinkForm.astro";
-import { getEdition, getMe, safeNext } from "../../../lib/espace/api";
+import { getEdition, getMe, publicStrapiUrl, safeNext } from "../../../lib/espace/api";
 import { meetingsSubtitle } from "../../../lib/espace/format";
 
 const slug = Astro.params.edition ?? "";
@@ -41,6 +41,8 @@ const state =
             : "initial";
 // L'adresse sert à la page « Lien envoyé » puis au formulaire qui suit ; ensuite le cookie est effacé.
 if (sent && state !== "sent") Astro.cookies.delete("jib_espace_sent", { path: "/espace" });
+const codeError = query.get("erreur") === "code";
+const codeTooMany = query.get("envoye") === "1" && query.get("erreur") === "trop";
 const retry = new URLSearchParams({ ...(next && { next }) }).toString();
 const titles = {
   initial: "Connexion",
@@ -52,7 +54,7 @@ const titles = {
 };
 ---
 
-<EspaceLayout title={titles[state]}>
+<EspaceLayout title={state === "sent" && codeError ? "Code non valable" : state === "sent" && codeTooMany ? "Trop d’essais" : titles[state]}>
   <EditionBanner title="Bienvenue dans votre espace participant" subtitle={meetingsSubtitle(edition)} themeColor={edition.themeColor} />
   {
     state === "sent" ? (
@@ -65,6 +67,40 @@ const titles = {
           Le lien est valable 30&nbsp;minutes et ne fonctionne qu’une seule fois. Rien reçu&nbsp;? Regardez dans vos courriers
           indésirables, puis demandez un nouveau lien.
         </p>
+        <form method="post" action={`${publicStrapiUrl}/api/espace/auth/verify-code`} class="mt-6" id="code-form">
+          <input type="hidden" name="editionSlug" value={slug} />
+          {email && <input type="hidden" name="email" value={email} />}
+          {next && <input type="hidden" name="next" value={next} />}
+          {
+            !email && (
+              <>
+                <label for="code-email" class="block font-semibold">Adresse e-mail utilisée pour l’inscription</label>
+                <input id="code-email" name="email" type="email" required autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" class="mt-2 mb-4 min-h-12 w-full rounded-lg border-2 border-accent bg-white px-4 text-lg text-ink" />
+              </>
+            )
+          }
+          <label for="code" class="block font-semibold">Code reçu par e-mail</label>
+          <p id="code-aide" class="mt-1 text-sm text-muted">
+            Le lien s’ouvre dans une autre application&nbsp;? Saisissez ici le code à six chiffres de l’e-mail.
+          </p>
+          {codeError && <Notice kind="alert">Ce code n’est pas valable. Vérifiez-le ou demandez un nouveau lien.</Notice>}
+          {codeTooMany && <Notice kind="alert">Trop d’essais, réessayez dans quelques minutes.</Notice>}
+          <input
+            id="code"
+            name="code"
+            type="text"
+            required
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            pattern="[0-9]{6}"
+            autocapitalize="none"
+            spellcheck="false"
+            aria-describedby="code-aide"
+            aria-invalid={codeError ? "true" : undefined}
+            class={`mt-2 min-h-12 w-full rounded-lg border-2 bg-white px-4 text-lg tracking-widest text-ink ${codeError ? "border-danger" : "border-accent"}`}
+          />
+          <EspaceButton class="mt-4">Valider le code</EspaceButton>
+        </form>
         <EspaceButton variant="secondary" href={`/espace/${encodeURIComponent(slug)}/connexion${retry && `?${retry}`}`} class="mt-6">
           Demander un nouveau lien
         </EspaceButton>

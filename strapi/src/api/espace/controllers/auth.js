@@ -13,6 +13,27 @@ function see(ctx, path) {
   ctx.set('Location', `${strapi.config.get('server.espace').publicUrl.replace(/\/+$/, '')}${path}`);
 }
 
+const decodeCookie = (value) => {
+  try {
+    return value ? decodeURIComponent(value) : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+/** Cookie and answer of a session just opened, by the link (verify) or by the code (verifyCode): the same redirection. */
+function openedSession(ctx, { attendee, edition, isOrganizer, sessionToken }, next) {
+  strapi.service('api::espace.auth').setCookie(ctx, sessionToken);
+  // F-103: on a closed edition the organizer goes to the dashboard, the only screen open to them.
+  const redirect = !edition.participantSpaceEnabled
+    ? `/espace/${edition.slug}/organisateur`
+    : attendee.consentAt
+      ? safeNextPath(next, edition.slug)
+      : `/espace/${edition.slug}/bienvenue`;
+  if (isForm(ctx)) return see(ctx, redirect);
+  ctx.body = { me: strapi.service('api::espace.me').toMe({ attendee, edition, isOrganizer }), redirect };
+}
+
 // Forms without JavaScript (NF-31) get a 303 to the page that fits ; the JSON clients get a status and a body.
 module.exports = {
   // POST /api/espace/auth/request-link (public): F-01, F-02, NF-03
@@ -65,16 +86,28 @@ module.exports = {
       return see(ctx, `/espace/verifier${query && `?${query}`}`);
     }
 
-    const { attendee, edition, isOrganizer, sessionToken } = opened;
-    auth.setCookie(ctx, sessionToken);
-    // F-103: on a closed edition the organizer goes to the dashboard, the only screen open to them.
-    const redirect = !edition.participantSpaceEnabled
-      ? `/espace/${edition.slug}/organisateur`
-      : attendee.consentAt
-        ? safeNextPath(next, edition.slug)
-        : `/espace/${edition.slug}/bienvenue`;
-    if (isForm(ctx)) return see(ctx, redirect);
-    ctx.body = { me: strapi.service('api::espace.me').toMe({ attendee, edition, isOrganizer }), redirect };
+    return openedSession(ctx, opened, next);
+  },
+
+  // POST /api/espace/auth/verify-code (public): I-44, F-142. The address comes from the form, or from the short-lived cookie when it reaches Strapi.
+  verifyCode: async (ctx) => {
+    const { editionSlug, email, code, next } = bodyOf(ctx);
+    const auth = strapi.service('api::espace.auth');
+    const address = text(email) ?? decodeCookie(ctx.cookies.get('jib_espace_sent'));
+
+    let opened;
+    try {
+      opened = await auth.verifyCode({ editionSlug, email: address, code, ip: ctx.request.ip });
+    } catch (error) {
+      const failure = error instanceof EspaceError && { RATE_LIMITED: 'trop', CODE_INVALID: 'code' }[error.code];
+      if (!isForm(ctx) || !failure) throw error;
+      // The "link sent" page again, with the address recalled by the cookie, never by the URL (F-102).
+      if (text(address)) auth.rememberEmail(ctx, address.trim().slice(0, 254));
+      const kept = text(next) && safeNextPath(next, editionSlug) !== `/espace/${editionSlug}/` ? safeNextPath(next, editionSlug) : '';
+      const query = new URLSearchParams({ envoye: '1', erreur: failure, ...(kept && { next: kept }) });
+      return see(ctx, `/espace/${encodeURIComponent(editionSlug)}/connexion?${query}`);
+    }
+    return openedSession(ctx, opened, next);
   },
 
   // POST /api/espace/auth/logout (session): the same answer without a session

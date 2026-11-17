@@ -1,6 +1,6 @@
 'use strict';
 
-const { generateToken, hashToken } = require('../lib/tokens');
+const { generateCode, generateToken, hashCode, hashToken } = require('../lib/tokens');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -18,6 +18,22 @@ module.exports = ({ strapi }) => ({
       },
     });
     return token;
+  },
+
+  /**
+   * I-44: link token of a login request, with its six-digit code -> { token, code }, both in clear, which only leave in the e-mail.
+   * The code is a second row bound to the link (see hashCode): consuming one invalidates the other (services/auth.js).
+   */
+  async issueLoginLink(attendeeDocumentId, { ttlMinutes = 30, ip, now = new Date(), secret } = {}) {
+    const documents = strapi.documents('api::espace.magic-token');
+    const expiresAt = new Date(now.getTime() + ttlMinutes * 60 * 1000);
+    const token = generateToken();
+    const link = await documents.create({ data: { attendee: { documentId: attendeeDocumentId }, kind: 'link', tokenHash: hashToken(token), expiresAt, ip } });
+    const code = generateCode();
+    await documents.create({
+      data: { attendee: { documentId: attendeeDocumentId }, kind: 'link', tokenHash: hashCode(code, { linkDocumentId: link.documentId, secret }), expiresAt, ip },
+    });
+    return { token, code };
   },
 
   /**
