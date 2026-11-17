@@ -294,6 +294,7 @@ describe('rendez-vous : demandes et consultation (lot 8)', { timeout: 600_000 },
       (await as(world.edition, requester)).post('/meetings', {
         slotId: world.slots[label].documentId,
         target: typeof target === 'string' ? target : `p:${target.documentId}`,
+        message: 'Bonjour, échangeons pendant la pause.',
         ...body,
       });
     const linkAfter = (text, label) => new RegExp(`${label}[\\s${NBSP}]*:[\\s${NBSP}]*(https?://\\S+)`).exec(text)?.[1];
@@ -362,10 +363,13 @@ describe('rendez-vous : demandes et consultation (lot 8)', { timeout: 600_000 },
         assert.equal(row.requester.documentId, lea.documentId);
       });
 
-      it('sans message : le message est vide', async () => {
+      it('D-08 : sans message, ou avec des espaces seulement, la demande est refusée (400 VALIDATION, `fields.message`)', async () => {
         const { world, lea, ines } = await setup();
-        const { json } = await ask(world, lea, ines);
-        assert.ok(!json.message);
+        for (const message of [undefined, '', '   ']) {
+          const response = await ask(world, lea, ines, '10h45', { message });
+          expectError(response, 400, 'VALIDATION');
+          assert.equal(typeof response.json.error.fields.message, 'string');
+        }
       });
 
       it('T-10 : un participant qui n’a rien coché (ni annuaire, ni rendez-vous) peut demander', async () => {
@@ -503,14 +507,14 @@ describe('rendez-vous : demandes et consultation (lot 8)', { timeout: 600_000 },
     describe('400 et 404 : corps de la requête et références', () => {
       const send = async (world, who, body) => (await as(world.edition, who)).post('/meetings', body);
 
-      it('400 VALIDATION : message de plus de 300 caractères, avec `error.fields` ; 300 caractères passent', async () => {
+      it('400 VALIDATION : message de plus de 250 caractères, avec `error.fields` ; 250 caractères passent', async () => {
         const world = await newEdition();
         const [lea, ines] = [await person(world.edition), await person(world.edition)];
-        const tooLong = await ask(world, lea, ines, '10h45', { message: 'x'.repeat(301) });
+        const tooLong = await ask(world, lea, ines, '10h45', { message: 'x'.repeat(251) });
         expectError(tooLong, 400, 'VALIDATION');
         assert.equal(typeof tooLong.json.error.fields, 'object');
         assert.equal((await meetingsOf(world.edition)).length, 0);
-        assert.equal((await ask(world, lea, ines, '10h45', { message: 'x'.repeat(300) })).status, 201);
+        assert.equal((await ask(world, lea, ines, '10h45', { message: 'x'.repeat(250) })).status, 201);
       });
 
       it('400 VALIDATION : message qui n’est pas un texte', async () => {

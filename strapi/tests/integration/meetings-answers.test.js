@@ -574,12 +574,12 @@ describe('rendez-vous : réponses, annulation, tables et e-mails (lot 8)', { tim
       assert.equal((await W.meetingsAt(app(), world.edition)).length, 1);
     });
 
-    it('400 VALIDATION : créneau absent, message de plus de 300 caractères ; 404 SLOT_NOT_FOUND : créneau inconnu', async () => {
+    it('400 VALIDATION : créneau absent, message de plus de 250 caractères ; 404 SLOT_NOT_FOUND : créneau inconnu', async () => {
       const world = await newEdition();
       const { lea, ines } = await duo(world);
       const initial = await seed(world, { slot: world.slots['10h45'], requester: ines, target: lea });
       expectError(await answer(world, lea, initial, 'counter', {}), 400, 'VALIDATION');
-      expectError(await answer(world, lea, initial, 'counter', { slotId: world.slots['11h00'].documentId, message: 'x'.repeat(301) }), 400, 'VALIDATION');
+      expectError(await answer(world, lea, initial, 'counter', { slotId: world.slots['11h00'].documentId, message: 'x'.repeat(251) }), 400, 'VALIDATION');
       expectError(await answer(world, lea, initial, 'counter', { slotId: 'inconnu0000000000000000' }), 404, 'SLOT_NOT_FOUND');
       assert.equal((await reload(initial)).status, 'pending');
     });

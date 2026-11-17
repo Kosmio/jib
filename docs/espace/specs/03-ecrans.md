@@ -73,7 +73,7 @@ Maquette : 03-annuaire.
 
 Maquette : 04-fiche. `type` = `p` (participant ou intervenant) ou `x` (exposant).
 
-Éléments : retour, en-tête (photo, nom, fonction, entreprise ou nom d'exposant et stand), étiquettes (type, séquence de l'intervenant avec heure), présentation, sujets. Bloc « Proposer un rendez-vous » : créneaux regroupés par pause B2B (libellé et horaire de la pause), grille de boutons d'heure, message facultatif (300 caractères), bouton principal « Envoyer la demande pour {heure} ». Lien « Écrire un message » vers E7.
+Éléments : retour, en-tête (photo, nom, fonction, entreprise ou nom d'exposant et stand), étiquettes (type, séquence de l'intervenant avec heure), présentation, sujets. Bloc « Proposer un rendez-vous » : créneaux regroupés par pause B2B (libellé et horaire de la pause), grille de boutons d'heure, message obligatoire pour une demande à une personne, facultatif pour une contre-proposition (250 caractères, D-08), bouton principal « Envoyer la demande pour {heure} ». Lien « Écrire un message » vers E7.
 
 - **F-50 (P0)** Créneaux affichés : ceux de l'édition dont l'heure n'est pas passée. État de chaque créneau calculé selon R-12 : disponible, indisponible (barré, désactivé, `aria-disabled`, libellé « indisponible » pour les lecteurs d'écran), sélectionné.
 - **F-51 (P0)** Aucun créneau présélectionné ; le bouton principal est désactivé tant qu'aucun créneau n'est choisi, avec le libellé « Choisissez un créneau ».

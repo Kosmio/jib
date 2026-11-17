@@ -52,14 +52,12 @@ test('Tom : E0, lien, vérification, E2, E1, déconnexion, E0', async ({ page, c
     await expect(page.getByLabel('Nom', { exact: true })).toHaveValue('Laffitte');
     await expect(page.getByLabel('Entreprise')).not.toHaveValue('');
     await expect(page.getByLabel('Fonction (facultatif)')).toBeVisible();
-    for (const name of [
-      'Apparaître dans l’annuaire des participants',
-      'Recevoir des demandes de rendez-vous et des messages',
-      'Recevoir des nouvelles des prochaines éditions',
-    ]) {
+    for (const name of ['Apparaître dans l’annuaire des participants', 'Recevoir des nouvelles des prochaines éditions']) {
       await expect(page.getByRole('checkbox', { name }), name).not.toBeChecked();
     }
-    await expect(note).toBeEmpty();
+    // D-07 : recevoir des demandes et des messages est coché par défaut, d'où la note F-11 tant que l'annuaire ne l'est pas.
+    await expect(page.getByRole('checkbox', { name: 'Recevoir des demandes de rendez-vous et des messages' })).toBeChecked();
+    await expect(note).toHaveText(NOTE_F11);
     await expect(page.getByRole('button', { name: 'Continuer' })).toBeEnabled();
 
     expect(scripts.length, 'E2 charge l’îlot').toBeGreaterThan(0);

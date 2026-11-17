@@ -11,10 +11,14 @@
  *
  *   {
  *     "edition": "nouvelle-aquitaine",
+ *     "topics": [{ "name": "Forêt", "sessions": ["Titre de la séquence"] }],
+ *     "replaceTopics": false,
  *     "exhibitors": [{ "organisation": "Bois de France", "standNumber": "1" }],
  *     "speakers": [{ "name": "Prénom Nom", "email": "prenom.nom@example.org" }]
  *   }
  *
+ * Topics (the tags of the profiles and of the directory filter): created by name, linked to the sequences named in `sessions`.
+ * With `replaceTopics: true`, the topics of the edition that the file does not name are removed, and the profiles lose them.
  * Exhibitors: the organisation is found by its name (case and accents ignored), created and published when it does not exist,
  * then one Exhibitor per organisation and edition ; `standNumber` is updated when given.
  * Speakers: the account of the speaker is the attendee linked to the intervenant, or of the same name. Its address becomes
@@ -33,6 +37,7 @@ const UID = {
   sequence: 'api::sequence.sequence',
   intervenant: 'api::intervenant.intervenant',
   organisation: 'api::organisation.organisation',
+  topic: 'api::espace.topic',
   exhibitor: 'api::espace.exhibitor',
   attendee: 'api::espace.attendee',
 };
@@ -67,6 +72,47 @@ function planSpeaker({ row, intervenant, attendees }) {
     return holder.role === 'speaker' && linked ? { action: 'none', attendee: holder, email } : { action: 'promote', attendee: holder, email };
   }
   return account ? { action: 'update', attendee: account, email } : { action: 'create', email };
+}
+
+async function importTopics(app, edition, rows, replace, apply, log) {
+  const sequences = await app.documents(UID.sequence).findMany({ filters: { edition: link(edition) }, status: 'published', fields: ['title'], limit: 1000 });
+  const topics = await app.documents(UID.topic).findMany({ filters: { edition: link(edition) }, populate: { sessions: { fields: ['documentId'] } }, limit: 1000 });
+  const kept = new Set();
+
+  for (const row of rows) {
+    const name = String(row.name ?? '').trim();
+    if (!name) continue;
+    const sessions = [];
+    for (const title of row.sessions ?? []) {
+      const sequence = sequences.find((item) => squeezed(item.title) === squeezed(title));
+      if (sequence) sessions.push(link(sequence));
+      else log(`séquence introuvable pour « ${name} » : ${title}`);
+    }
+    const wanted = sessions.map(({ documentId }) => documentId).sort().join();
+    const topic = topics.find((item) => squeezed(item.name) === squeezed(name));
+    if (!topic) {
+      log(`sujet à créer : ${name} (${sessions.length} séquence(s))`);
+      if (apply) await app.documents(UID.topic).create({ data: { name, edition: link(edition), sessions } });
+      continue;
+    }
+    kept.add(topic.documentId);
+    const current = [...new Set((topic.sessions ?? []).map(({ documentId }) => documentId))].sort().join();
+    if (topic.name !== name || current !== wanted) {
+      log(`sujet à mettre à jour : ${name}`);
+      if (apply) await app.documents(UID.topic).update({ documentId: topic.documentId, data: { name, sessions } });
+    } else {
+      log(`sujet déjà en place : ${name}`);
+    }
+  }
+
+  const others = topics.filter(({ documentId }) => !kept.has(documentId));
+  if (!others.length) return;
+  if (!replace) {
+    log(`${others.length} autre(s) sujet(s) conservé(s) (replaceTopics absent)`);
+    return;
+  }
+  log(`${others.length} sujet(s) à retirer : ${others.map(({ name }) => name).join(', ')}`);
+  if (apply) for (const { documentId } of others) await app.documents(UID.topic).delete({ documentId });
 }
 
 async function importExhibitors(app, edition, rows, apply, log) {
@@ -184,10 +230,18 @@ async function main() {
     console.log(`${apply ? 'Écriture' : 'Simulation (rien n’est écrit, ajouter --apply)'} : édition ${edition.slug}, base ${database}`);
     const log = (line) => console.log(`  ${line}`);
 
-    console.log('Exposants');
-    await importExhibitors(app, edition, input.exhibitors ?? [], apply, log);
-    console.log('Intervenants');
-    await importSpeakers(app, edition, input.speakers ?? [], apply, log);
+    if (input.topics) {
+      console.log('Sujets');
+      await importTopics(app, edition, input.topics, input.replaceTopics === true, apply, log);
+    }
+    if (input.exhibitors) {
+      console.log('Exposants');
+      await importExhibitors(app, edition, input.exhibitors, apply, log);
+    }
+    if (input.speakers) {
+      console.log('Intervenants');
+      await importSpeakers(app, edition, input.speakers, apply, log);
+    }
   } finally {
     // Strapi emits the entry.* events without awaiting them: leave them the time to end before the connection closes.
     await new Promise((resolve) => setTimeout(resolve, 750));

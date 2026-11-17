@@ -179,7 +179,7 @@ describe('rendez-vous : concurrence (lot 8)', { timeout: 900_000 }, () => {
       const world = await newEdition();
       const [lea, ines] = [await person(world.edition), await person(world.edition)];
       const client = await as(world.edition, lea);
-      const send = () => client.post('/meetings', { slotId: world.slots['10h45'].documentId, target: `p:${ines.documentId}` });
+      const send = () => client.post('/meetings', { slotId: world.slots['10h45'].documentId, target: `p:${ines.documentId}`, message: 'Bonjour, échangeons.' });
       const responses = await Promise.all([send(), send(), send()]);
       noServerError(responses);
       assert.equal(responses.filter((response) => response.status === 201).length, 1);
@@ -195,7 +195,7 @@ describe('rendez-vous : concurrence (lot 8)', { timeout: 900_000 }, () => {
       const client = await as(world.edition, lea);
       const targets = [];
       for (let index = 0; index < 14; index += 1) targets.push(await person(world.edition));
-      const responses = await Promise.all(targets.map((target, index) => client.post('/meetings', { slotId: world.slots[labels[index]].documentId, target: `p:${target.documentId}` })));
+      const responses = await Promise.all(targets.map((target, index) => client.post('/meetings', { slotId: world.slots[labels[index]].documentId, target: `p:${target.documentId}`, message: 'Bonjour, échangeons.' })));
       noServerError(responses);
       assert.equal(responses.filter((response) => response.status === 201).length, 10);
       assert.ok(responses.filter((response) => response.status === 409).every((response) => response.json.error.code === 'TOO_MANY_PENDING'));

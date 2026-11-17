@@ -39,7 +39,7 @@ type Props = {
   onClose?: () => void;
 };
 
-const MESSAGE_MAX = 300;
+const MESSAGE_MAX = 250;
 
 const SLOT_BASE = "flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-lg border-2 px-2 py-1 font-heading text-lg font-medium";
 const SLOT_LOOK = {
@@ -313,12 +313,13 @@ export default function SlotPicker({
               {mode !== "booking" && (
                 <div className="mt-6">
                   <label htmlFor={`${uid}-message`} className="block font-semibold">
-                    {isCounter ? "Un mot pour accompagner votre proposition (facultatif)" : "Un mot pour présenter votre demande (facultatif)"}
+                    {isCounter ? "Un mot pour accompagner votre proposition (facultatif)" : "Un mot pour présenter votre demande (obligatoire)"}
                   </label>
                   <textarea
                     id={`${uid}-message`}
                     rows={3}
                     maxLength={MESSAGE_MAX}
+                    required={!isCounter}
                     value={message}
                     onChange={(event) => setMessage(event.target.value)}
                     className="mt-2 min-h-24 w-full rounded-lg border-2 border-accent-dark bg-white px-4 py-3 text-lg text-ink"
@@ -340,7 +341,7 @@ export default function SlotPicker({
 
               <button
                 type="submit"
-                disabled={!chosen || sending}
+                disabled={!chosen || sending || (mode === "request" && !message.trim())}
                 aria-busy={sending}
                 aria-describedby={noteId}
                 className="mt-6 inline-flex min-h-13 w-full items-center justify-center rounded-lg bg-gold px-6 text-lg font-bold text-gold-ink shadow-md shadow-gold/25 hover:bg-gold-light disabled:cursor-not-allowed disabled:opacity-60"

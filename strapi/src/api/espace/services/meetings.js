@@ -14,7 +14,8 @@ const SLOT = 'api::espace.slot';
 const SEQUENCE = 'api::sequence.sequence';
 const EDITION = 'api::edition.edition';
 const ACTION_LINK_MINUTES = 72 * 60;
-const MESSAGE_MAX = 300;
+// D-08: 250 characters, and a request to a person does not leave without a word (a booking of a dedicated table may).
+const MESSAGE_MAX = 250;
 const REASON_MAX = 200;
 const CLOSED_LIMIT = 20;
 const DEFAULT_SESSION_MINUTES = 30;
@@ -398,6 +399,7 @@ function operations(strapi) {
         if (!check.ok) throw rules.meetingError(check.code);
 
         const booking = check.mode === 'booking';
+        if (!booking && !message) throw validation({ message: 'Écrivez un mot pour présenter votre demande.' });
         const meeting = await documents(MEETING).create({
           data: {
             edition: { documentId: editionId },
