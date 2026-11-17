@@ -1477,8 +1477,8 @@ const ADMIN_CONFIG = {
   'api::espace.email-log': {
     mainField: 'template',
     sort: ['sentAt', 'DESC'],
-    list: ['template', 'status', 'sentAt', 'scenarioKey'],
-    labels: { template: ['Gabarit'], status: ['Statut'], sentAt: ['Envoyé le'], scenarioKey: ['Motif'] },
+    list: ['template', 'status', 'sentAt', 'error', 'scenarioKey'],
+    labels: { template: ['Gabarit'], status: ['Statut'], sentAt: ['Envoyé le'], error: ['Motif'], scenarioKey: ['Scénario'] },
   },
 };
 
