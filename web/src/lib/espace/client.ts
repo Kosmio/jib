@@ -117,6 +117,12 @@ export async function request<T>(baseUrl: string, path: string, method: string, 
   }
 
   const data = await response.json().catch(() => null);
+  // F-104 : session perdue dans un îlot, retour à la connexion, qui ramène ensuite à la page courante.
+  const slug = typeof window === "undefined" ? null : window.location.pathname.match(/^\/espace\/([^/]+)\//)?.[1];
+  if (response.status === 401 && slug) {
+    const page = encodeURIComponent(window.location.pathname + window.location.search);
+    window.location.assign(`/espace/${slug}/connexion?next=${page}&expire=1`);
+  }
   if (!response.ok) {
     const error = data?.error;
     throw new EspaceApiError(response.status, error?.code ?? "UNKNOWN", error?.message ?? "", error?.fields);

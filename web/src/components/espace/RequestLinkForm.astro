@@ -12,13 +12,16 @@ export interface Props {
   /** Adresse refusée par l'API (?erreur=email). */
   emailInvalid?: boolean;
   button?: string;
+  /** Chemin interne à l'espace où revenir après la connexion (F-102) : transmis tel quel, l'API le valide. */
+  next?: string;
 }
 
-const { editionSlug, email = "", emailInvalid = false, button = "Recevoir mon lien" } = Astro.props;
+const { editionSlug, email = "", emailInvalid = false, button = "Recevoir mon lien", next = "" } = Astro.props;
 ---
 
 <form method="post" action={`${publicStrapiUrl}/api/espace/auth/request-link`} class="mt-6">
   <input type="hidden" name="editionSlug" value={editionSlug} />
+  {next && <input type="hidden" name="next" value={next} />}
   <label for="email" class="block font-semibold">Adresse e-mail utilisée pour l’inscription</label>
   <input
     id="email"

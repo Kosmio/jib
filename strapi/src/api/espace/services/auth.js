@@ -3,7 +3,7 @@
 const { EspaceError } = require('../lib/errors');
 const { normalizeEmail } = require('../lib/import');
 const { createRateLimiter } = require('../lib/rate-limit');
-const { COOKIE_NAME, sessionCookieOptions } = require('../lib/session');
+const { COOKIE_NAME, safeNextPath, sessionCookieOptions } = require('../lib/session');
 const { generateToken, hashToken, linkUrl } = require('../lib/tokens');
 
 const TOKEN = 'api::espace.magic-token';
@@ -16,13 +16,16 @@ const SESSION_MS = 30 * DAY_MS;
 const ORGANIZER_PROFILE = { firstName: 'Organisateur', lastName: 'JIB', company: 'Xylofutur' };
 
 module.exports = ({ strapi }) => {
-  // One limiter per Strapi instance (NF-03): a Strapi restarted by the tests starts from zero.
-  const limiter = createRateLimiter();
   const documents = (uid) => strapi.documents(uid);
   const settings = () => strapi.config.get('server.espace');
+  // One pair of limiters per Strapi instance (NF-03): a Strapi restarted by the tests starts from zero. NF-61: the IP ceiling comes from the settings.
+  const emailLimiter = createRateLimiter();
+  const ipLimiter = createRateLimiter({ max: settings().linkRateIpMax });
 
   const isListed = (email) => settings().organizerEmails.some((listed) => listed.trim().toLowerCase() === email.toLowerCase());
   const isOrganizer = (attendee) => attendee.role === 'organizer' || isListed(attendee.email);
+  // F-103: a closed edition stays open to its organizers (the dashboard), to nobody else.
+  const isOpenFor = (edition, attendee) => Boolean(edition) && (Boolean(edition.participantSpaceEnabled) || isOrganizer(attendee));
 
   const cookieOptions = () => sessionCookieOptions({ publicUrl: settings().publicUrl, maxAgeMs: SESSION_MS });
   const setCookie = (ctx, token) => ctx.cookies.set(COOKIE_NAME, token, cookieOptions());
@@ -56,16 +59,16 @@ module.exports = ({ strapi }) => {
   }
 
   const isUsable = ({ link, edition }, now) =>
-    !link.usedAt && new Date(link.expiresAt) > now && link.attendee.status === 'active' && Boolean(edition?.participantSpaceEnabled);
+    !link.usedAt && new Date(link.expiresAt) > now && link.attendee.status === 'active' && isOpenFor(edition, link.attendee);
 
   /** Sends the access link when the address belongs to an active attendee (or is an organizer's) of an open edition. */
-  async function deliverLink({ editionSlug, email, ip, now }) {
+  async function deliverLink({ editionSlug, email, next, ip, now }) {
     const edition = await strapi.service('api::espace.editions').findPublished(editionSlug);
-    if (!edition?.participantSpaceEnabled) return;
+    if (!edition) return;
 
     let attendee = await findAttendee(edition.documentId, email);
     if (!attendee && isListed(email)) attendee = await createOrganizer(edition.documentId, email);
-    if (attendee?.status !== 'active') return;
+    if (attendee?.status !== 'active' || !isOpenFor(edition, attendee)) return;
 
     const { publicUrl } = settings();
     const token = await strapi.service('api::espace.tokens').issueLink(attendee.documentId, { ttlMinutes: LINK_MINUTES, ip, now });
@@ -76,7 +79,7 @@ module.exports = ({ strapi }) => {
         edition: { slug: edition.slug, title: edition.title, themeColor: edition.hero_bg_color },
         publicUrl,
         firstName: attendee.firstName,
-        url: linkUrl({ publicUrl, token, next: `/espace/${edition.slug}/` }),
+        url: linkUrl({ publicUrl, token, next: safeNextPath(next, edition.slug) }),
         validityMinutes: LINK_MINUTES,
       },
       now,
@@ -87,18 +90,18 @@ module.exports = ({ strapi }) => {
     setCookie,
 
     /**
-     * F-01, F-02, NF-03. Throws 400 EMAIL_INVALID or 429 RATE_LIMITED, otherwise returns at once: the lookup and the
+     * F-01, F-02, NF-03. `next` (F-102) is kept when it stays inside the edition. Throws 400 EMAIL_INVALID or 429 RATE_LIMITED, otherwise returns at once: the lookup and the
      * sending are detached (A-19), so the response time does not tell a known address from an unknown one.
      * The counters of the address and of the IP are incremented before any lookup.
      */
-    requestLink({ editionSlug, email, ip, now = new Date() }) {
+    requestLink({ editionSlug, email, next, ip, now = new Date() }) {
       if (typeof editionSlug !== 'string') throw new EspaceError(400, 'VALIDATION', 'Édition non valable.');
       const address = normalizeEmail(email);
       if (!address) throw new EspaceError(400, 'EMAIL_INVALID', 'Saisissez une adresse e-mail valide.');
-      if (![`email:${address}`, `ip:${ip}`].map((key) => limiter.hit(key)).every(Boolean)) {
+      if (![emailLimiter.hit(address), ipLimiter.hit(ip)].every(Boolean)) {
         throw new EspaceError(429, 'RATE_LIMITED', 'Trop de demandes, réessayez dans quelques minutes.');
       }
-      deliverLink({ editionSlug, email: address, ip, now }).catch((error) =>
+      deliverLink({ editionSlug, email: address, next, ip, now }).catch((error) =>
         strapi.log.error(`[auth] access link not sent: ${error.message.split('\n')[0]}`)
       );
     },
@@ -110,7 +113,7 @@ module.exports = ({ strapi }) => {
       const { attendee } = loaded.link;
       const editionSlug = attendee.edition?.slug;
       if (isUsable(loaded, now)) return { valid: true, editionSlug };
-      return attendee.status === 'active' && loaded.edition?.participantSpaceEnabled ? { valid: false, editionSlug, email: attendee.email } : { valid: false, editionSlug };
+      return attendee.status === 'active' && isOpenFor(loaded.edition, attendee) ? { valid: false, editionSlug, email: attendee.email } : { valid: false, editionSlug };
     },
 
     /**
@@ -159,7 +162,7 @@ module.exports = ({ strapi }) => {
       });
       const attendee = session?.attendee;
       const edition = attendee?.status === 'active' ? await publishedEdition(attendee.edition?.documentId) : null;
-      if (!edition?.participantSpaceEnabled) return null;
+      if (!isOpenFor(edition, attendee)) return null;
 
       if (new Date(session.expiresAt).getTime() - now.getTime() < SESSION_MS - DAY_MS && canSetCookie(ctx)) {
         await documents(TOKEN).update({ documentId: session.documentId, data: { expiresAt: new Date(now.getTime() + SESSION_MS) } });

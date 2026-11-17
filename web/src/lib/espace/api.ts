@@ -103,14 +103,29 @@ export async function getMe(cookie: string | null): Promise<Me | null> {
  * Édition absente ou fermée : `notFound`. Sans session valable pour cette édition : E0. Sans consentement enregistré : E2
  * (sauf `consent: false`, pour E2 lui-même).
  */
+/** F-100 à F-102 : `next` s'il reste dans l'espace de l'édition, sinon l'accueil (même règle que `safeNextPath` de Strapi). */
+export function safeNext(next: string | null | undefined, slug: string): string {
+  const home = `/espace/${slug}/`;
+  if (!next?.startsWith(home)) return home;
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(next);
+  } catch {
+    return home;
+  }
+  return [next, decoded].some((path) => /\/\/|\\|\.\.|[\u0000-\u001f]/.test(path)) ? home : next;
+}
+
 export type EspaceGuard = { edition: EspaceEdition; me: Me } | { redirect: string } | { notFound: true };
 
-export async function guardSession(slug: string, cookie: string | null, { consent = true } = {}): Promise<EspaceGuard> {
-  const edition = await getOpenEdition(slug);
+export async function guardSession(slug: string, cookie: string | null, { consent = true, pilotage = false } = {}): Promise<EspaceGuard> {
+  const edition = await getEdition(slug);
   if (!edition) return { notFound: true };
   const base = `/espace/${encodeURIComponent(slug)}`;
   const me = await getMe(cookie);
-  if (me?.edition.slug !== slug) return { redirect: `${base}/connexion` };
+  if (me?.edition.slug !== slug) return edition.participantSpaceEnabled || pilotage ? { redirect: `${base}/connexion` } : { notFound: true };
+  // F-103 : espace fermé, seul l'organisateur a une session ; il n'a accès qu'au pilotage (`pilotage: true`), les autres écrans le lui renvoient.
+  if (!edition.participantSpaceEnabled) return pilotage ? { edition, me } : { redirect: `${base}/organisateur` };
   if (consent && !me.consent.consentAt) return { redirect: `${base}/bienvenue` };
   return { edition, me };
 }

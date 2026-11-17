@@ -9,7 +9,7 @@ import EditionBanner from "../../components/espace/EditionBanner.astro";
 import EspaceCard from "../../components/espace/EspaceCard.astro";
 import EspaceButton from "../../components/espace/EspaceButton.astro";
 import RequestLinkForm from "../../components/espace/RequestLinkForm.astro";
-import { getLinkState, getOpenEdition, publicStrapiUrl, type LinkState } from "../../lib/espace/api";
+import { getEdition, getLinkState, getMe, publicStrapiUrl, safeNext, type LinkState } from "../../lib/espace/api";
 import { editionSlugFromPath, meetingsSubtitle } from "../../lib/espace/format";
 
 const token = Astro.url.searchParams.get("token") ?? "";
@@ -18,7 +18,11 @@ const next = Astro.url.searchParams.get("next") ?? "";
 const link: LinkState = token ? await getLinkState(token) : { valid: false };
 // L'édition vient du lien s'il est connu, sinon de `next` (A-18) ; absente ou fermée, il n'y a ni formulaire ni couleur d'édition.
 const slug = link.editionSlug ?? editionSlugFromPath(next);
-const edition = slug ? await getOpenEdition(slug) : null;
+const edition = slug ? await getEdition(slug) : null;
+// F-101 : lien inutilisable mais session valable pour l'édition visée : retour à `next` plutôt que l'écran d'échec.
+if (!link.valid && slug && (await getMe(Astro.request.headers.get("cookie")))?.edition.slug === slug) {
+  return Astro.redirect(safeNext(next, slug), 303);
+}
 const valid = link.valid && edition !== null;
 ---
 
@@ -39,7 +43,7 @@ const valid = link.valid && edition !== null;
       <EspaceCard heading="Ce lien n’est plus valable">
         <p class="mt-4">Il a expiré ou a déjà été utilisé. Recevez un nouveau lien à l’adresse de votre inscription.</p>
         {edition ? (
-          <RequestLinkForm editionSlug={edition.slug} email={link.email} button="Recevoir un nouveau lien" />
+          <RequestLinkForm editionSlug={edition.slug} email={link.email} button="Recevoir un nouveau lien" next={next && slug ? safeNext(next, slug) : ""} />
         ) : (
           <EspaceButton variant="secondary" href="/" class="mt-6">
             Retour au site des Journées

@@ -7,14 +7,19 @@ import EspaceCard from "../../../components/espace/EspaceCard.astro";
 import EspaceButton from "../../../components/espace/EspaceButton.astro";
 import Notice from "../../../components/espace/Notice.astro";
 import RequestLinkForm from "../../../components/espace/RequestLinkForm.astro";
-import { getOpenEdition } from "../../../lib/espace/api";
+import { getEdition, getMe, safeNext } from "../../../lib/espace/api";
 import { meetingsSubtitle } from "../../../lib/espace/format";
 
 const slug = Astro.params.edition ?? "";
-const edition = await getOpenEdition(slug);
+const edition = await getEdition(slug);
 if (!edition) return Astro.rewrite("/espace/introuvable");
 
 const query = Astro.url.searchParams;
+// F-100 : une session valable pour cette édition renvoie à `next` (interne à l'espace de l'édition) ou à l'accueil, sans lien émis.
+if ((await getMe(Astro.request.headers.get("cookie")))?.edition.slug === slug) return Astro.redirect(safeNext(query.get("next"), slug), 303);
+// F-102 : `next` et l'adresse saisie survivent à une nouvelle demande.
+const next = query.get("next") ? safeNext(query.get("next"), slug) : "";
+const email = query.get("email") ?? "";
 const state =
   query.get("envoye") === "1"
     ? "sent"
@@ -24,10 +29,14 @@ const state =
         ? "invalidEmail"
         : query.get("deconnecte") === "1"
           ? "loggedOut"
-          : "initial";
+          : query.get("expire") === "1"
+            ? "expired"
+            : "initial";
+const retry = new URLSearchParams({ ...(email && { email }), ...(next && { next }) }).toString();
 const titles = {
   initial: "Connexion",
   loggedOut: "Connexion",
+  expired: "Connexion",
   sent: "Lien envoyé",
   tooMany: "Trop de demandes",
   invalidEmail: "Adresse non valide",
@@ -40,21 +49,22 @@ const titles = {
     state === "sent" ? (
       <EspaceCard heading="Vérifiez votre messagerie">
         <p role="status" class="mt-4 font-semibold">
-          Si cette adresse est inscrite, un lien vient de vous être envoyé.
+          Si cette adresse est inscrite, un lien vient de vous être envoyé{email && <> à <strong>{email}</strong></>}.
         </p>
         <p class="mt-2 text-muted">
           Le lien est valable 30&nbsp;minutes et ne fonctionne qu’une seule fois. Rien reçu&nbsp;? Regardez dans vos courriers
           indésirables, puis demandez un nouveau lien.
         </p>
-        <EspaceButton variant="secondary" href={`/espace/${encodeURIComponent(slug)}/connexion`} class="mt-6">
+        <EspaceButton variant="secondary" href={`/espace/${encodeURIComponent(slug)}/connexion${retry && `?${retry}`}`} class="mt-6">
           Demander un nouveau lien
         </EspaceButton>
       </EspaceCard>
     ) : (
       <EspaceCard heading="Recevoir mon lien de connexion">
         {state === "tooMany" && <Notice kind="alert">Trop de demandes, réessayez dans quelques minutes.</Notice>}
+        {state === "expired" && <Notice kind="alert">Votre session a expiré, demandez un nouveau lien.</Notice>}
         {state === "loggedOut" && <Notice kind="status">Déconnexion effectuée.</Notice>}
-        <RequestLinkForm editionSlug={slug} emailInvalid={state === "invalidEmail"} />
+        <RequestLinkForm editionSlug={slug} emailInvalid={state === "invalidEmail"} {email} {next} />
       </EspaceCard>
     )
   }

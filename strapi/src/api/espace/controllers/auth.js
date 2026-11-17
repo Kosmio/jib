@@ -17,16 +17,21 @@ function see(ctx, path) {
 module.exports = {
   // POST /api/espace/auth/request-link (public): F-01, F-02, NF-03
   requestLink: async (ctx) => {
-    const { editionSlug, email } = bodyOf(ctx);
+    const { editionSlug, email, next } = bodyOf(ctx);
+    // F-102: the form's `next` comes back to the login page, so that a new request keeps it ; the address comes back to be recalled.
+    const back = (params) => {
+      const query = new URLSearchParams({ ...params, ...(text(next) && { next: safeNextPath(next, editionSlug) }) });
+      return see(ctx, `/espace/${encodeURIComponent(editionSlug)}/connexion?${query}`);
+    };
     try {
-      strapi.service('api::espace.auth').requestLink({ editionSlug, email, ip: ctx.request.ip });
+      strapi.service('api::espace.auth').requestLink({ editionSlug, email, next, ip: ctx.request.ip });
     } catch (error) {
       const failure = error instanceof EspaceError && { RATE_LIMITED: 'trop', EMAIL_INVALID: 'email' }[error.code];
       if (!isForm(ctx) || !failure) throw error;
-      return see(ctx, `/espace/${encodeURIComponent(editionSlug)}/connexion?erreur=${failure}`);
+      return back({ erreur: failure });
     }
 
-    if (isForm(ctx)) return see(ctx, `/espace/${encodeURIComponent(editionSlug)}/connexion?envoye=1`);
+    if (isForm(ctx)) return back({ envoye: '1', ...(text(email) && { email: email.trim().slice(0, 254) }) });
     ctx.status = 202;
     ctx.body = { status: 'accepted' };
   },
@@ -56,7 +61,12 @@ module.exports = {
 
     const { attendee, edition, isOrganizer, sessionToken } = opened;
     auth.setCookie(ctx, sessionToken);
-    const redirect = attendee.consentAt ? safeNextPath(next, edition.slug) : `/espace/${edition.slug}/bienvenue`;
+    // F-103: on a closed edition the organizer goes to the dashboard, the only screen open to them.
+    const redirect = !edition.participantSpaceEnabled
+      ? `/espace/${edition.slug}/organisateur`
+      : attendee.consentAt
+        ? safeNextPath(next, edition.slug)
+        : `/espace/${edition.slug}/bienvenue`;
     if (isForm(ctx)) return see(ctx, redirect);
     ctx.body = { me: strapi.service('api::espace.me').toMe({ attendee, edition, isOrganizer }), redirect };
   },
