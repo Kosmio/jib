@@ -10,7 +10,7 @@
  * `tests/fixtures/existing-schemas.json`, relevée au commit a70a56e), et ne reçoivent que des champs scalaires :
  * 9 champs privés sur `edition`, `kind` sur `sequence`. Toute relation nouvelle part d'un type nouveau `api::espace.*`.
  *
- * Modèle du lot 2 (tests d'abord) : les types nouveaux (10 au lot 2, 11 avec `badge-setting` du lot V4-D1), leurs relations et leurs champs clés.
+ * Modèle du lot 2 (tests d'abord) : les types nouveaux (10 au lot 2, 11 avec `badge-setting` du lot V4-D1, 12 avec `message-report` du lot V5-B), leurs relations et leurs champs clés.
  */
 
 const { describe, it } = require('node:test');
@@ -115,7 +115,7 @@ describe('types de l’espace : règles communes (A-03, 02-modele-donnees.md)', 
   }
 });
 
-describe('modèle du lot 2 : les 11 types nouveaux (section 3 du plan, plus badge-setting du lot V4-D1)', () => {
+describe('modèle du lot 2 : les 12 types nouveaux (section 3 du plan, plus badge-setting du lot V4-D1 et message-report du lot V5-B)', () => {
   const EXPECTED = {
     topic: { table: 'espace_topics', relations: { edition: 'api::edition.edition', sessions: 'api::sequence.sequence' } },
     slot: { table: 'espace_slots', relations: { edition: 'api::edition.edition', session: 'api::sequence.sequence' } },
@@ -148,9 +148,11 @@ describe('modèle du lot 2 : les 11 types nouveaux (section 3 du plan, plus badg
     'sync-run': { table: 'espace_sync_runs', relations: { edition: 'api::edition.edition' } },
     // V4-D1 (12-badges.md, F-99) : plan du lieu et accent du badge, une entrée par édition ; A-15 interdit d'ajouter un média à `edition`.
     'badge-setting': { table: 'espace_badge_settings', relations: { edition: 'api::edition.edition' } },
+    // V5-B (F-75, R-63) : signalement d'un message par son destinataire ; `message` reste nullable (le message peut disparaître avec l'effacement).
+    'message-report': { table: 'espace_message_reports', relations: { edition: 'api::edition.edition', message: 'api::espace.message', author: 'api::espace.attendee' } },
   };
 
-  it('contient exactement ces 11 types (Notification est P2 : non créée)', () => {
+  it('contient exactement ces 12 types (Notification est P2 : non créée)', () => {
     assert.deepEqual(espaceTypes().sort(), Object.keys(EXPECTED).sort());
   });
 
@@ -273,10 +275,11 @@ describe('modèle du lot 2 : les 11 types nouveaux (section 3 du plan, plus badg
     assert.ok(!kind.private, 'sequence.kind reste lisible par l’API publique (le site et le MCP)');
   });
 
-  it('le MCP ne reçoit que sequence.kind : aucun type de l’espace n’y figure (données personnelles, aucune route REST)', () => {
+  it('le MCP décrit sequence.kind et les réglages de l’édition (V5-F), mais aucun type de l’espace (données personnelles, aucune route REST)', () => {
     const mcp = require('../../mcp/content-types.json');
     assert.ok('kind' in mcp.sequences.fields, 'sequences.fields.kind');
-    assert.deepEqual(Object.keys(mcp).filter((key) => /attendee|topic|slot|exhibitor|meeting|conversation|message|token|email-log|sync|badge/i.test(key)), []);
-    for (const field of EDITION_FIELDS) assert.ok(!(field in mcp.editions.fields), `editions.fields.${field} ne doit pas figurer dans le MCP`);
+    assert.deepEqual(Object.keys(mcp).filter((key) => /attendee|topic|slot|exhibitor|meeting|conversation|message|token|email-log|sync|badge|report/i.test(key)), []);
+    // V5-F a voulu les réglages de l'espace dans content-types.json (privés, jamais relus) ; la synchronisation fine est dans mcp.test.js.
+    for (const field of EDITION_FIELDS) assert.ok(field in mcp.editions.fields, `editions.fields.${field} décrit dans le MCP (V5-F)`);
   });
 });

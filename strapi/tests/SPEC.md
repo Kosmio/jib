@@ -372,3 +372,14 @@ Défauts de la revue de l'architecte (section 11 du plan), corrigés au lot 6b (
 - Les e2e du lot 16 ne servent pas la PWA en test par défaut : `serviceWorkers: 'block'` dans `web/playwright.config.ts`, réautorisé par `espace-pwa.spec.ts` seul. Sans cela, le service worker de `/espace/` intercepterait chaque navigation.
 - Les tests e2e de l'espace partagent une base non remise à zéro entre eux : ils ne rejouent pas deux fois le même inscrit après consommation de son lien, et ne se relancent pas en désordre sur la même base (`test:e2e` vide la base à chaque exécution). Le fichier de boîte de sortie se lit en dehors de Strapi : `e2e/espace.ts` recalcule son chemin par `buildTestEnv`, et `e2e-server.js` le supprime au démarrage.
 - Playwright coupe JavaScript par l'émulation du protocole : Chromium n'affiche alors pas le contenu de `<noscript>`. Le test lit donc le HTML servi pour ce message, et prouve que l'îlot ne s'hydrate pas par la note F-11 qui n'apparaît pas.
+
+## Lot V5-B : signalement d'un message (F-75, R-63)
+
+| Fichier | Couvre | Tests |
+|---|---|---|
+| `integration/espace-signalements.test.js` | `POST /conversations/:id/messages/:messageId/report` (201, motif rogné, 500 caractères admis, 400 `fields.reason` pour absent, vide, espaces, non texte et 501, sans écriture ni e-mail) ; critère 1 (son message, tiers, organisateur non participant, autre conversation, autre édition, identifiants inconnus : 404 `MESSAGE_NOT_FOUND`) ; critère 3 (409 `ALREADY_REPORTED`, simultanés : un seul 201) ; critère 4 (participant, intervenant, représentant, organisateur d'une autre édition : 403 ; `ORGANIZER_EMAILS` admis) ; critère 2 et R-63 (la file ne contient que le message signalé, forme exacte, ouverts et traités, plus récent d'abord, cloisonnée par édition, fil toujours 404 pour l'organisateur) ; `handle` (200, idempotent à date constante, 404 `REPORT_NOT_FOUND`, autre édition) ; e-mail `message-report` (organisateurs actifs seulement, sans contenu, lien 72 h vers le pilotage et session ouverte par ce lien, rien sur un refus) | 41 |
+| `e2e/espace-signalements.spec.ts` | Fil de Léa (« Signaler » sur les seuls messages reçus, motif obligatoire, limite 500, confirmation « Signalement transmis à l'organisation », 409 reçu comme transmis, erreur réseau lisible) ; e-mail sans contenu ; 403 pour un participant ; carte « Messages signalés » (seul message signalé affiché) et « Marquer comme traité » | 10 |
+| `unit/schemas.test.js` | 12 types de l'espace (ajout `message-report`) ; le MCP décrit les réglages de l'édition depuis V5-F, jamais un type de l'espace | 90 |
+| `unit/mcp.test.js` | contrôle des tirets cadratins sans écrire le caractère (il faisait échouer `conventions.test.js`, qui lit `strapi/tests`) | |
+
+Limite : un organisateur seulement listé dans `ORGANIZER_EMAILS` n'a pas d'inscrit avant sa première connexion et ne reçoit donc pas l'e-mail.

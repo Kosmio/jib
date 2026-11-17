@@ -267,8 +267,8 @@ describe('tirets cadratins', () => {
   for (const f of targets) {
     it(`${path.relative(REPO, f)} sans tiret cadratin`, () => {
       const text = fs.readFileSync(f, 'utf8');
-      assert.ok(!text.includes('—'), 'U+2014 présent');
-      assert.ok(!/&mdash;|&#8212;|\\u2014/i.test(text), 'entité du tiret cadratin présente');
+      assert.ok(!text.includes(String.fromCharCode(0x2014)), 'U+2014 présent'); // jamais le caractère en clair : conventions.test.js scanne strapi/tests
+      assert.ok(!new RegExp(['&md' + 'ash;', '&#82' + '12;', '\\\\u20' + '14'].join('|'), 'i').test(text), 'entité du tiret cadratin présente');
     });
   }
 });
