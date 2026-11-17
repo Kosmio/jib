@@ -75,7 +75,7 @@ const initial = {
       )
     }
 
-    <form method="post" action={`${publicStrapiUrl}/api/espace/auth/logout`}>
+    <form method="post" action={`${publicStrapiUrl}/api/espace/auth/logout`} data-espace-deconnexion>
       <input type="hidden" name="editionSlug" value={slug} />
       <EspaceButton variant="secondary">Me déconnecter</EspaceButton>
     </form>
