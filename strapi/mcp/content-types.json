@@ -2,7 +2,7 @@
   "tags": {
     "singularName": "tag",
     "displayName": "Tag",
-    "description": "Étiquettes thématiques utilisées pour catégoriser organisations et intervenants (ex: 'innovation', 'bois-construction'). Pas de draft/publish — les tags sont immédiatement disponibles dès leur création.",
+    "description": "Étiquettes thématiques utilisées pour catégoriser organisations et intervenants (ex: 'innovation', 'bois-construction'). Pas de draft/publish, les tags sont immédiatement disponibles dès leur création.",
     "draftAndPublish": false,
     "fields": {
       "name": {
@@ -139,7 +139,7 @@
       "interventions": {
         "type": "relation manyToMany",
         "target": "interventions",
-        "description": "Interventions (prises de parole) de cet intervenant. Relation inverse — gérée côté intervention"
+        "description": "Interventions (prises de parole) de cet intervenant. Relation inverse, gérée côté intervention"
       }
     }
   },
@@ -151,11 +151,16 @@
     "fields": {
       "display_name": {
         "type": "string",
-        "description": "Libellé d'affichage du partenariat (ex: 'Xylofutur — Co-organisateur'). Si vide, le nom de l'organisation est utilisé"
+        "description": "Libellé d'affichage du partenariat (ex: 'Xylofutur - Co-organisateur'). Si vide, le nom de l'organisation est utilisé"
       },
       "role": {
         "type": "enumeration",
-        "enum": ["soutien", "co-organisateur", "institutionnel", "prive"],
+        "enum": [
+          "soutien",
+          "co-organisateur",
+          "institutionnel",
+          "prive"
+        ],
         "required": true,
         "description": "Type de partenariat. 'co-organisateur' = pôle/Fibois ; 'soutien' = financeur ; 'institutionnel' = acteur public ; 'prive' = entreprise"
       },
@@ -180,7 +185,7 @@
       "title": {
         "type": "string",
         "required": true,
-        "description": "Titre complet de l'édition (ex: 'Journées de l'Innovation Filière Bois — Paris 2025')"
+        "description": "Titre complet de l'édition (ex: 'Journées de l'Innovation Filière Bois, Paris 2025')"
       },
       "slug": {
         "type": "uid",
@@ -193,7 +198,21 @@
       },
       "region": {
         "type": "enumeration",
-        "enum": ["normandie", "provence-alpes-cote-d-azur", "nouvelle-aquitaine", "auvergne-rhone-alpes", "ile-de-france", "bretagne", "occitanie", "grand-est", "hauts-de-france", "pays-de-la-loire", "bourgogne-franche-comte", "centre-val-de-loire", "corse"],
+        "enum": [
+          "normandie",
+          "provence-alpes-cote-d-azur",
+          "nouvelle-aquitaine",
+          "auvergne-rhone-alpes",
+          "ile-de-france",
+          "bretagne",
+          "occitanie",
+          "grand-est",
+          "hauts-de-france",
+          "pays-de-la-loire",
+          "bourgogne-franche-comte",
+          "centre-val-de-loire",
+          "corse"
+        ],
         "required": true,
         "description": "Région française d'accueil"
       },
@@ -208,7 +227,12 @@
       },
       "edition_status": {
         "type": "enumeration",
-        "enum": ["a-venir", "inscriptions-ouvertes", "complet", "passee"],
+        "enum": [
+          "a-venir",
+          "inscriptions-ouvertes",
+          "complet",
+          "passee"
+        ],
         "required": true,
         "description": "État de l'édition. Pilote l'affichage du CTA d'inscription"
       },
@@ -265,6 +289,60 @@
         "type": "relation manyToMany",
         "target": "partenaires",
         "description": "Partenariats associés à cette édition"
+      },
+      "participants_count": {
+        "type": "integer",
+        "description": "Nombre de participants affiché sur le site public (entier positif ou nul)"
+      },
+      "participantSpaceEnabled": {
+        "type": "boolean",
+        "private": true,
+        "description": "Réglage de l'espace participant, privé : modifiable mais jamais renvoyé par l'API (impossible de relire la valeur). Ouvre l'espace participant de cette édition (défaut false). À activer seulement quand l'organisation le demande."
+      },
+      "welcomeStartedAt": {
+        "type": "datetime",
+        "private": true,
+        "description": "Réglage de l'espace participant, privé : modifiable mais jamais renvoyé par l'API (impossible de relire la valeur). Date d'envoi du premier e-mail d'accueil, posée par le système. Ne pas modifier."
+      },
+      "helloassoOrgSlug": {
+        "type": "string",
+        "private": true,
+        "description": "Réglage de l'espace participant, privé : modifiable mais jamais renvoyé par l'API (impossible de relire la valeur). Identifiant HelloAsso de l'association (slug)."
+      },
+      "helloassoFormType": {
+        "type": "enumeration",
+        "private": true,
+        "description": "Réglage de l'espace participant, privé : modifiable mais jamais renvoyé par l'API (impossible de relire la valeur). Type du formulaire HelloAsso : Event, Membership, CrowdFunding, Donation, PaymentForm, Checkout ou Shop (défaut Event)."
+      },
+      "helloassoFormSlug": {
+        "type": "string",
+        "private": true,
+        "description": "Réglage de l'espace participant, privé : modifiable mais jamais renvoyé par l'API (impossible de relire la valeur). Identifiant (slug) du formulaire HelloAsso des inscriptions."
+      },
+      "helloassoFieldMap": {
+        "type": "json",
+        "private": true,
+        "description": "Réglage de l'espace participant, privé : modifiable mais jamais renvoyé par l'API (impossible de relire la valeur). Correspondance entre les champs personnalisés HelloAsso et ceux de l'espace (objet JSON). Ne pas modifier sans consigne."
+      },
+      "slotDurationMinutes": {
+        "type": "integer",
+        "private": true,
+        "description": "Réglage de l'espace participant, privé : modifiable mais jamais renvoyé par l'API (impossible de relire la valeur). Durée d'un créneau de rendez-vous B2B en minutes (défaut 15, minimum 1)."
+      },
+      "tablesCount": {
+        "type": "integer",
+        "private": true,
+        "description": "Réglage de l'espace participant, privé : modifiable mais jamais renvoyé par l'API (impossible de relire la valeur). Nombre de tables disponibles pour les rendez-vous B2B (défaut 20, minimum 0)."
+      },
+      "meetingRequestsOpenAt": {
+        "type": "datetime",
+        "private": true,
+        "description": "Réglage de l'espace participant, privé : modifiable mais jamais renvoyé par l'API (impossible de relire la valeur). Début de la fenêtre de demandes de rendez-vous (date et heure ISO 8601, UTC)."
+      },
+      "meetingRequestsCloseAt": {
+        "type": "datetime",
+        "private": true,
+        "description": "Réglage de l'espace participant, privé : modifiable mais jamais renvoyé par l'API (impossible de relire la valeur). Fin de la fenêtre de demandes de rendez-vous (date et heure ISO 8601, UTC)."
       }
     }
   },
@@ -277,7 +355,7 @@
       "slug": {
         "type": "uid",
         "required": true,
-        "description": "Identifiant URL — slugs utilisés par le site : 'mentions-legales', 'confidentialite'. Pour ajouter une nouvelle page, créez aussi le fichier .astro correspondant côté front"
+        "description": "Identifiant URL, slugs utilisés par le site : 'mentions-legales', 'confidentialite'. Pour ajouter une nouvelle page, créez aussi le fichier .astro correspondant côté front"
       },
       "title": {
         "type": "string",
@@ -291,7 +369,7 @@
       "body": {
         "type": "richtext",
         "required": true,
-        "description": "Contenu principal de la page en Markdown — liens, listes, gras/italique, headings (## et ###) supportés"
+        "description": "Contenu principal de la page en Markdown, liens, listes, gras/italique, headings (## et ###) supportés"
       },
       "meta_description": {
         "type": "text",
@@ -317,7 +395,7 @@
       },
       "end_time": {
         "type": "string",
-        "description": "Heure de fin (même format que start_time). Optionnel — si vide, affichage 'À partir de {start_time}'"
+        "description": "Heure de fin (même format que start_time). Optionnel, si vide, affichage 'À partir de {start_time}'"
       },
       "description": {
         "type": "richtext",
@@ -329,7 +407,13 @@
       },
       "theme": {
         "type": "enumeration",
-        "enum": ["foret", "industrie", "coproduits", "ville", "construction"],
+        "enum": [
+          "foret",
+          "industrie",
+          "coproduits",
+          "ville",
+          "construction"
+        ],
         "description": "Thème visuel de la séquence, repris du programme imprimé : donne la couleur du bandeau et le pictogramme. 'foret' = vert, arbre ; 'industrie' = jaune, éclair ; 'coproduits' = bronze, fiole ; 'ville' = bordeaux, rondins ; 'construction' = bleu ardoise, bâtiment. Vide = carte neutre (accueil, pauses)"
       },
       "subtitle": {
@@ -338,7 +422,11 @@
       },
       "kind": {
         "type": "enumeration",
-        "enum": ["talk", "b2b_break", "other"],
+        "enum": [
+          "talk",
+          "b2b_break",
+          "other"
+        ],
         "description": "Nature de la séquence. 'talk' (par défaut) = intervention ; 'b2b_break' = pause avec rendez-vous B2B, dont l’heure de fin est obligatoire et qui génère les créneaux de rendez-vous de l’espace participant ; 'other' = accueil, clôture, etc. À choisir à la main, jamais déduit du titre"
       },
       "edition": {
@@ -366,7 +454,7 @@
   "home-page": {
     "singularName": "home-page",
     "displayName": "Page d'accueil",
-    "description": "Single type — une seule entrée. Textes éditables de la page d'accueil, structurés par sections (hero, pourquoi, éditions, dynamique, partenaires, suite). Le frontend retombe sur des valeurs par défaut si la fiche est vide.",
+    "description": "Single type, une seule entrée. Textes éditables de la page d'accueil, structurés par sections (hero, pourquoi, éditions, dynamique, partenaires, suite). Le frontend retombe sur des valeurs par défaut si la fiche est vide.",
     "kind": "singleType",
     "draftAndPublish": true,
     "fields": {
@@ -380,11 +468,11 @@
       },
       "pourquoi_title": {
         "type": "string",
-        "description": "Section 'Pourquoi ?' — titre"
+        "description": "Section 'Pourquoi ?', titre"
       },
       "pourquoi_intro": {
         "type": "text",
-        "description": "Section 'Pourquoi ?' — paragraphe d'introduction"
+        "description": "Section 'Pourquoi ?', paragraphe d'introduction"
       },
       "pourquoi_cards": {
         "type": "component repeatable (home.feature-card)",
@@ -396,39 +484,39 @@
       },
       "editions_title": {
         "type": "string",
-        "description": "Section 'Éditions' — titre"
+        "description": "Section 'Éditions', titre"
       },
       "editions_intro": {
         "type": "text",
-        "description": "Section 'Éditions' — paragraphe d'introduction"
+        "description": "Section 'Éditions', paragraphe d'introduction"
       },
       "dynamique_title": {
         "type": "string",
-        "description": "Section 'Dynamique collective' — titre"
+        "description": "Section 'Dynamique collective', titre"
       },
       "dynamique_body": {
         "type": "richtext",
-        "description": "Section 'Dynamique collective' — texte. Markdown gras (**...**) supporté"
+        "description": "Section 'Dynamique collective', texte. Markdown gras (**...**) supporté"
       },
       "partenaires_label": {
         "type": "string",
-        "description": "Bandeau partenaires — petite étiquette au-dessus des logos (ex: 'Avec le soutien de')"
+        "description": "Bandeau partenaires, petite étiquette au-dessus des logos (ex: 'Avec le soutien de')"
       },
       "suite_title": {
         "type": "string",
-        "description": "Section 'Et pour la suite ?' — titre"
+        "description": "Section 'Et pour la suite ?', titre"
       },
       "suite_body": {
         "type": "text",
-        "description": "Section 'Et pour la suite ?' — paragraphe"
+        "description": "Section 'Et pour la suite ?', paragraphe"
       },
       "suite_cta_label": {
         "type": "string",
-        "description": "Section 'Et pour la suite ?' — libellé du bouton CTA"
+        "description": "Section 'Et pour la suite ?', libellé du bouton CTA"
       },
       "suite_cta_url": {
         "type": "string",
-        "description": "Section 'Et pour la suite ?' — URL du bouton (ex: page Outlook de prise de RDV)"
+        "description": "Section 'Et pour la suite ?', URL du bouton (ex: page Outlook de prise de RDV)"
       }
     }
   },
@@ -450,7 +538,7 @@
       },
       "description": {
         "type": "richtext",
-        "description": "Description propre de l'intervention en Markdown (ex: pitch du sujet abordé). Optionnelle — si vide, n'apparaît pas"
+        "description": "Description propre de l'intervention en Markdown (ex: pitch du sujet abordé). Optionnelle, si vide, n'apparaît pas"
       },
       "presentation": {
         "type": "media",
