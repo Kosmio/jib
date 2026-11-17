@@ -38,11 +38,34 @@ test('manifeste de l’édition et icônes (F-05, NF-24)', async ({ page }) => {
     short_name: 'JIB',
   });
   expect(manifest.theme_color).toMatch(/^#[0-9a-f]{6}$/i);
-  expect(manifest.icons.map((icon: { sizes: string }) => icon.sizes).sort()).toEqual(['192x192', '512x512']);
+  expect(manifest.icons.map((icon: { sizes: string; purpose: string }) => `${icon.sizes} ${icon.purpose}`).sort()).toEqual(['192x192 any', '512x512 any', '512x512 maskable']);
   for (const icon of manifest.icons) {
     const file = await page.request.get(icon.src);
     expect(file.status(), icon.src).toBe(200);
     expect(file.headers()['content-type'], icon.src).toContain('image/png');
+  }
+});
+
+test('icône maskable 512 px : entrée du manifeste et fichier PNG de 512 x 512 servi (F-130)', async ({ page }) => {
+  const manifest = await (await page.request.get(`${ESPACE}/manifest.webmanifest`)).json();
+  const maskable = manifest.icons.filter((icon: { purpose: string }) => icon.purpose === 'maskable');
+  expect(maskable).toHaveLength(1);
+  expect(maskable[0]).toMatchObject({ src: '/espace/icon-maskable-512.png', sizes: '512x512', type: 'image/png' });
+
+  const file = await page.request.get(maskable[0].src);
+  expect(file.status()).toBe(200);
+  expect(file.headers()['content-type']).toContain('image/png');
+  const png = await file.body();
+  expect(png.subarray(1, 4).toString('ascii')).toBe('PNG');
+  expect([png.readUInt32BE(16), png.readUInt32BE(20)], 'dimensions du PNG').toEqual([512, 512]);
+});
+
+test('balise theme-color dans la mise en page, sur les pages de l’édition et sur la vérification du lien (F-130)', async ({ page }) => {
+  for (const path of [`${ESPACE}/connexion`, `${ESPACE}/programme`, '/espace/verifier?token=jeton-inconnu']) {
+    await page.goto(path);
+    const meta = page.locator('meta[name="theme-color"]');
+    await expect(meta, path).toHaveCount(1);
+    await expect(meta, path).toHaveAttribute('content', /^#[0-9a-f]{6}$/i);
   }
 });
 

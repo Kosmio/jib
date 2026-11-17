@@ -120,7 +120,7 @@ const REQUEST = {
 
 describeTemplate('meeting-request', {
   data: REQUEST,
-  urls: [REQUEST.acceptUrl, REQUEST.viewUrl],
+  urls: [REQUEST.acceptUrl],
   mustContain: ['Léa', 'Inès Castaing', 'Cheffe de projet, Atelier Fictif', SLOT_LABEL, 'Cocktail déjeunatoire et B2B', 'Bonjour Léa, échangeons sur la construction bois.'],
   hostile: ['firstName', 'requesterName', 'requesterSubtitle', 'sessionTitle', 'message'],
 });
@@ -129,17 +129,20 @@ describe('meeting-request : boutons, message et nouvelle proposition (F-52, A-31
   const rendered = (overrides = {}) => renderEmail('meeting-request', { ...REQUEST, ...overrides });
   const everything = (result) => `${result.subject}\n${result.html}\n${result.text}`;
 
-  it('le bouton « Accepter » mène au lien d’action d’acceptation, « Voir la demande » au lien de consultation', () => {
-    const { html } = rendered();
-    const hrefOf = (label) => html.match(new RegExp(`<a href="([^"]+)"[^>]*>${label}</a>`))?.[1];
-    assert.equal(hrefOf('Accepter')?.replaceAll('&amp;', '&'), REQUEST.acceptUrl);
-    assert.equal(hrefOf('Voir la demande')?.replaceAll('&amp;', '&'), REQUEST.viewUrl);
+  const buttons = (html) => [...html.matchAll(/<a href="([^"]+)"[^>]*>([^<]+)<\/a>/g)].map(([, href, label]) => ({ href: href.replaceAll('&amp;', '&'), label }));
+
+  it('un seul bouton principal « Répondre à la demande », vers le lien d’action (F-127)', () => {
+    const main = buttons(rendered().html).filter(({ label }) => label !== 'Gérer mes notifications');
+    assert.deepEqual(main, [{ href: REQUEST.acceptUrl, label: 'Répondre à la demande' }]);
   });
 
-  it('les deux liens sont distincts : chaque bouton porte son propre lien d’action (A-33)', () => {
-    assert.notEqual(REQUEST.acceptUrl, REQUEST.viewUrl);
-    const { text } = rendered();
-    assert.ok(text.includes(REQUEST.acceptUrl) && text.includes(REQUEST.viewUrl));
+  it('ni « Accepter » ni « Voir la demande » : les deux anciens boutons ont disparu (F-127)', () => {
+    const { html, text } = rendered();
+    for (const old of ['Accepter', 'Voir la demande']) {
+      assert.ok(!buttons(html).some(({ label }) => label === old), `bouton « ${old} » encore présent`);
+      assert.ok(!text.includes(old), `« ${old} » encore dans le texte`);
+    }
+    assert.ok(!text.includes(REQUEST.viewUrl), 'le lien de consultation ne doit plus être émis');
   });
 
   it('l’objet nomme le demandeur ou le créneau', () => {
@@ -264,6 +267,28 @@ describe('meeting-declined : motif facultatif et invitation à choisir un autre 
       assert.ok(!html.includes('Le créneau n’est plus disponible.'));
     });
   }
+
+  const PROFILE_URL = link('fiche');
+
+  it('sans fiche (profileUrl absent) : bouton « Parcourir l’annuaire » vers l’annuaire (F-127)', () => {
+    const { html, text } = rendered();
+    assert.ok(html.includes('>Parcourir l’annuaire</a>'));
+    assert.ok(!html.includes('Voir la fiche de'));
+    assert.ok(text.includes(DECLINED.directoryUrl));
+  });
+
+  it('avec profileUrl : bouton « Voir la fiche de X » vers la fiche, plus de bouton annuaire (F-127)', () => {
+    const { html, text } = rendered({ profileUrl: PROFILE_URL });
+    const href = html.match(/<a href="([^"]+)"[^>]*>Voir la fiche de Léa Ducasse<\/a>/)?.[1];
+    assert.equal(href?.replaceAll('&amp;', '&'), PROFILE_URL);
+    assert.ok(!html.includes('Parcourir l’annuaire'));
+    assert.ok(text.includes(PROFILE_URL));
+  });
+
+  it('le nom du bouton « Voir la fiche de » est échappé', () => {
+    const { html } = rendered({ profileUrl: PROFILE_URL, counterpartName: HOSTILE });
+    assert.ok(!html.includes('<script'));
+  });
 
   it('invite à choisir un autre créneau depuis l’annuaire', () => {
     const { text } = rendered();

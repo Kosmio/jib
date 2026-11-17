@@ -178,6 +178,30 @@ describeTemplate('access-link', {
   manage: false,
 });
 
+describe('enveloppe : lien « Gérer mes notifications » facultatif, manageUrl (F-127)', () => {
+  const DATA = { edition: EDITION, publicUrl: PUBLIC_URL, firstName: 'Léa', slotLabel: 'jeudi 3 décembre à 10h45', counterpartName: 'Mathis Lagrange', agendaUrl: `${PUBLIC_URL}/espace/verifier?token=agenda` };
+  const ACTION = `${PUBLIC_URL}/espace/verifier?token=profil-_123&next=%2Fespace%2F${EDITION.slug}%2Fprofil`;
+
+  it('sans manageUrl : lien direct vers /espace/{édition}/profil', async () => {
+    const { html, text } = await renderEmail('meeting-cancelled', DATA);
+    assert.ok(html.includes(`href="${PUBLIC_URL}/espace/${EDITION.slug}/profil"`));
+    assert.ok(text.includes(`${PUBLIC_URL}/espace/${EDITION.slug}/profil`));
+  });
+
+  it('avec manageUrl : « Gérer mes notifications » porte le lien d’action, en HTML et en texte', async () => {
+    const { html, text } = await renderEmail('meeting-cancelled', { ...DATA, manageUrl: ACTION });
+    assert.ok(html.includes(`<a href="${ACTION}"`) || html.includes(`<a href="${escapeHtml(ACTION)}"`));
+    assert.match(html, new RegExp(`href="[^"]+"[^>]*>Gérer mes notifications</a>`));
+    assert.ok(text.includes(`Gérer mes notifications${String.fromCharCode(0xa0)}: ${ACTION}`));
+    assert.ok(!html.includes(`href="${PUBLIC_URL}/espace/${EDITION.slug}/profil"`), 'le lien direct ne doit plus apparaître');
+  });
+
+  it('access-link (manage: false) n’affiche rien même avec manageUrl', async () => {
+    const { html, text } = await renderEmail('access-link', { edition: EDITION, publicUrl: PUBLIC_URL, firstName: 'Léa', url: ACTION_URL, validityMinutes: 30, manageUrl: ACTION });
+    assert.doesNotMatch(html + text, /Gérer mes notifications/);
+  });
+});
+
 describe('meeting-cancelled : motif facultatif (R-18, section 11 du plan, point 6)', () => {
   const DATA = {
     edition: EDITION,
