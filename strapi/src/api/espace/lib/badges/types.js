@@ -2,9 +2,8 @@
 
 const { normalizeText } = require('../directory');
 
-/** Roles of an attendee that a badge or a card can show (type of the band). `exhibitor` is the directory's name for `exhibitor_rep`. */
+/** Roles of an attendee, exactly the enumeration of its schema: the values accepted in the `types` filter and shown in the band. */
 const BADGE_TYPES = ['participant', 'speaker', 'exhibitor_rep', 'organizer'];
-const TYPE_ALIASES = { exhibitor: 'exhibitor_rep' };
 const TYPE_LABELS = { participant: 'Participant', speaker: 'Intervenant', exhibitor_rep: 'Exposant', organizer: 'Organisateur' };
 
 /** Type of an attendee: an organizer listed in ORGANIZER_EMAILS counts as one. */
@@ -18,7 +17,7 @@ const isReduced = (attendee, type) => type === 'organizer' || !(attendee.directo
 function parseTypes(types) {
   if (types === undefined || types === null) return null;
   if (!Array.isArray(types)) return undefined;
-  const roles = types.map((type) => TYPE_ALIASES[type] ?? type);
+  const roles = types;
   if (!roles.every((role) => BADGE_TYPES.includes(role))) return undefined;
   return roles.length ? [...new Set(roles)] : null;
 }

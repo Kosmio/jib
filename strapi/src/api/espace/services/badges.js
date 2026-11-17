@@ -126,7 +126,7 @@ module.exports = ({ strapi }) => {
     /** POST /admin/:edition/badges (F-97): { pdf, count, reduced } for the active attendees, filtered by type, sorted by name or company. */
     async generate(edition, { types, sort } = {}) {
       const roles = parseTypes(types);
-      if (roles === undefined) throw validation({ types: 'Choisissez des types parmi participant, intervenant, exposant et organisateur.' });
+      if (roles === undefined) throw validation({ types: 'Choisissez des types parmi participant, speaker, exhibitor_rep et organizer.' });
       if (sort !== undefined && !['name', 'company'].includes(sort)) throw validation({ sort: 'Choisissez « name » ou « company ».' });
 
       const emails = organizerEmails();
