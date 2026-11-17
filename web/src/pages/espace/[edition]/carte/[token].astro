@@ -35,7 +35,10 @@ Astro.response.headers.set("Cache-Control", "private, no-store");
 Astro.response.headers.set("Referrer-Policy", "strict-origin");
 Astro.response.headers.set("X-Robots-Tag", "noindex");
 
-const result = await espaceGet<CardResponse>(`/cards/${encodeURIComponent(slug)}/${encodeURIComponent(token)}`, null, Astro.clientAddress);
+// NF-54 : la limite de débit de Strapi compte par visiteur. Astro.clientAddress n'est l'IP du visiteur que si security.allowedDomains est réglé :
+// on lit la dernière entrée de X-Forwarded-For (ajoutée par Traefik, un client ne peut pas la forger), à défaut l'adresse de la connexion.
+const visitorIp = Astro.request.headers.get("x-forwarded-for")?.split(",").at(-1)?.trim() || Astro.clientAddress;
+const result = await espaceGet<CardResponse>(`/cards/${encodeURIComponent(slug)}/${encodeURIComponent(token)}`, null, visitorIp);
 if (!result.ok && result.status !== 404 && result.status !== 429) throw new Error(`GET /cards : ${result.status}`);
 const found = result.ok ? result.data : null;
 if (!result.ok) Astro.response.status = result.status === 429 ? 429 : 404;
