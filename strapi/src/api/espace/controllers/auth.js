@@ -18,9 +18,11 @@ module.exports = {
   // POST /api/espace/auth/request-link (public): F-01, F-02, NF-03
   requestLink: async (ctx) => {
     const { editionSlug, email, next } = bodyOf(ctx);
-    // F-102: the form's `next` comes back to the login page, so that a new request keeps it ; the address comes back to be recalled.
+    // F-102: the form's `next` comes back to the login page, so that a new request keeps it.
+    // The edition home is the default: only a deeper path is carried.
+    const kept = text(next) && safeNextPath(next, editionSlug) !== `/espace/${editionSlug}/` ? safeNextPath(next, editionSlug) : '';
     const back = (params) => {
-      const query = new URLSearchParams({ ...params, ...(text(next) && { next: safeNextPath(next, editionSlug) }) });
+      const query = new URLSearchParams({ ...params, ...(kept && { next: kept }) });
       return see(ctx, `/espace/${encodeURIComponent(editionSlug)}/connexion?${query}`);
     };
     try {
@@ -31,7 +33,11 @@ module.exports = {
       return back({ erreur: failure });
     }
 
-    if (isForm(ctx)) return back({ envoye: '1', ...(text(email) && { email: email.trim().slice(0, 254) }) });
+    if (isForm(ctx)) {
+      // The address to recall travels in a short-lived cookie, never in the URL.
+      if (text(email)) strapi.service('api::espace.auth').rememberEmail(ctx, email.trim().slice(0, 254));
+      return back({ envoye: '1' });
+    }
     ctx.status = 202;
     ctx.body = { status: 'accepted' };
   },

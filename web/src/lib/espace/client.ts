@@ -122,6 +122,8 @@ export async function request<T>(baseUrl: string, path: string, method: string, 
   if (response.status === 401 && slug) {
     const page = encodeURIComponent(window.location.pathname + window.location.search);
     window.location.assign(`/espace/${slug}/connexion?next=${page}&expire=1`);
+    // La navigation est lancée : l'îlot ne doit pas en lancer une autre (sa propre redirection écraserait `next` et `expire`).
+    return new Promise<T>(() => {});
   }
   if (!response.ok) {
     const error = data?.error;

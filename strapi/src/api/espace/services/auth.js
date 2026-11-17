@@ -9,6 +9,7 @@ const { generateToken, hashToken, linkUrl } = require('../lib/tokens');
 const TOKEN = 'api::espace.magic-token';
 const ATTENDEE = 'api::espace.attendee';
 const LINK_MINUTES = 30;
+const SENT_COOKIE = 'jib_espace_sent';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const SESSION_MS = 30 * DAY_MS;
 
@@ -30,6 +31,11 @@ module.exports = ({ strapi }) => {
   const cookieOptions = () => sessionCookieOptions({ publicUrl: settings().publicUrl, maxAgeMs: SESSION_MS });
   const setCookie = (ctx, token) => ctx.cookies.set(COOKIE_NAME, token, cookieOptions());
   const clearCookie = (ctx) => ctx.cookies.set(COOKIE_NAME, null, cookieOptions());
+  // The address of a request, kept 5 minutes for the "link sent" page, out of the URL (history, proxy logs, Referer). A-25 applies.
+  const rememberEmail = (ctx, email) => {
+    if (!canSetCookie(ctx)) return;
+    ctx.cookies.set(SENT_COOKIE, encodeURIComponent(email), { httpOnly: true, sameSite: 'lax', path: '/espace', secure: cookieOptions().secure, overwrite: true, maxAge: 5 * 60 * 1000 });
+  };
   // A-25: Koa refuses a Secure cookie on a request it sees in http, such as the internal call of the server-side rendering.
   const canSetCookie = (ctx) => ctx.request.secure || !cookieOptions().secure;
 
@@ -88,6 +94,7 @@ module.exports = ({ strapi }) => {
 
   return {
     setCookie,
+    rememberEmail,
 
     /**
      * F-01, F-02, NF-03. `next` (F-102) is kept when it stays inside the edition. Throws 400 EMAIL_INVALID or 429 RATE_LIMITED, otherwise returns at once: the lookup and the

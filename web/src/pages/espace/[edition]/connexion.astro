@@ -17,9 +17,16 @@ if (!edition) return Astro.rewrite("/espace/introuvable");
 const query = Astro.url.searchParams;
 // F-100 : une session valable pour cette édition renvoie à `next` (interne à l'espace de l'édition) ou à l'accueil, sans lien émis.
 if ((await getMe(Astro.request.headers.get("cookie")))?.edition.slug === slug) return Astro.redirect(safeNext(query.get("next"), slug), 303);
-// F-102 : `next` et l'adresse saisie survivent à une nouvelle demande.
+// F-102 : `next` survit à une nouvelle demande ; l'adresse saisie vient d'un cookie de 5 minutes posé par Strapi, jamais de l'URL.
 const next = query.get("next") ? safeNext(query.get("next"), slug) : "";
-const email = query.get("email") ?? "";
+const sent = Astro.cookies.get("jib_espace_sent")?.value ?? "";
+const email = (() => {
+  try {
+    return decodeURIComponent(sent);
+  } catch {
+    return "";
+  }
+})();
 const state =
   query.get("envoye") === "1"
     ? "sent"
@@ -32,7 +39,9 @@ const state =
           : query.get("expire") === "1"
             ? "expired"
             : "initial";
-const retry = new URLSearchParams({ ...(email && { email }), ...(next && { next }) }).toString();
+// L'adresse sert à la page « Lien envoyé » puis au formulaire qui suit ; ensuite le cookie est effacé.
+if (sent && state !== "sent") Astro.cookies.delete("jib_espace_sent", { path: "/espace" });
+const retry = new URLSearchParams({ ...(next && { next }) }).toString();
 const titles = {
   initial: "Connexion",
   loggedOut: "Connexion",
@@ -49,8 +58,9 @@ const titles = {
     state === "sent" ? (
       <EspaceCard heading="Vérifiez votre messagerie">
         <p role="status" class="mt-4 font-semibold">
-          Si cette adresse est inscrite, un lien vient de vous être envoyé{email && <> à <strong>{email}</strong></>}.
+          Si cette adresse est inscrite, un lien vient de vous être envoyé.
         </p>
+        {email && <p class="mt-2">Adresse saisie&nbsp;: <strong>{email}</strong></p>}
         <p class="mt-2 text-muted">
           Le lien est valable 30&nbsp;minutes et ne fonctionne qu’une seule fois. Rien reçu&nbsp;? Regardez dans vos courriers
           indésirables, puis demandez un nouveau lien.
