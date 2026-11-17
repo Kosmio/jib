@@ -23,6 +23,15 @@ const LOCK_ATTEMPTS = 3;
 const CLOSED_BY_OTHER_MEETING = 'Créneau pris par un autre rendez-vous';
 const ALREADY_BOOKED = 'Vous avez déjà un rendez-vous à cette table.';
 const SLOT_NO_LONGER_AVAILABLE = 'Le créneau n’est plus disponible.';
+// NF-67: the meetings already reported as orphaned (a person, an exhibitor or a slot is gone), so that each is logged once per process.
+const reportedOrphans = new Set();
+
+function reportOrphan(strapi, meeting) {
+  if (reportedOrphans.has(meeting.documentId)) return;
+  reportedOrphans.add(meeting.documentId);
+  strapi.log.warn(`[meetings] meeting ${meeting.documentId} ignored: its requester, its target or its slot no longer exists`);
+}
+
 const dayFormat = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', weekday: 'long', day: 'numeric', month: 'long' });
 
 // Relations of a Meeting as the rules need them: documentIds only (names of the person who answered, for the exhibitors).
@@ -74,7 +83,19 @@ function operations(strapi) {
     });
     const attendees = await documents(ATTENDEE).findMany({ filters, populate: ATTENDEE_CARD_POPULATE, limit: 5000 });
     const exhibitors = await documents(EXHIBITOR).findMany({ filters, populate: EXHIBITOR_CARD_POPULATE, limit: 1000 });
-    const meetings = await documents(MEETING).findMany({ filters, populate: MEETING_POPULATE, sort: ['createdAt:asc'], limit: 10000 });
+    const stored = await documents(MEETING).findMany({ filters, populate: MEETING_POPULATE, sort: ['createdAt:asc'], limit: 10000 });
+    const meetings = stored.filter((meeting) => {
+      const intact =
+        meeting.slot &&
+        meeting.requester &&
+        (meeting.targetAttendee || meeting.targetExhibitor) &&
+        attendees.some(({ documentId }) => documentId === meeting.requester.documentId) &&
+        (!meeting.targetAttendee || attendees.some(({ documentId }) => documentId === meeting.targetAttendee.documentId)) &&
+        (!meeting.targetExhibitor || exhibitors.some(({ documentId }) => documentId === meeting.targetExhibitor.documentId)) &&
+        slots.some(({ documentId }) => documentId === meeting.slot.documentId);
+      if (!intact) reportOrphan(strapi, meeting);
+      return intact;
+    });
 
     return {
       edition,
@@ -661,6 +682,10 @@ module.exports = ({ strapi }) => ({
     const counterpartName = `${attendee.firstName} ${attendee.lastName}`;
 
     for (const meeting of meetings) {
+      if (!meeting.requester || !meeting.slot || !(meeting.targetAttendee || meeting.targetExhibitor)) {
+        reportOrphan(strapi, meeting);
+        continue;
+      }
       await strapi.documents(MEETING).update({
         documentId: meeting.documentId,
         data: { status: 'cancelled', cancelledAt: now, cancelReason: reason, tableKey: null },

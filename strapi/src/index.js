@@ -833,7 +833,10 @@ Cette politique de confidentialité peut être mise à jour à tout moment. Date
 // =============================================================================
 
 module.exports = {
-  register(/*{ strapi }*/) {},
+  register({ strapi }) {
+    // NF-63 to NF-65: admin guards, the decision lives in api::espace.admin-guards (resolved at call time)
+    strapi.documents.use((context, next) => strapi.service('api::espace.admin-guards').check(context).then(next));
+  },
 
   async bootstrap({ strapi }) {
     // Set French as default locale if not already configured
@@ -868,6 +871,7 @@ module.exports = {
 
     // Set French labels on content types
     await setFrenchLabels(strapi);
+    await lockAttendeeFields(strapi);
 
     // Apply data migrations (must run before any content-type validation)
     try {
@@ -903,6 +907,13 @@ module.exports = {
       await resetAdminUser(strapi);
     } catch (err) {
       strapi.log.error(`[admin-reset] failed: ${err.message}`);
+    }
+
+    // V1-C: checks the e-mail sender at startup once that service exists
+    try {
+      await strapi.service('api::espace.service-status')?.checkSenderAtStartup?.();
+    } catch (err) {
+      strapi.log.error(`[sender-check] failed: ${err.message}`);
     }
   },
 };
@@ -1304,6 +1315,28 @@ async function resetAdminUser(strapi) {
   const superAdmin = await strapi.service('admin::role').getSuperAdmin();
   await users.create({ email, firstname: 'Admin', lastname: 'JIB', password, isActive: true, roles: [superAdmin.id] });
   strapi.log.warn(`[admin-reset] super admin ${email} created`);
+}
+
+// NF-66: attendee fields the admin shows but does not let edit (they belong to the import and to the attendee's own choices)
+const READ_ONLY_ATTENDEE_FIELDS = [
+  'editedFields', 'emailPrefs', 'unavailableSessions', 'consentAt', 'activatedAt', 'lastSeenAt',
+  'directoryOptIn', 'meetingsOptIn', 'newsOptIn', 'helloassoItemId', 'helloassoOrderId',
+];
+
+async function lockAttendeeFields(strapi) {
+  const key = 'plugin_content_manager_configuration_content_types::api::espace.attendee';
+  const entry = await strapi.db.query('strapi::core-store').findOne({ where: { key } });
+  if (!entry) return;
+  const config = typeof entry.value === 'string' ? JSON.parse(entry.value) : entry.value;
+  let changed = false;
+  for (const field of READ_ONLY_ATTENDEE_FIELDS) {
+    const edit = config.metadatas?.[field]?.edit;
+    if (edit && edit.editable !== false) {
+      edit.editable = false;
+      changed = true;
+    }
+  }
+  if (changed) await strapi.db.query('strapi::core-store').update({ where: { id: entry.id }, data: { value: JSON.stringify(config) } });
 }
 
 async function setFrenchLabels(strapi) {
