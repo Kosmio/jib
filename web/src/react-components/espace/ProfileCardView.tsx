@@ -7,7 +7,8 @@ import { photoSrc } from "../../lib/espace/format";
 //  - `href` : la carte entière est un lien, avec chevron (annuaire) ;
 //  - `action` : un bouton (suggestions : « Rencontrer »), sous le texte et sur toute la largeur tant que la carte fait moins de
 //    28 rem (`@md`, requête de conteneur : la largeur de la carte, pas celle de l'écran), à droite au-delà ;
-//  - ni l'un ni l'autre : carte seule.
+//  - ni l'un ni l'autre : carte seule ;
+//  - `myTopicIds` (annuaire, F-143) : affiche les sujets de la carte, ceux que j'ai aussi choisis en premier sous la mention « En commun ».
 // `strapiUrl` (REACT_STRAPI_URL passé en propriété) préfixe le chemin de photo renvoyé par l'API.
 
 export type { ProfileCard };
@@ -17,6 +18,7 @@ type Props = {
   strapiUrl: string;
   href?: string;
   action?: { label: string; href: string };
+  myTopicIds?: string[];
 };
 
 /** Couleur d'avatar déterministe : quatre paires de jetons, choisies par l'empreinte de l'identifiant. */
@@ -63,15 +65,41 @@ export function Avatar({ card, strapiUrl, size = "size-12" }: { card: ProfileCar
   );
 }
 
-export default function ProfileCardView({ card, strapiUrl, href, action }: Props) {
+/** Sujets d'une carte (F-143) : les sujets communs d'abord, annoncés par un mot et non par la seule couleur. */
+function Topics({ card, mine }: { card: ProfileCard; mine: string[] }) {
+  const topics = card.topics ?? [];
+  if (topics.length === 0) return null;
+  const shared = topics.filter((topic) => mine.includes(topic.id));
+  const others = topics.filter((topic) => !mine.includes(topic.id));
+  const chip = "max-w-full rounded-full px-2.5 py-0.5 text-sm font-semibold break-words";
+  return (
+    <span className="mt-2 flex flex-wrap items-center gap-1.5">
+      <span className="sr-only">Sujets : </span>
+      {shared.length > 0 && <span className="text-sm font-bold text-title">En commun :</span>}
+      {shared.map((topic) => (
+        <span key={topic.id} className={`${chip} border-2 border-title bg-title text-white`}>
+          {topic.name}
+        </span>
+      ))}
+      {others.map((topic) => (
+        <span key={topic.id} className={`${chip} bg-surface text-title`}>
+          {topic.name}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+export default function ProfileCardView({ card, strapiUrl, href, action, myTopicIds }: Props) {
   const tag = tagOf(card);
   const body = (
     <>
       <Avatar card={card} strapiUrl={strapiUrl} />
       <span className="min-w-0 flex-1">
-        <span className="block text-lg leading-snug font-bold text-ink">{card.displayName}</span>
-        {card.subtitle && <span className="block leading-snug text-muted">{card.subtitle}</span>}
+        <span className="block text-lg leading-snug font-bold break-words text-ink">{card.displayName}</span>
+        {card.subtitle && <span className="block leading-snug break-words text-muted">{card.subtitle}</span>}
         <span className={`mt-1.5 inline-block rounded-md px-2 py-0.5 text-sm font-bold ${tag.classes}`}>{tag.label}</span>
+        {myTopicIds && <Topics card={card} mine={myTopicIds} />}
       </span>
     </>
   );

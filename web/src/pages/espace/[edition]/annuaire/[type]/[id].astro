@@ -7,6 +7,7 @@ import EspaceButton from "../../../../../components/espace/EspaceButton.astro";
 import { Avatar, tagOf } from "../../../../../react-components/espace/ProfileCardView";
 import ProfileCardView from "../../../../../react-components/espace/ProfileCardView";
 import { Icon } from "../../../../../react-components/espace/MeetingStatus";
+import { filtersQuery, parseFilters } from "../../../../../react-components/espace/DirectoryBrowser";
 import SlotPicker from "../../../../../react-components/espace/SlotPicker";
 import { espaceGet, guardSession, publicStrapiUrl } from "../../../../../lib/espace/api";
 import { bannerColor } from "../../../../../lib/espace/format";
@@ -32,6 +33,9 @@ if ("notFound" in guard) return Astro.rewrite("/espace/introuvable");
 const { edition, me } = guard;
 
 const base = `/espace/${encodeURIComponent(slug)}`;
+// F-45 : le lien de retour ramène à l'annuaire tel qu'on l'a quitté (recherche, type et sujets passés dans l'URL de la fiche).
+const backQuery = filtersQuery(parseFilters(Astro.url.searchParams, [...Astro.url.searchParams.get("topics")?.split(",") ?? []].filter(Boolean).map((id) => ({ id, name: "" }))));
+const backHref = `${base}/annuaire${backQuery}`;
 const profile = await espaceGet<DirectoryPerson | DirectoryExhibitor>(`/directory/${type}/${encodeURIComponent(id)}`, cookie);
 if (!profile.ok && profile.status === 401) return Astro.redirect(`${base}/connexion`);
 if (!profile.ok && profile.status !== 404) throw new Error(`GET /directory/${type}/${id} : ${profile.status}`);
@@ -57,7 +61,7 @@ const role = person ? [person.jobTitle, person.company].filter(Boolean) : [];
 <AppShell title={title} active="directory" editionSlug={slug} me={me}>
   <div class="border-b border-surface-alt bg-white">
     <div class="mx-auto max-w-180 px-4 pt-2">
-      <a href={`${base}/annuaire`} class="inline-flex min-h-11 items-center gap-2 font-heading text-lg font-semibold text-title">
+      <a href={backHref} class="inline-flex min-h-11 items-center gap-2 font-heading text-lg font-semibold text-title">
         <Icon name="back" />
         Annuaire
       </a>
@@ -70,7 +74,7 @@ const role = person ? [person.jobTitle, person.company].filter(Boolean) : [];
         <section class="rounded-xl border border-surface-alt bg-white p-6">
           <h1 class="font-heading text-2xl leading-tight font-bold normal-case">Profil introuvable</h1>
           <p class="mt-3">Ce profil n’existe pas, ou son auteur ne l’a pas rendu visible dans l’annuaire.</p>
-          <EspaceButton variant="secondary" href={`${base}/annuaire`} class="mt-6">
+          <EspaceButton variant="secondary" href={backHref} class="mt-6">
             Retour à l’annuaire
           </EspaceButton>
         </section>

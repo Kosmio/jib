@@ -160,9 +160,10 @@ module.exports = ({ strapi }) => {
   return {
     hostedOwners,
 
-    /** GET /directory (F-40 to F-43): the visible cards, filtered, sorted and cut. */
-    async search({ edition }, { q, type, topicIds, cursor }) {
-      return searchDirectory({ cards: await visibleCards(edition), q, type, topicIds, cursor });
+    /** GET /directory (F-40 to F-43): the visible cards, filtered, sorted and cut. F-144: the viewer is not in their own list, nor in `total`. */
+    async search({ edition, attendee }, { q, type, topicIds, cursor }) {
+      const cards = (await visibleCards(edition)).filter((card) => !(card.kind === 'attendee' && card.id === attendee.documentId));
+      return searchDirectory({ cards, q, type, topicIds, cursor });
     },
 
     /** GET /directory/p/:id (R-41, R-42, A-29): a person's page, 404 PROFILE_NOT_FOUND when the viewer may not see it. */
