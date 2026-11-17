@@ -402,4 +402,61 @@ describe('programme et tableau de bord (lot 14)', { timeout: 900_000 }, () => {
       assert.deepEqual(W.leaks((await statsOf(edition, p.boss)).text), []);
     });
   });
+
+  describe('GET /admin/:edition/export/:nom.csv : exports de l’organisateur (F-91, R-63)', () => {
+    const lines = (text) => text.replace(/^﻿/, '').trimEnd().split('\r\n');
+
+    it('réservés à l’organisateur de l’édition : 401 sans session, 403 pour un participant, 404 pour un nom inconnu', async () => {
+      const { edition } = await W.createMeetingEdition(app(), { slug: W.unique('export-acces'), title: 'Essai' });
+      const path = `/admin/${edition.slug}/export/participants.csv`;
+      assert.equal((await espace().request(`/api/espace${path}`)).status, 401);
+      assert.equal((await (await as(edition, await W.createPerson(app(), edition))).get(path)).status, 403);
+      const organizer = await W.createPerson(app(), edition, { role: 'organizer' });
+      assert.equal((await (await as(edition, organizer)).get(`/admin/${edition.slug}/export/inconnu.csv`)).status, 404);
+      assert.equal((await (await as(edition, organizer)).get(`/admin/${edition.slug}/export/participants.json`)).status, 404);
+    });
+
+    it('participants, rendez-vous, exposants et statistiques : rendez-vous confirmés reportés, jamais le texte de la demande', async () => {
+      const world = await W.createMeetingEdition(app(), { slug: W.unique('export'), title: 'Essai' });
+      const { edition } = world;
+      const lea = await W.createPerson(app(), edition, { firstName: 'Léa', lastName: 'Ducasse', company: 'Atelier; Fictif', linkedinUrl: 'https://www.linkedin.com/in/lea-test' });
+      const ines = await W.createPerson(app(), edition, { firstName: 'Inès', lastName: 'Castaing', company: 'Scierie Fictive' });
+      const organizer = await W.createPerson(app(), edition, { role: 'organizer', lastName: 'Organisation' });
+      const asked = await (await as(edition, lea)).post('/meetings', { slotId: world.slots['10h45'].documentId, target: `p:${ines.documentId}`, message: 'Texte secret de la demande.' });
+      assert.equal(asked.status, 201, asked.text);
+      const accepted = await (await as(edition, ines)).post(`/meetings/${asked.json.id}/accept`);
+      assert.equal(accepted.status, 200, accepted.text);
+
+      const session = await as(edition, organizer);
+      const get = (name) => session.get(`/admin/${edition.slug}/export/${name}.csv`);
+
+      const participants = await get('participants');
+      assert.equal(participants.status, 200, participants.text);
+      const rows = lines(participants.text);
+      assert.ok(rows[0].startsWith('Nom;Prénom;E-mail;'), rows[0]);
+      const leaRow = rows.find((row) => row.startsWith('Ducasse;Léa;'));
+      assert.ok(leaRow, 'ligne de Léa');
+      assert.ok(leaRow.includes('"Atelier; Fictif"'));
+      assert.ok(leaRow.includes('https://www.linkedin.com/in/lea-test'));
+      assert.ok(leaRow.includes('10h45, Inès Castaing (Scierie Fictive), Table 1'), leaRow);
+      assert.ok(rows.find((row) => row.startsWith('Castaing;Inès;')).includes('10h45, Léa Ducasse (Atelier; Fictif), Table 1'));
+      assert.ok(!rows.some((row) => row.startsWith('Organisation;')), 'l’organisateur n’est pas un inscrit');
+
+      const meetings = await get('meetings');
+      assert.equal(meetings.status, 200, meetings.text);
+      const [, first] = lines(meetings.text);
+      assert.ok(first.startsWith('10h45;11h00;'), first);
+      assert.ok(first.includes(';Confirmé;Table 1;1;Léa Ducasse;'), first);
+
+      const exhibitors = await get('exhibitors');
+      assert.equal(exhibitors.status, 200, exhibitors.text);
+      assert.ok(lines(exhibitors.text)[0].startsWith('Exposant;Stand;'));
+
+      const stats = await get('stats');
+      assert.equal(stats.status, 200, stats.text);
+      assert.ok(lines(stats.text).includes('Rendez-vous : confirmé;1'), stats.text);
+
+      for (const file of [participants, meetings, exhibitors, stats]) assert.ok(!file.text.includes('Texte secret'), 'le texte de la demande ne sort jamais');
+    });
+  });
 });

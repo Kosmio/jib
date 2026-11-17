@@ -7,5 +7,6 @@ module.exports = {
   routes: [
     { method: 'GET', path: '/espace/editions/:slug/program', handler: 'program.show', config },
     { method: 'GET', path: '/espace/admin/:edition/stats', handler: 'stats.show', config },
+    { method: 'GET', path: '/espace/admin/:edition/export/:file', handler: 'exports.show', config },
   ],
 };

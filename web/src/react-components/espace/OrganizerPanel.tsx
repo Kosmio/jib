@@ -18,7 +18,8 @@ import { plural, timeLabel } from "../../lib/espace/format";
 // E9, tableau de bord organisateur (F-90) : synchronisation HelloAsso, indicateurs, remplissage par pause B2B et régénération des
 // créneaux (R-02, F-94), exposants les plus sollicités, avertissements, historique. Les chiffres viennent de
 // `GET /admin/{edition}/stats` ; aucun contenu de message (R-63).
-// Les exports CSV (F-91) et la relance manuelle (F-92) viennent après la recette du 30 octobre.
+// Exports CSV (F-91) : quatre liens vers `GET /admin/{edition}/export/{nom}.csv`, téléchargés avec le cookie de session. La relance
+// manuelle (F-92) reste à faire.
 
 type Props = {
   /** REACT_STRAPI_URL : adresse publique de Strapi, atteinte par le navigateur. */
@@ -87,6 +88,13 @@ function Icon({ name }: { name: "alert" | "check" | "refresh" }) {
     </svg>
   );
 }
+
+const EXPORTS = [
+  { file: "participants", label: "Participants", help: "Coordonnées, rôle, page LinkedIn et rendez-vous confirmés de chacun (badges, relances)." },
+  { file: "meetings", label: "Rendez-vous", help: "Tous les rendez-vous par heure, avec la table ou le stand et le statut." },
+  { file: "exhibitors", label: "Exposants", help: "Stand, représentants et nombre de demandes reçues." },
+  { file: "stats", label: "Statistiques", help: "Les indicateurs de ce tableau de bord." },
+] as const;
 
 function Card({ heading, children, className = "" }: { heading: string; children: React.ReactNode; className?: string }) {
   return (
@@ -445,6 +453,25 @@ export default function OrganizerPanel({ strapiUrl, editionSlug, nowIso, themeCo
           )}
         </Card>
       </div>
+
+      <Card heading="Exports">
+        <p className="mt-2 text-muted">
+          Fichiers CSV à ouvrir dans Excel. Ils contiennent des données personnelles&nbsp;: à réserver à l’organisation de la journée.
+        </p>
+        <ul className="mt-4 grid gap-3 md:grid-cols-2">
+          {EXPORTS.map(({ file, label, help }) => (
+            <li key={file}>
+              <a
+                href={`${strapiUrl}/api/espace/admin/${encodeURIComponent(editionSlug)}/export/${file}.csv`}
+                className="flex min-h-13 flex-col justify-center rounded-lg border-2 border-title bg-white px-4 py-2 text-title hover:bg-surface"
+              >
+                <span className="font-bold">{label}</span>
+                <span className="text-sm text-muted">{help}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </Card>
 
       <Card heading="Avertissements">
         {warnings.length === 0 ? (
