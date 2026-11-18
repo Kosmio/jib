@@ -55,3 +55,9 @@ test('NF-60 : EMAIL_FROM, ORGANIZER_EMAILS et LINK_RATE_IP_MAX viennent de vars.
     assert.match(text, new RegExp(`^ +${name}=\\$\\{\\{ vars\\.${name} \\}\\}$`, 'm'));
   }
 });
+
+test('NF-55 : Traefik sans journal d’accès, qui écrirait les jetons des URL en clair', () => {
+  const compose = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'infra', 'deploy', 'base', 'docker-compose.base.yml'), 'utf8');
+  const enabled = compose.split('\n').filter((line) => !line.trim().startsWith('#') && /--accesslog(=true|\b(?!\.))/.test(line));
+  assert.deepEqual(enabled, []);
+});

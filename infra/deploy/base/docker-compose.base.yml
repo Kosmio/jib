@@ -13,7 +13,8 @@ services:
     image: traefik:${TRAEFIK_VERSION:-v3.7.16}
     container_name: jib-traefik
     command:
-      - "--accesslog=true"
+      # Pas de journal d'accès : il écrirait en clair les jetons portés par les URL
+      # (carte de badge, flux calendrier, liens de connexion), NF-55. Voir docs/espace/exploitation.md, section 11.
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--entryPoints.web.address=:80"
