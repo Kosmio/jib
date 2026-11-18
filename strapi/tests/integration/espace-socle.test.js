@@ -31,7 +31,7 @@ const PRIVATE_FIELDS = [
   'meetingRequestsOpenAt',
   'meetingRequestsCloseAt',
 ];
-const PUBLIC_EDITION_KEYS = ['city', 'date', 'meetingRequestsCloseAt', 'meetingRequestsOpenAt', 'participantSpaceEnabled', 'readOnly', 'slug', 'themeColor', 'title', 'venue'];
+const PUBLIC_EDITION_KEYS = ['b2bEnabled', 'city', 'date', 'meetingRequestsCloseAt', 'meetingRequestsOpenAt', 'participantSpaceEnabled', 'readOnly', 'slug', 'themeColor', 'title', 'venue'];
 
 describe('socle de l’espace (lot 2)', { timeout: 180_000 }, () => {
   const espace = useEspace({ overrides: { CORS_ORIGINS: `${FRONT},${SECOND_FRONT}` } });

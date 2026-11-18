@@ -171,6 +171,27 @@ describe('Strapi sur la base de test', { timeout: 180_000 }, () => {
       'DELETE /api/espace/me/calendar-feed',
       'GET /api/espace/calendar/:x',
       'POST /api/espace/webhooks/helloasso',
+      // AD-1 à AD-4 (15-administration.md, 06-api.md) : interface organisation.
+      'GET /api/espace/admin/:x/settings',
+      'PATCH /api/espace/admin/:x/settings',
+      'POST /api/espace/admin/:x/helloasso/test',
+      'PATCH /api/espace/admin/:x/sequences/:x/break',
+      'GET /api/espace/admin/:x/organisations',
+      'POST /api/espace/admin/:x/organisations',
+      'PATCH /api/espace/admin/:x/organisations/:x',
+      'GET /api/espace/admin/:x/intervenants',
+      'POST /api/espace/admin/:x/intervenants',
+      'PATCH /api/espace/admin/:x/intervenants/:x',
+      'GET /api/espace/admin/:x/attendees/:x/roles',
+      'PATCH /api/espace/admin/:x/attendees/:x/roles',
+      'GET /api/espace/admin/:x/program',
+      'POST /api/espace/admin/:x/program/publish',
+      'POST /api/espace/admin/:x/sequences',
+      'PATCH /api/espace/admin/:x/sequences/:x',
+      'DELETE /api/espace/admin/:x/sequences/:x',
+      'POST /api/espace/admin/:x/sequences/:x/interventions',
+      'PATCH /api/espace/admin/:x/interventions/:x',
+      'DELETE /api/espace/admin/:x/interventions/:x',
     ]);
     const declared = () =>
       espaceRoutes().flatMap((route) =>

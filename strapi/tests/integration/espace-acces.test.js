@@ -520,7 +520,7 @@ describe('accès à l’espace (lot 5)', { timeout: 300_000 }, () => {
       assert.deepEqual(Object.keys(json.me).sort(), ME_KEYS);
       assert.equal(json.me.id, attendee.documentId);
       assert.deepEqual([json.me.firstName, json.me.lastName, json.me.jobTitle, json.me.company, json.me.role, json.me.isOrganizer], ['Mathis', 'Lagrange', 'Dirigeant', 'Pinède & Fils', 'participant', false]);
-      assert.deepEqual(json.me.edition, { slug: a.slug, title: 'Édition A' });
+      assert.deepEqual(json.me.edition, { slug: a.slug, title: 'Édition A', b2bEnabled: true });
       assert.deepEqual(json.me.consent, { directoryOptIn: false, meetingsOptIn: false, newsOptIn: false, consentAt: null });
       const text = JSON.stringify(json);
       assert.ok(!text.includes(attendee.email), 'e-mail dans la réponse');
