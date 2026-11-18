@@ -273,7 +273,8 @@ export default function ChatThread({
       </header>
 
       <div className="mx-auto flex w-full max-w-180 flex-col">
-        <ol role="log" aria-label="Messages" aria-live="polite" className="flex flex-col gap-4 px-4 py-6">
+        <div role="log" aria-label="Messages" aria-live="polite">
+        <ol className="flex flex-col gap-4 px-4 py-6">
           {messages.length === 0 && (
             <li className="py-8 text-center text-muted">
               {target ? `Écrivez votre premier message à ${firstName}.` : "Aucun message pour l’instant."}
@@ -384,6 +385,7 @@ export default function ChatThread({
             );
           })}
         </ol>
+        </div>
 
         <form noValidate onSubmit={send} className="sticky bottom-16 z-10 border-t border-surface-alt bg-surface px-4 pt-3 pb-4 lg:bottom-0">
           {error && (

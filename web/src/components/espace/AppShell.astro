@@ -88,7 +88,6 @@ const linkClass = (id: ShellTab) =>
         <a
           href={`${base}/profil`}
           data-profil-avatar
-          aria-label={`Mon profil, ${me.firstName} ${me.lastName}`}
           aria-current={active === "profile" ? "page" : undefined}
           class="fixed top-2 right-2 z-40 flex size-11 items-center justify-center rounded-full border-2 border-white bg-white shadow-md lg:hidden"
         >
@@ -99,6 +98,7 @@ const linkClass = (id: ShellTab) =>
               {initialsOf(me.firstName, me.lastName)}
             </span>
           )}
+          <span class="sr-only">Mon profil, {me.firstName} {me.lastName}</span>
         </a>
         )}
         <div class="lg:flex lg:flex-col lg:gap-6">

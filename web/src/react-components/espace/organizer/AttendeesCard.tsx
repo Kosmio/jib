@@ -172,10 +172,10 @@ export default function AttendeesCard({ edition, strapiUrl }: CardProps) {
               <button
                 type="button"
                 onClick={() => setSelected(attendee.id)}
-                aria-label={`Ouvrir la fiche de ${attendee.firstName} ${attendee.lastName}`}
                 className="flex min-h-14 w-full flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-2 text-left hover:bg-surface"
               >
                 <span>
+                  <span className="sr-only">Ouvrir la fiche de </span>
                   <span className="block font-semibold text-title">{`${attendee.firstName} ${attendee.lastName}`}</span>
                   <span className="block text-muted">{[attendee.company, attendee.email].filter(Boolean).join(", ")}</span>
                 </span>
