@@ -139,3 +139,17 @@
 .rich-text ol { list-style: decimal; padding-left: 1.25rem; }
 .rich-text h3, .rich-text h4 { font-weight: 700; font-size: 1.05em; margin-top: 0.5em; text-transform: none; }
 .rich-text a { text-decoration: underline; }
+
+/* Espace, pages d'aide de l'interface organisation (F-187) */
+.help-text h3 { font-family: var(--font-heading, inherit); font-size: 1.3rem; font-weight: 600; text-transform: none; margin-top: 2rem; scroll-margin-top: 1rem; color: var(--color-title); }
+.help-text h3:first-child { margin-top: 0; }
+.help-text p, .help-text ul, .help-text ol { margin-top: 0.75rem; line-height: 1.6; }
+.help-text ul { list-style: disc; padding-left: 1.5rem; }
+.help-text ol { list-style: decimal; padding-left: 1.5rem; }
+.help-text li + li { margin-top: 0.35rem; }
+.help-text strong { color: var(--color-title); }
+.help-text code { background: var(--color-surface); border-radius: 0.25rem; padding: 0.05rem 0.3rem; font-size: 0.92em; overflow-wrap: anywhere; }
+@media print {
+  body:has(.help-article) nav, body:has(.help-article) header, body:has(.help-article) footer { display: none !important; }
+  .help-text { border: 0; padding: 0; max-width: none; }
+}
