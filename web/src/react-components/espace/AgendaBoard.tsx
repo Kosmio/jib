@@ -407,9 +407,8 @@ export default function AgendaBoard({ strapiUrl, editionSlug, themeColor, dayLab
                           <span className="block text-sm font-medium text-muted">{`à ${hourLabel(meeting.slot.endsAt)}`}</span>
                         </p>
                         <div className="min-w-0">
-                          <p className="text-lg leading-snug font-bold text-ink">{meeting.counterpart.displayName}</p>
-                          {meeting.counterpart.subtitle && <p className="leading-snug text-muted">{meeting.counterpart.subtitle}</p>}
-                          {meeting.location && <p className="mt-1 text-lg font-bold text-ink">{meeting.location}</p>}
+                          <Person meeting={meeting} strapiUrl={strapiUrl} size="size-12" />
+                          {meeting.location && <p className="mt-2 text-lg font-bold text-ink">{meeting.location}</p>}
                           {meeting.status === "accepted" && phones[meeting.counterpart.id] && (
                             <p className="mt-1 text-ink">
                               Téléphone :{" "}

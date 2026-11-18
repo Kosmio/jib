@@ -51,6 +51,8 @@ async function signIn(page: Page, baseURL: string | undefined, email: string) {
       await page.getByRole('checkbox', { name: 'Apparaître dans l’annuaire des participants' }).check();
       await page.getByRole('checkbox', { name: 'Recevoir des demandes de rendez-vous et des messages' }).check();
     }
+    // Retour de recette du 18/11 : au moins un sujet à l’arrivée.
+    if (!(await page.locator('input[id^="sujet-"]:checked').count()) && (await page.locator('input[id^="sujet-"]').count())) await page.locator('input[id^="sujet-"]').first().check();
     await page.getByRole('button', { name: 'Continuer', exact: true }).click();
     // L'organisation n'est pas dans l'annuaire par défaut : confirmation avant de continuer.
     const skip = page.getByRole('button', { name: 'Continuer sans apparaître' });

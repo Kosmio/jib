@@ -136,7 +136,7 @@ export async function request<T>(baseUrl: string, path: string, method: string, 
 }
 
 /** PATCH /me : les quatre champs importés de l'inscription (F-30), ou le profil complet de E3 (`ProfileUpdate`). */
-export const updateProfile = (baseUrl: string, profile: Profile | ProfileUpdate) =>
+export const updateProfile = (baseUrl: string, profile: Profile & Partial<ProfileUpdate>) =>
   request<Me>(baseUrl, "/me", "PATCH", profile);
 
 /** PUT /me/consent : les trois choix de visibilité, tous obligatoires (R-40, F-10). */

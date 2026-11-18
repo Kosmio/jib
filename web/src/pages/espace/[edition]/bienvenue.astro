@@ -5,13 +5,15 @@ import EspaceLayout from "../../../layouts/EspaceLayout.astro";
 import EditionBanner from "../../../components/espace/EditionBanner.astro";
 import EspaceCard from "../../../components/espace/EspaceCard.astro";
 import WelcomeForm from "../../../react-components/espace/WelcomeForm";
-import { getMe, getOpenEdition, publicStrapiUrl } from "../../../lib/espace/api";
+import { espaceGet, getMe, getOpenEdition, publicStrapiUrl } from "../../../lib/espace/api";
+import type { Topic } from "../../../lib/espace/client";
 
 const slug = Astro.params.edition ?? "";
 const edition = await getOpenEdition(slug);
 if (!edition) return Astro.rewrite("/espace/introuvable");
 
-const me = await getMe(Astro.request.headers.get("cookie"));
+const cookie = Astro.request.headers.get("cookie");
+const me = await getMe(cookie);
 if (me?.edition.slug !== slug) return Astro.redirect(`/espace/${encodeURIComponent(slug)}/connexion`);
 
 // Valeurs actuelles reçues du serveur (D-14) : aucune case n'est cochée par l'écran, le profil est celui de l'import (F-10, F-116).
@@ -23,13 +25,17 @@ const initial = {
   directoryOptIn: me.consent.directoryOptIn,
   meetingsOptIn: me.consent.meetingsOptIn,
   newsOptIn: me.consent.newsOptIn,
+  topics: me.topics.map((topic) => topic.id),
 };
+// Sujets de l'édition : au moins un à choisir dès l'arrivée (retour de recette du 18 novembre) ; sans réponse, l'étape reste possible.
+const topicsResult = await espaceGet<Topic[]>(`/editions/${encodeURIComponent(slug)}/topics`, cookie).catch(() => null);
+const topics = topicsResult?.ok ? topicsResult.data : [];
 ---
 
 <EspaceLayout title="Vos informations">
   <EditionBanner
     title={`Bienvenue, ${me.firstName}`}
-    subtitle="Vérifiez vos informations, puis choisissez ce que les autres participants voient de vous."
+    subtitle="Vérifiez vos informations, choisissez vos sujets, puis ce que les autres participants voient de vous."
     themeColor={edition.themeColor}
     readOnly={edition.readOnly}
   />
@@ -37,6 +43,6 @@ const initial = {
     <noscript>
       <p class="font-semibold">Cette étape demande JavaScript. Activez-le ou utilisez un autre navigateur.</p>
     </noscript>
-    <WelcomeForm client:load strapiUrl={publicStrapiUrl} editionSlug={slug} initial={initial} />
+    <WelcomeForm client:load strapiUrl={publicStrapiUrl} editionSlug={slug} initial={initial} topics={topics} />
   </EspaceCard>
 </EspaceLayout>

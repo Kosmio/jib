@@ -45,6 +45,8 @@ const readSessions = (): Record<string, Cookies> => (existsSync(SESSIONS_FILE) ?
 async function passWelcome(page: Page) {
   if (!page.url().endsWith('/bienvenue')) return;
   await hydrated(page);
+  // Retour de recette du 18/11 : au moins un sujet à l’arrivée.
+  if (!(await page.locator('input[id^="sujet-"]:checked').count()) && (await page.locator('input[id^="sujet-"]').count())) await page.locator('input[id^="sujet-"]').first().check();
   await page.getByRole('button', { name: 'Continuer' }).click();
   const decline = page.getByRole('button', { name: 'Continuer sans apparaître' });
   await expect(decline.or(page.getByRole('navigation', { name: 'Espace participant' }))).toBeVisible();

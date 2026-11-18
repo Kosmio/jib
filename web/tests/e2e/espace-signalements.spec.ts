@@ -38,6 +38,8 @@ async function signIn(page: Page, baseURL: string | undefined, email: string) {
 async function welcomeIfNeeded(page: Page, baseURL: string | undefined) {
   if (page.url().endsWith('/bienvenue')) {
     await hydrated(page);
+    // Retour de recette du 18/11 : au moins un sujet à l’arrivée.
+    if (!(await page.locator('input[id^="sujet-"]:checked').count()) && (await page.locator('input[id^="sujet-"]').count())) await page.locator('input[id^="sujet-"]').first().check();
     await page.getByRole('button', { name: 'Continuer' }).click();
     await page.getByRole('button', { name: 'Continuer sans apparaître' }).click();
     await expect(page).toHaveURL(`${baseURL}${ESPACE}/`);

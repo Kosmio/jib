@@ -252,6 +252,8 @@ test.describe('sans JavaScript (NF-31, Q-13)', () => {
     await page.goto(await receiveLink(page, 'nathan.lasserre@example.org'));
     await page.getByRole('button', { name: 'Ouvrir mon espace' }).click();
     await page.goto(`${ESPACE}/bienvenue`);
+    // Retour de recette du 18/11 : au moins un sujet à l’arrivée.
+    if (!(await page.locator('input[id^="sujet-"]:checked').count()) && (await page.locator('input[id^="sujet-"]').count())) await page.locator('input[id^="sujet-"]').first().check();
     await page.getByRole('button', { name: 'Continuer' }).click();
     expect(new URL(page.url()).search).toBe('');
   });

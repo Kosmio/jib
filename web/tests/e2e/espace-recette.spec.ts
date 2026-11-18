@@ -280,7 +280,7 @@ test('Léa accepte la demande d’Inès : e-mail meeting-accepted avec .ics, ren
   await expect(page.getByRole('region', { name: 'Demandes reçues' })).toHaveCount(0);
   const day = page.getByRole('region', { name: /^Mes rendez-vous/ });
   await expect(day).toContainText('Inès Castaing');
-  await expect(day.locator('div', { hasText: /^Inès Castaing/ }).last()).toContainText('Table 1');
+  await expect(day.locator('li', { hasText: /Inès Castaing/ }).first()).toContainText('Table 1');
   await capture(page, 'E6-apres-acceptation');
 
   // L'e-mail part après la transaction, avec le .ics en pièce jointe (I-41) ; Léa, qui a répondu, n'en reçoit pas.
@@ -353,7 +353,7 @@ test('un participant réserve un créneau libre de la table 2 d’Antoine, confi
 
   await tab(page, 'Agenda').click();
   await hydrated(page);
-  const card = page.getByRole('region', { name: /^Mes rendez-vous/ }).locator('div', { hasText: /^Antoine Vergnes/ }).last();
+  const card = page.getByRole('region', { name: /^Mes rendez-vous/ }).locator('li', { hasText: /Antoine Vergnes/ }).first();
   await expect(card).toContainText('Table 2');
   await expect(card).toContainText('Confirmé');
 });
@@ -449,6 +449,8 @@ test('l’organisateur ouvre E9 : indicateurs égaux aux comptes de l’API, auc
   // Première connexion de l'organisateur : E2 (A-26). Le profil provisoire suffit, on valide les choix tels quels.
   if (page.url().endsWith('/bienvenue')) {
     await hydrated(page);
+    // Retour de recette du 18/11 : au moins un sujet à l’arrivée.
+    if (!(await page.locator('input[id^="sujet-"]:checked').count()) && (await page.locator('input[id^="sujet-"]').count())) await page.locator('input[id^="sujet-"]').first().check();
     await page.getByRole('button', { name: 'Continuer' }).click();
     await page.getByRole('button', { name: 'Continuer sans apparaître' }).click(); // V2-B : confirmation, annuaire décoché
     await expect(page).toHaveURL(`${baseURL}${ESPACE}/`);
@@ -521,6 +523,8 @@ test.describe('E9 : régénérer les créneaux (F-94, R-02)', () => {
       await openSpace(page, ORGANIZER);
       if (page.url().endsWith('/bienvenue')) {
         await hydrated(page);
+        // Retour de recette du 18/11 : au moins un sujet à l’arrivée.
+        if (!(await page.locator('input[id^="sujet-"]:checked').count()) && (await page.locator('input[id^="sujet-"]').count())) await page.locator('input[id^="sujet-"]').first().check();
         await page.getByRole('button', { name: 'Continuer' }).click();
         await page.getByRole('button', { name: 'Continuer sans apparaître' }).click(); // V2-B : confirmation, annuaire décoché
         await expect(page).toHaveURL(`${baseURL}${ESPACE}/`);

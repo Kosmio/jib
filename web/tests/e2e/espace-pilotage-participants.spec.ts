@@ -32,6 +32,8 @@ test.describe('pilotage : participants (V3-E)', () => {
       await openSpace(page, ORGANIZER);
       if (page.url().endsWith('/bienvenue')) {
         await hydrated(page);
+        // Retour de recette du 18/11 : au moins un sujet à l’arrivée.
+        if (!(await page.locator('input[id^="sujet-"]:checked').count()) && (await page.locator('input[id^="sujet-"]').count())) await page.locator('input[id^="sujet-"]').first().check();
         await page.getByRole('button', { name: 'Continuer' }).click();
         await page.getByRole('button', { name: 'Continuer sans apparaître' }).click(); // V2-B : confirmation, annuaire décoché
         await expect(page).toHaveURL(`${baseURL}${ESPACE}/`);

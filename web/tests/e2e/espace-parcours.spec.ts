@@ -82,6 +82,8 @@ test('Tom : E0, lien, vérification, E2, E1, déconnexion, E0', async ({ page, c
   await test.step('E2 : champs obligatoires vides, erreurs sous les champs, rien d’enregistré', async () => {
     await page.getByLabel('Prénom').fill('');
     await page.getByLabel('Entreprise').fill('');
+    // Retour de recette du 18/11 : au moins un sujet à l’arrivée.
+    if (!(await page.locator('input[id^="sujet-"]:checked').count()) && (await page.locator('input[id^="sujet-"]').count())) await page.locator('input[id^="sujet-"]').first().check();
     await page.getByRole('button', { name: 'Continuer' }).click();
     // V2-B : l'annuaire est décoché, la confirmation s'intercale avant l'enregistrement ; on la passe pour atteindre la validation des champs.
     await page.getByRole('button', { name: 'Continuer sans apparaître' }).click();
@@ -105,6 +107,8 @@ test('Tom : E0, lien, vérification, E2, E1, déconnexion, E0', async ({ page, c
     await page.getByLabel('Prénom').fill('Thomas');
     await page.getByLabel('Entreprise').fill('Entreprise de recette');
     await page.getByRole('checkbox', { name: 'Apparaître dans l’annuaire des participants' }).check();
+    // Retour de recette du 18/11 : au moins un sujet à l’arrivée.
+    if (!(await page.locator('input[id^="sujet-"]:checked').count()) && (await page.locator('input[id^="sujet-"]').count())) await page.locator('input[id^="sujet-"]').first().check();
     await page.getByRole('button', { name: 'Continuer' }).click();
 
     await expect(page).toHaveURL(`${baseURL}${ESPACE}/`);

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { EspaceApiError, saveConsent, updateProfile, type Consent, type Profile } from "../../lib/espace/client";
+import { EspaceApiError, saveConsent, updateProfile, type Consent, type Profile, type Topic } from "../../lib/espace/client";
 
 // E2 (F-10 à F-12, F-116, F-118, NF-56) : les quatre champs importés de l'inscription et les trois choix de visibilité.
 // Aucune case n'est cochée par le code : elles reflètent la valeur reçue du serveur (D-14). Chaque case dit sa conséquence quand elle est
@@ -13,8 +13,12 @@ type Props = {
   /** REACT_STRAPI_URL : adresse publique de Strapi, atteinte par le navigateur. */
   strapiUrl: string;
   editionSlug: string;
-  initial: Profile & Consent;
+  initial: Profile & Consent & { topics: string[] };
+  /** Sujets de l'édition (`GET /editions/:slug/topics`). Quand il y en a, en choisir au moins un est obligatoire (retour de recette du 18 novembre). */
+  topics?: Topic[];
 };
+
+const MAX_TOPICS = 3;
 
 const FIELDS = [
   { name: "firstName", label: "Prénom", autoComplete: "given-name", required: true, fallback: "Indiquez votre prénom." },
@@ -64,7 +68,7 @@ function Icon({ name }: { name: "alert" | "info" }) {
   );
 }
 
-export default function WelcomeForm({ strapiUrl, editionSlug, initial }: Props) {
+export default function WelcomeForm({ strapiUrl, editionSlug, initial, topics = [] }: Props) {
   const [profile, setProfile] = useState<Profile>({
     firstName: initial.firstName,
     lastName: initial.lastName,
@@ -76,6 +80,8 @@ export default function WelcomeForm({ strapiUrl, editionSlug, initial }: Props) 
     meetingsOptIn: initial.meetingsOptIn,
     newsOptIn: initial.newsOptIn,
   });
+  const [topicIds, setTopicIds] = useState<string[]>(initial.topics.filter((id) => topics.some((topic) => topic.id === id)));
+  const [topicError, setTopicError] = useState<string | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -97,6 +103,12 @@ export default function WelcomeForm({ strapiUrl, editionSlug, initial }: Props) 
   function validate(event: React.FormEvent) {
     event.preventDefault();
     if (saving) return;
+    if (topics.length > 0 && topicIds.length === 0) {
+      setTopicError("Choisissez au moins un sujet : il sert à vous proposer les bonnes personnes.");
+      setFormError(null);
+      setFocusField(`sujet-${topics[0].id}`);
+      return;
+    }
     if (!consent.directoryOptIn) {
       setFormError(null);
       setFocusField(null);
@@ -121,7 +133,7 @@ export default function WelcomeForm({ strapiUrl, editionSlug, initial }: Props) 
 
     let profileSaved = false;
     try {
-      await updateProfile(strapiUrl, profile);
+      await updateProfile(strapiUrl, topics.length ? { ...profile, topics: topicIds } : profile);
       profileSaved = true;
       await saveConsent(strapiUrl, toSave);
       window.location.assign(`/espace/${encodeURIComponent(editionSlug)}/`);
@@ -177,6 +189,55 @@ export default function WelcomeForm({ strapiUrl, editionSlug, initial }: Props) 
           </div>
         ))}
       </div>
+
+      {topics.length > 0 && (
+        <fieldset className="mt-6" aria-describedby={topicError ? "sujets-aide sujets-erreur" : "sujets-aide"}>
+          <legend className="font-heading text-xl font-semibold normal-case">
+            Vos sujets d’intérêt
+            <span aria-hidden="true" className="text-danger">
+              {" "}
+              *
+            </span>
+          </legend>
+          <p id="sujets-aide" className="mt-1 text-sm text-muted">
+            De 1 à {MAX_TOPICS}. L’accueil vous propose les personnes qui partagent vos sujets.
+          </p>
+          <ul className="mt-3 flex flex-wrap gap-2">
+            {topics.map((topic) => {
+              const checked = topicIds.includes(topic.id);
+              const full = !checked && topicIds.length >= MAX_TOPICS;
+              return (
+                <li key={topic.id}>
+                  <label
+                    className={`inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border-2 px-4 font-semibold ${
+                      checked ? "border-primary-ink bg-surface text-title" : full ? "cursor-not-allowed border-surface-alt text-muted" : "border-surface-alt bg-white text-ink hover:border-accent"
+                    }`}
+                  >
+                    <input
+                      id={`sujet-${topic.id}`}
+                      type="checkbox"
+                      className="size-5 accent-primary-ink"
+                      checked={checked}
+                      disabled={full}
+                      onChange={(event) => {
+                        setTopicError(null);
+                        setTopicIds(event.target.checked ? [...topicIds, topic.id] : topicIds.filter((id) => id !== topic.id));
+                      }}
+                    />
+                    {topic.name}
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+          {topicError && (
+            <p id="sujets-erreur" role="alert" className="mt-2 flex items-start gap-2 text-sm font-semibold text-danger">
+              <Icon name="alert" />
+              {topicError}
+            </p>
+          )}
+        </fieldset>
+      )}
 
       <fieldset className="mt-6 rounded-xl bg-surface p-4">
         <legend className="float-left w-full font-heading font-semibold text-title">Vos choix de visibilité</legend>

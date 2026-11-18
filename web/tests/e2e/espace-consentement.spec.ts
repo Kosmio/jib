@@ -68,6 +68,8 @@ test.describe('E2, écran de bienvenue (F-116)', () => {
       () => true,
       () => false,
     );
+    // Retour de recette du 18/11 : au moins un sujet à l’arrivée.
+    if (!(await page.locator('input[id^="sujet-"]:checked').count()) && (await page.locator('input[id^="sujet-"]').count())) await page.locator('input[id^="sujet-"]').first().check();
     await page.getByRole('button', { name: 'Continuer', exact: true }).click();
 
     const confirmation = page.locator('#confirmation-annuaire');
@@ -83,6 +85,8 @@ test.describe('E2, écran de bienvenue (F-116)', () => {
 
   test('avec l’annuaire coché, aucune confirmation : Continuer enregistre et ouvre E1', async ({ page, baseURL }) => {
     await openWelcome(page, JULES);
+    // Retour de recette du 18/11 : au moins un sujet à l’arrivée.
+    if (!(await page.locator('input[id^="sujet-"]:checked').count()) && (await page.locator('input[id^="sujet-"]').count())) await page.locator('input[id^="sujet-"]').first().check();
     await page.getByRole('button', { name: 'Continuer', exact: true }).click();
     await expect(page).toHaveURL(`${baseURL}${ESPACE}/`);
   });
@@ -90,6 +94,8 @@ test.describe('E2, écran de bienvenue (F-116)', () => {
   test('recocher l’annuaire retire la confirmation', async ({ page }) => {
     await openWelcome(page, JULES);
     await page.getByRole('checkbox', { name: DIRECTORY }).uncheck();
+    // Retour de recette du 18/11 : au moins un sujet à l’arrivée.
+    if (!(await page.locator('input[id^="sujet-"]:checked').count()) && (await page.locator('input[id^="sujet-"]').count())) await page.locator('input[id^="sujet-"]').first().check();
     await page.getByRole('button', { name: 'Continuer', exact: true }).click();
     await expect(page.locator('#confirmation-annuaire')).toBeVisible();
     await page.getByRole('checkbox', { name: DIRECTORY }).check();
@@ -99,6 +105,8 @@ test.describe('E2, écran de bienvenue (F-116)', () => {
   test('« Continuer sans apparaître » enregistre l’annuaire décoché, « Apparaître dans l’annuaire » le coche et l’enregistre', async ({ page, baseURL }) => {
     await openWelcome(page, ALICE);
     await page.getByRole('checkbox', { name: DIRECTORY }).uncheck();
+    // Retour de recette du 18/11 : au moins un sujet à l’arrivée.
+    if (!(await page.locator('input[id^="sujet-"]:checked').count()) && (await page.locator('input[id^="sujet-"]').count())) await page.locator('input[id^="sujet-"]').first().check();
     await page.getByRole('button', { name: 'Continuer', exact: true }).click();
     await page.getByRole('button', { name: 'Continuer sans apparaître' }).click();
     await expect(page).toHaveURL(`${baseURL}${ESPACE}/`);
@@ -109,6 +117,8 @@ test.describe('E2, écran de bienvenue (F-116)', () => {
     await expect(page.getByRole('checkbox', { name: MEETINGS })).toBeChecked();
 
     // Même écran, autre choix : la confirmation coche la case et enregistre (l'état de départ est ainsi rétabli).
+    // Retour de recette du 18/11 : au moins un sujet à l’arrivée.
+    if (!(await page.locator('input[id^="sujet-"]:checked').count()) && (await page.locator('input[id^="sujet-"]').count())) await page.locator('input[id^="sujet-"]').first().check();
     await page.getByRole('button', { name: 'Continuer', exact: true }).click();
     await page.getByRole('button', { name: 'Apparaître dans l’annuaire' }).click();
     await expect(page).toHaveURL(`${baseURL}${ESPACE}/`);
@@ -121,6 +131,8 @@ test.describe('E2, écran de bienvenue (F-116)', () => {
   test('l’échec du second enregistrement dit ce qui est déjà enregistré, et le focus revient sur « Continuer »', async ({ page, baseURL }) => {
     await openWelcome(page, JULES);
     await page.route('**/me/consent', (route) => route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":{"message":"Erreur"}}' }));
+    // Retour de recette du 18/11 : au moins un sujet à l’arrivée.
+    if (!(await page.locator('input[id^="sujet-"]:checked').count()) && (await page.locator('input[id^="sujet-"]').count())) await page.locator('input[id^="sujet-"]').first().check();
     await page.getByRole('button', { name: 'Continuer', exact: true }).click();
 
     await expect(page.getByRole('alert')).toContainText('Vos informations sont enregistrées, mais pas vos choix de visibilité');
@@ -132,10 +144,27 @@ test.describe('E2, écran de bienvenue (F-116)', () => {
     await openWelcome(page, JULES);
     await page.route('**/me/consent', (route) => route.fulfill({ status: 500, contentType: 'application/json', body: '{"error":{"message":"Erreur"}}' }));
     await page.getByRole('checkbox', { name: DIRECTORY }).uncheck();
+    // Retour de recette du 18/11 : au moins un sujet à l’arrivée.
+    if (!(await page.locator('input[id^="sujet-"]:checked').count()) && (await page.locator('input[id^="sujet-"]').count())) await page.locator('input[id^="sujet-"]').first().check();
     await page.getByRole('button', { name: 'Continuer', exact: true }).click();
     await page.getByRole('button', { name: 'Continuer sans apparaître' }).click();
     await expect(page.getByRole('alert')).toContainText('Vos informations sont enregistrées, mais pas vos choix de visibilité');
     await expect(page.locator('#confirmation-annuaire')).toHaveCount(0);
+  });
+
+  test('retour de recette du 18/11 : sans sujet coché, « Continuer » le demande et n’enregistre rien', async ({ page }) => {
+    await openWelcome(page, JULES);
+    const topics = page.locator('input[id^="sujet-"]');
+    test.skip((await topics.count()) === 0, 'édition de recette sans sujets');
+    for (const box of await topics.all()) await box.setChecked(false);
+    const saved = page.waitForRequest((request) => request.method() === 'PATCH' && request.url().includes('/me'), { timeout: 1500 }).then(
+      () => true,
+      () => false,
+    );
+    await page.getByRole('button', { name: 'Continuer', exact: true }).click();
+    await expect(page.getByRole('alert').filter({ hasText: 'Choisissez au moins un sujet' })).toBeVisible();
+    await expect(topics.first()).toBeFocused();
+    expect(await saved).toBe(false);
   });
 });
 
