@@ -84,7 +84,7 @@ const linkClass = (id: ShellTab) =>
       >
         <p class="sr-only" role="status" aria-live="polite" aria-atomic="true" data-live-announce></p>
         {/* F-149 : sous 1024 px, l'avatar menant au profil reste présent sur tous les écrans sauf l'accueil, dont l'en-tête a le sien (la colonne latérale le porte au-delà). */}
-        {active !== "home" && (
+        {active !== "home" && (me.firstName.trim() || me.lastName.trim()) && (
         <a
           href={`${base}/profil`}
           data-profil-avatar
