@@ -31,6 +31,9 @@
  * draft and the published edition alike. `b2bSessions`: titles of the sequences that become B2B breaks, then the slots are regenerated.
  * `showTestSpeakers: true`: the speaker accounts with an @example.org address tick the directory and the meetings (test environments).
  * `testExhibitorReps: true`: a representative with an @example.org address for each exhibitor that has no active one (test environments).
+ * `linkSpeakersByName: true`: an intervenant of the published program whose name is that of exactly one registered attendee with a real
+ * address is linked to that attendee, who becomes its speaker account ; the test account that stood for it is removed (test environments).
+ * `speakerTopics: true`: each speaker account receives the topics of the sequences where its intervenant speaks ; topics already ticked stay.
  * Idempotent: a second run changes nothing. No e-mail is sent here ; the next synchronization sends `welcome` to new accounts.
  */
 
@@ -78,6 +81,110 @@ function planSpeaker({ row, intervenant, attendees }) {
     return holder.role === 'speaker' && linked ? { action: 'none', attendee: holder, email } : { action: 'promote', attendee: holder, email };
   }
   return account ? { action: 'update', attendee: account, email } : { action: 'create', email };
+}
+
+/** Topics of each intervenant: those linked to the sequences where it speaks. Pure. -> Map(intervenant documentId -> [topic]) */
+function topicsBySpeaker({ sequences, topics }) {
+  const result = new Map();
+  for (const sequence of sequences) {
+    const linked = topics.filter((topic) => (topic.sessions ?? []).some(({ documentId }) => documentId === sequence.documentId));
+    for (const { intervenants = [] } of sequence.interventions ?? []) {
+      for (const { documentId } of intervenants) {
+        const known = result.get(documentId) ?? [];
+        result.set(documentId, [...known, ...linked.filter((topic) => !known.some((item) => item.documentId === topic.documentId))]);
+      }
+    }
+  }
+  return result;
+}
+
+const FAKE_ADDRESS = /@example\.org$/i;
+const sameName = (attendee, name) => [`${attendee.firstName} ${attendee.lastName}`, `${attendee.lastName} ${attendee.firstName}`].some((text) => squeezed(text) === squeezed(name));
+
+/**
+ * Who should hold the speaker account of an intervenant, from the active attendees of the edition. Pure.
+ * -> { action: 'none' } | { action: 'ambiguous', count } | { action: 'link', attendee, replaced: [test accounts that held the link] }
+ */
+function planNameLink({ intervenant, attendees }) {
+  const real = attendees.filter((attendee) => attendee.status === 'active' && !FAKE_ADDRESS.test(attendee.email) && sameName(attendee, intervenant.name));
+  if (!real.length) return { action: 'none' };
+  if (real.length > 1) return { action: 'ambiguous', count: real.length };
+  const [attendee] = real;
+  const replaced = attendees.filter((other) => other.documentId !== attendee.documentId && FAKE_ADDRESS.test(other.email) && other.speaker?.documentId === intervenant.documentId);
+  const linked = attendee.role === 'speaker' && attendee.speaker?.documentId === intervenant.documentId;
+  return linked && !replaced.length ? { action: 'none' } : { action: 'link', attendee, replaced };
+}
+
+/** Sequences of the published program with the intervenants of their interventions. */
+const programSequences = (app, edition) =>
+  app.documents(UID.sequence).findMany({
+    filters: { edition: link(edition) },
+    status: 'published',
+    populate: { interventions: { populate: { intervenants: { fields: ['documentId', 'name'] } } } },
+    limit: 1000,
+  });
+
+async function linkSpeakersByName(app, edition, apply, log) {
+  const intervenants = new Map();
+  for (const { interventions = [] } of await programSequences(app, edition)) {
+    for (const { intervenants: people = [] } of interventions) for (const person of people) intervenants.set(person.documentId, person);
+  }
+  const attendees = await app.documents(UID.attendee).findMany({
+    filters: { edition: link(edition) },
+    fields: ['email', 'firstName', 'lastName', 'role', 'status'],
+    populate: { speaker: { fields: ['documentId'] } },
+    limit: 10000,
+  });
+
+  let changed = 0;
+  for (const intervenant of intervenants.values()) {
+    const plan = planNameLink({ intervenant, attendees });
+    if (plan.action === 'ambiguous') log(`${plan.count} inscrits portent le nom de ${intervenant.name} : rien de rattaché, à trancher à la main`);
+    if (plan.action !== 'link') continue;
+    changed += 1;
+    log(`inscrit à rattacher à son intervenant : ${intervenant.name} (rôle ${plan.attendee.role} -> speaker)`);
+    if (apply) await app.documents(UID.attendee).update({ documentId: plan.attendee.documentId, data: { role: 'speaker', speaker: link(intervenant) } });
+    for (const account of plan.replaced) {
+      const busy = await app.documents('api::espace.meeting').count({
+        filters: { status: { $in: ['pending', 'accepted'] }, $or: [{ requester: link(account) }, { targetAttendee: link(account) }] },
+      });
+      if (busy) {
+        log(`  compte de test conservé, ${busy} rendez-vous en cours, détaché de l’intervenant : ${account.email}`);
+        if (apply) await app.documents(UID.attendee).update({ documentId: account.documentId, data: { speaker: null } });
+        continue;
+      }
+      log(`  compte de test à retirer : ${account.email}`);
+      if (!apply) continue;
+      try {
+        await app.documents(UID.attendee).delete({ documentId: account.documentId });
+      } catch (error) {
+        log(`  conservé : ${error.message}`);
+      }
+    }
+  }
+  if (!changed) log('aucun rattachement à faire');
+}
+
+async function importSpeakerTopics(app, edition, apply, log) {
+  const topics = await app.documents(UID.topic).findMany({ filters: { edition: link(edition) }, populate: { sessions: { fields: ['documentId'] } }, limit: 1000 });
+  const wanted = topicsBySpeaker({ sequences: await programSequences(app, edition), topics });
+  const accounts = await app.documents(UID.attendee).findMany({
+    filters: { edition: link(edition), status: 'active', speaker: { documentId: { $notNull: true } } },
+    fields: ['firstName', 'lastName'],
+    populate: { speaker: { fields: ['documentId'] }, topics: { fields: ['documentId'] } },
+    limit: 10000,
+  });
+
+  let changed = 0;
+  for (const account of accounts) {
+    const current = new Set((account.topics ?? []).map(({ documentId }) => documentId));
+    const missing = (wanted.get(account.speaker.documentId) ?? []).filter(({ documentId }) => !current.has(documentId));
+    if (!missing.length) continue;
+    changed += 1;
+    log(`sujets à ajouter : ${account.firstName} ${account.lastName}, ${missing.map(({ name }) => name).join(', ')}`);
+    if (apply) await app.documents(UID.attendee).update({ documentId: account.documentId, data: { topics: [...current, ...missing.map(({ documentId }) => documentId)].map((documentId) => ({ documentId })) } });
+  }
+  log(`${accounts.length} compte(s) d’intervenant, ${changed} à compléter`);
 }
 
 async function importTopics(app, edition, rows, replace, apply, log) {
@@ -398,6 +505,14 @@ async function main() {
       console.log('Intervenants');
       await importSpeakers(app, edition, input.speakers, apply, log);
     }
+    if (input.linkSpeakersByName === true) {
+      console.log('Intervenants rattachés à leur inscription');
+      await linkSpeakersByName(app, edition, apply, log);
+    }
+    if (input.speakerTopics === true) {
+      console.log('Sujets des intervenants');
+      await importSpeakerTopics(app, edition, apply, log);
+    }
     if (input.b2bSessions) {
       console.log('Pauses B2B et créneaux');
       await importB2bSessions(app, edition, input.b2bSessions, apply, log);
@@ -417,7 +532,7 @@ async function main() {
   }
 }
 
-module.exports = { planSpeaker, plain, squeezed };
+module.exports = { planNameLink, planSpeaker, plain, squeezed, topicsBySpeaker };
 
 if (require.main === module) {
   main().catch((error) => {
