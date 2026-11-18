@@ -31,7 +31,7 @@ if (stats && !stats.ok && stats.status === 403) Astro.response.status = 403;
 const refused = page.kind === "refused" || (stats !== null && !stats.ok && stats.status === 403);
 ---
 
-<OrganizerFrame title="Pilotage" heading="Pilotage de l’édition" tab="pilotage" edition={edition} me={me} slug={slug} base={base} refused={refused}>
+<OrganizerFrame title="Pilotage" heading="Pilotage de l’édition" tab="pilotage" edition={edition} me={me} slug={slug} base={base} refused={refused} refusedText="Le tableau de bord est réservé aux organisateurs de l’édition.">
   {editions?.ok && <EditionSwitcher editions={editions.data} strapiUrl={publicStrapiUrl} />}
   <div class="mt-6">
     {
