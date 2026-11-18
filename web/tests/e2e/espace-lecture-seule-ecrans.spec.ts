@@ -1,9 +1,8 @@
-import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { BrowserContext, Page } from '@playwright/test';
-import { ESPACE, expect, hydrated, openSpace, receiveLink, test } from './espace';
+import { ESPACE, expect, hydrated, openSpace, psql, receiveLink, test } from './espace';
 
 /**
  * Lecture seule visible sur les écrans (V4-F2 et V4-F3, NF-70).
@@ -13,7 +12,7 @@ import { ESPACE, expect, hydrated, openSpace, receiveLink, test } from './espace
  * exports et pilotage intacts, droits RGPD (V5-A : « Télécharger mes données », « Supprimer mes données ») utilisables. Édition ouverte :
  * rien de désactivé, champs de V5-D préremplis par la page sans appel supplémentaire à GET /me.
  *
- * - L'édition de recette est modifiée par SQL (`docker exec jib-postgres psql`) sur la base e2e de l'exécution : `read_only_at` dans le passé
+ * - L'édition de recette est modifiée par SQL (`psql`) sur la base e2e de l'exécution : `read_only_at` dans le passé
  *   sur les lignes brouillon et publiée, puis remis tel quel par `afterAll`. Les champs B2B de Nathan, posés pour le test de l'édition
  *   ouverte, sont remis de même. Aucune route ni aide partagée ne le permet.
  * - Une session par adresse (limite de 5 liens par 15 minutes, NF-03), ouverte pendant la phase « édition ouverte » ; Alice se connecte
@@ -31,10 +30,7 @@ const ALICE = 'alice.fourcade@example.org';
 const ORGANIZER = 'organisation@example.org';
 
 function sql(statement: string): string {
-  expect(DATABASE.endsWith('_e2e'), `base e2e attendue, reçu ${DATABASE}`).toBe(true);
-  const result = spawnSync('docker', ['exec', 'jib-postgres', 'psql', '-U', 'strapi', '-d', DATABASE, '-v', 'ON_ERROR_STOP=1', '-t', '-A', '-c', statement], { encoding: 'utf8' });
-  expect(result.status, `SQL « ${statement} » : ${result.stderr}`).toBe(0);
-  return result.stdout.trim();
+  return psql(statement).join('\n').trim();
 }
 
 type Row = { id: string; readOnlyAt: string };

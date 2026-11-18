@@ -4,7 +4,7 @@ import { createServer as createHttpServer, type Server } from 'node:http';
 import { createServer } from 'node:net';
 import path from 'node:path';
 import type { Page } from '@playwright/test';
-import { ESPACE, expect, hydrated, openSpace, tab, test } from './espace';
+import { ESPACE, expect, hydrated, openSpace, psql, tab, test } from './espace';
 import { STRAPI_URL } from './fixtures';
 
 /**
@@ -15,7 +15,7 @@ import { STRAPI_URL } from './fixtures';
  * - Contextes supplémentaires (`browser.newContext`) : `extraHTTPHeaders: {}`, sinon l'en-tête X-Forwarded-For du `test` de l'espace fait refuser par CORS
  *   les appels de l'îlot à Strapi (« x-forwarded-for is not allowed by Access-Control-Allow-Headers »).
  * - Temps : `page.clock` avance l'horloge de la page (relecture de 60 s, classement du jour J) sans attendre ; les appels réseau restent réels.
- * - Fenêtre de demandes (F-111) : l'édition de recette est modifiée par SQL (`docker exec jib-postgres psql`) sur la base e2e de l'exécution,
+ * - Fenêtre de demandes (F-111) : l'édition de recette est modifiée par SQL (`psql`) sur la base e2e de l'exécution,
  *   puis remise en l'état par `afterAll`. Aucune route ni aide partagée ne le permet.
  * - Lecture des rendez-vous en échec (F-110) : l'accueil lit `/meetings` côté serveur, hors de portée de `page.route`. Le test construit un
  *   second front (`dist-e2e/<port>-meetings-ko`) dont STRAPI_URL vise un relais local qui répond 500 à `/meetings` et transmet le reste au
@@ -75,10 +75,7 @@ async function openProfile(page: Page, email: string, search: string, name: RegE
 const slotButton = (page: Page, time: string) => page.getByRole('button', { name: new RegExp(`^${time}`) });
 
 function sql(statement: string): string {
-  expect(DATABASE.endsWith('_e2e'), `base e2e attendue, reçu ${DATABASE}`).toBe(true);
-  const result = spawnSync('docker', ['exec', 'jib-postgres', 'psql', '-U', 'strapi', '-d', DATABASE, '-v', 'ON_ERROR_STOP=1', '-t', '-A', '-c', statement], { encoding: 'utf8' });
-  expect(result.status, `SQL « ${statement} » : ${result.stderr}`).toBe(0);
-  return result.stdout.trim();
+  return psql(statement).join('\n').trim();
 }
 
 /** Plus grand identifiant de rendez-vous au départ du fichier : ceux que les tests créent ensuite sont supprimés par `afterAll`. */

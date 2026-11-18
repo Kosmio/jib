@@ -20,10 +20,32 @@ import { STRAPI_URL, expect, test as base } from './fixtures';
 const { buildTestEnv, e2eDatabaseName } = createRequire(import.meta.url)('../../../strapi/tests/helpers/env.js');
 export const OUTBOX_FILE: string = buildTestEnv({ database: e2eDatabaseName() }).EMAIL_OUTBOX_FILE;
 
-/** Requête SQL sur la base e2e (conteneur jib-postgres) : le résultat en lignes, colonnes séparées par « | ». Pour poser ou restaurer un état de départ. */
+/** Vrai si le conteneur jib-postgres tourne (poste local) et que le chemin TCP n'est pas forcé par E2E_PSQL=tcp. */
+function useDockerPsql(): boolean {
+  if (process.env.E2E_PSQL === 'tcp') return false;
+  const probe = spawnSync('docker', ['inspect', '-f', '{{.State.Running}}', 'jib-postgres'], { encoding: 'utf8', timeout: 15_000 });
+  return probe.status === 0 && probe.stdout.trim() === 'true';
+}
+
+/**
+ * Requête SQL sur la base e2e : le résultat en lignes, colonnes séparées par « | ». Pour poser ou restaurer un état de départ.
+ * En local, par `docker exec jib-postgres psql` ; sans ce conteneur (CI : service postgres publié sur localhost), par le client `psql`
+ * en TCP avec DATABASE_HOST, DATABASE_PORT, DATABASE_USERNAME et DATABASE_PASSWORD (défauts localhost, 5432, strapi, strapi).
+ */
 export function psql(sql: string): string[] {
-  const result = spawnSync('docker', ['exec', 'jib-postgres', 'psql', '-U', 'strapi', '-d', e2eDatabaseName(), '-At', '-c', sql], { encoding: 'utf8', timeout: 60_000 });
-  if (result.status !== 0) throw new Error(`psql a échoué : ${result.stderr}`);
+  const database = e2eDatabaseName();
+  if (!database.endsWith('_e2e')) throw new Error(`base e2e attendue, reçu ${database}`);
+  const args = ['-d', database, '-v', 'ON_ERROR_STOP=1', '-At', '-c', sql];
+  const user = process.env.DATABASE_USERNAME ?? 'strapi';
+  const result = useDockerPsql()
+    ? spawnSync('docker', ['exec', 'jib-postgres', 'psql', '-U', user, ...args], { encoding: 'utf8', timeout: 60_000 })
+    : spawnSync('psql', ['-h', process.env.DATABASE_HOST ?? 'localhost', '-p', process.env.DATABASE_PORT ?? '5432', '-U', user, ...args], {
+        encoding: 'utf8',
+        timeout: 60_000,
+        env: { ...process.env, PGPASSWORD: process.env.DATABASE_PASSWORD ?? 'strapi' },
+      });
+  if (result.error) throw new Error(`psql introuvable ou en échec : ${result.error.message}`);
+  if (result.status !== 0) throw new Error(`SQL « ${sql} » : ${result.stderr}`);
   return result.stdout.split('\n').filter(Boolean);
 }
 
