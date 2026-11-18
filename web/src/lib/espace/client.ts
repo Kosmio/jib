@@ -87,13 +87,16 @@ export class EspaceApiError extends Error {
   status: number;
   code: string;
   fields: Record<string, string>;
+  /** Le reste de l'objet `error` de la réponse (par exemple `candidates` d'un 409 SIMILAR_ORGANISATIONS). */
+  details: Record<string, unknown>;
 
-  constructor(status: number, code: string, message: string, fields: Record<string, string> = {}) {
+  constructor(status: number, code: string, message: string, fields: Record<string, string> = {}, details: Record<string, unknown> = {}) {
     super(message);
     this.name = "EspaceApiError";
     this.status = status;
     this.code = code;
     this.fields = fields;
+    this.details = details;
   }
 }
 
@@ -127,7 +130,7 @@ export async function request<T>(baseUrl: string, path: string, method: string, 
   }
   if (!response.ok) {
     const error = data?.error;
-    throw new EspaceApiError(response.status, error?.code ?? "UNKNOWN", error?.message ?? "", error?.fields);
+    throw new EspaceApiError(response.status, error?.code ?? "UNKNOWN", error?.message ?? "", error?.fields, error ?? {});
   }
   return data as T;
 }

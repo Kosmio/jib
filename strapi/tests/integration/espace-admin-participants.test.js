@@ -701,7 +701,11 @@ describe('participants dans le pilotage (V3-E : F-134 à F-138, R-89)', { timeou
       const result = await run(edition);
       assert.equal((await attendeesOf(edition)).length, before + 1, 'seul l’invité s’ajoute, le billet de Léa ne crée rien');
       assert.equal((await attendeesOf(edition)).filter((attendee) => attendee.email === LEA).length, 1);
-      assert.ok(result.errors.some((error) => error.email === LEA || /EMAIL/.test(error.code)), 'le billet est signalé comme doublon');
+      // R-96 (15-administration.md, 18 novembre) : le billet rejoint l'invité au lieu d'être signalé comme doublon.
+      const [guest] = (await attendeesOf(edition)).filter((attendee) => attendee.email === LEA);
+      assert.equal(guest.lastName, 'Invitée', 'les champs saisis à la main restent');
+      assert.ok(guest.helloassoItemId, 'le billet est rattaché à l’invité');
+      assert.ok(!result.errors.some((error) => error.email === LEA), JSON.stringify(result.errors));
     });
   });
 

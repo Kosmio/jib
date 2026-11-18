@@ -65,12 +65,15 @@ function mapItem(item, fieldMap) {
  * R-44: `isErased(email)` is true for the address of a person who asked for the erasure of their data: an unknown active ticket at
  * this address is ignored (code ERASED, an information, not a failure) and never creates nor reactivates an Attendee.
  * R-89: an Attendee whose status the organizer decided (`statusLockedAt`) is never cancelled, reactivated or taken over by a ticket:
- * a new ticket at its address stays in DUPLICATE_EMAIL. Attendees created by hand carry no ticket id and are never planned for removal.
+ * a new ticket at its address stays in DUPLICATE_EMAIL. Attendees created by hand carry no ticket id and are never planned for removal,
+ * until a ticket of their address arrives: it then joins them (R-96).
  */
 function planSync({ items, attendees, fieldMap, isErased = () => false }) {
   const known = new Map(attendees.filter((attendee) => attendee.helloassoItemId != null).map((attendee) => [String(attendee.helloassoItemId), attendee]));
   const taken = new Set(attendees.map((attendee) => normalizeEmail(attendee.email)));
   const returning = new Map(attendees.filter(({ status, statusLockedAt }) => status === 'cancelled' && !statusLockedAt).map((attendee) => [normalizeEmail(attendee.email), attendee]));
+  // R-96: a person created by hand (no ticket yet, status not locked) is the same person as a ticket of the same address.
+  const manual = new Map(attendees.filter(({ helloassoItemId, status, statusLockedAt }) => helloassoItemId == null && status === 'active' && !statusLockedAt).map((attendee) => [normalizeEmail(attendee.email), attendee]));
   const plan = { create: [], update: [], cancel: [], errors: [] };
 
   /** Imported fields that changed and that the participant did not edit (R-31) ; a blank value never empties a field. */
@@ -103,6 +106,11 @@ function planSync({ items, attendees, fieldMap, isErased = () => false }) {
       known.delete(String(buyer.helloassoItemId));
       const { helloassoItemId, helloassoOrderId } = mapped;
       plan.update.push({ documentId: buyer.documentId, changes: { helloassoItemId, helloassoOrderId, status: 'active', ...refreshed(buyer, mapped) } });
+    } else if (manual.has(mapped.email)) {
+      // R-96: the ticket joins the existing account ; its roles and its fields stay as the organizer set them.
+      const person = manual.get(mapped.email);
+      manual.delete(mapped.email);
+      plan.update.push({ documentId: person.documentId, changes: { helloassoItemId: mapped.helloassoItemId, helloassoOrderId: mapped.helloassoOrderId } });
     } else if (taken.has(mapped.email)) fail('DUPLICATE_EMAIL', { email: mapped.email });
     else {
       taken.add(mapped.email);
