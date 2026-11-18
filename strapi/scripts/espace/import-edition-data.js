@@ -20,7 +20,9 @@
  * Topics (the tags of the profiles and of the directory filter): created by name, linked to the sequences named in `sessions`.
  * With `replaceTopics: true`, the topics of the edition that the file does not name are removed, and the profiles lose them.
  * Exhibitors: the organisation is found by its name (case and accents ignored), created and published when it does not exist,
- * then one Exhibitor per organisation and edition ; `standNumber` is updated when given.
+ * then one Exhibitor per organisation and edition ; `standNumber` is updated when given. With `replaceExhibitors: true`, the
+ * exhibitors of the edition that the file does not name are removed, except those the admin guards keep (pending or accepted meeting).
+ * Files without personal data (topics, exhibitors) may live in scripts/espace/editions/ and be imported by the Deploy workflow.
  * Speakers: the account of the speaker is the attendee linked to the intervenant, or of the same name. Its address becomes
  * the real one (the fake address of a test account is replaced). Without an account, a speaker account is created. When
  * another attendee already holds the address (HelloAsso registration), that attendee becomes the speaker account and the
@@ -115,7 +117,7 @@ async function importTopics(app, edition, rows, replace, apply, log) {
   if (apply) for (const { documentId } of others) await app.documents(UID.topic).delete({ documentId });
 }
 
-async function importExhibitors(app, edition, rows, apply, log) {
+async function importExhibitors(app, edition, rows, replace, apply, log) {
   const organisations = await app.documents(UID.organisation).findMany({ status: 'published', fields: ['name', 'slug'], limit: 5000 });
   const exhibitors = await app.documents(UID.exhibitor).findMany({
     filters: { edition: link(edition) },
@@ -142,6 +144,21 @@ async function importExhibitors(app, edition, rows, apply, log) {
       if (apply) await app.documents(UID.exhibitor).update({ documentId: exhibitor.documentId, data: { standNumber } });
     } else {
       log(`exposant déjà en place : ${name}`);
+    }
+  }
+
+  if (!replace) return;
+  const listed = new Set(rows.map((row) => squeezed(row.organisation)));
+  for (const exhibitor of exhibitors) {
+    const name = exhibitor.organisation?.name ?? '(sans organisation)';
+    if (exhibitor.organisation && listed.has(squeezed(exhibitor.organisation.name))) continue;
+    log(`exposant absent de la liste, à retirer : ${name}`);
+    if (!apply) continue;
+    try {
+      await app.documents(UID.exhibitor).delete({ documentId: exhibitor.documentId });
+    } catch (error) {
+      // Garde NF-63 : un exposant qui porte un rendez-vous en attente ou accepté reste en place.
+      log(`  conservé : ${error.message}`);
     }
   }
 }
@@ -236,7 +253,7 @@ async function main() {
     }
     if (input.exhibitors) {
       console.log('Exposants');
-      await importExhibitors(app, edition, input.exhibitors, apply, log);
+      await importExhibitors(app, edition, input.exhibitors, input.replaceExhibitors === true, apply, log);
     }
     if (input.speakers) {
       console.log('Intervenants');

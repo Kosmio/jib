@@ -30,6 +30,16 @@ on:
         required: false
         type: boolean
         default: false
+      edition_data:
+        description: 'Optional: file of strapi/scripts/espace/editions/ to import after the deploy (topics, exhibitors, no personal data)'
+        required: false
+        type: string
+        default: ''
+      edition_data_apply:
+        description: 'Write the edition data (otherwise a simulation that only lists the changes)'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   deploy:
@@ -282,6 +292,30 @@ jobs:
             sleep 5
           done
           ssh $DST "docker start jib-mcp"
+
+      # Données d'une édition (sujets, exposants) sans donnée personnelle, versionnées dans strapi/scripts/espace/editions/.
+      # Le script du dépôt est copié dans le conteneur : il sert aussi sur une image plus ancienne. Simulation par défaut.
+      - name: Import edition data
+        if: ${{ !inputs.dry_run && inputs.edition_data != '' }}
+        env:
+          EDITION_DATA: ${{ inputs.edition_data }}
+          EDITION_DATA_APPLY: ${{ inputs.edition_data_apply }}
+        run: |
+          case "$EDITION_DATA" in
+            */*|*..*|'') echo "::error::edition_data est un nom de fichier de strapi/scripts/espace/editions/"; exit 1 ;;
+          esac
+          FILE="strapi/scripts/espace/editions/$EDITION_DATA"
+          [ -f "$FILE" ] || { echo "::error::$FILE introuvable"; exit 1; }
+          if grep -q '"speakers"' "$FILE"; then
+            echo "::error::$FILE contient des intervenants (données personnelles) : refusé"; exit 1
+          fi
+          DST="${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}"
+          cat "$FILE" | ssh $DST "docker exec -i jib-strapi sh -c 'cat > /tmp/edition-data.json'"
+          cat strapi/scripts/espace/import-edition-data.js | \
+            ssh $DST "docker exec -i jib-strapi sh -c 'cat > /tmp/import-edition-data.js'"
+          FLAG=""
+          if [ "$EDITION_DATA_APPLY" = "true" ]; then FLAG="--apply"; fi
+          ssh $DST "docker exec -w /app -e NODE_PATH=/app/node_modules jib-strapi node /tmp/import-edition-data.js /tmp/edition-data.json $FLAG; status=\$?; docker exec jib-strapi rm -f /tmp/edition-data.json /tmp/import-edition-data.js; exit \$status"
 
       - name: Verify container environment
         if: ${{ !inputs.dry_run }}
