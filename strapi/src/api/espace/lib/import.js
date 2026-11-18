@@ -59,6 +59,8 @@ function mapItem(item, fieldMap) {
  *   create: mapItem results to create ; update: [{ documentId, changes }] ; cancel: [documentId]
  *   errors: [{ itemId, code, email? }] with the codes DUPLICATE_EMAIL (I-14), INVALID_EMAIL, ERASED (R-44), WAITING, UNKNOWN
  * Tickets are handled by ascending id, so the first ticket of an e-mail address wins. Role, links and consents are never touched.
+ * Tickets of one order for one beneficiary (day and cocktail) are one person: only the main ticket counts (groupTickets), the others
+ * are neither imported nor reported.
  * A-22: an active unknown ticket whose address is that of an Attendee already `cancelled` when the synchronization starts is
  * attached to this Attendee (ticket ids, status `active`, imported fields not edited). An Attendee is attached once per run:
  * a second active ticket at the same address stays in DUPLICATE_EMAIL.
@@ -68,6 +70,33 @@ function mapItem(item, fieldMap) {
  * a new ticket at its address stays in DUPLICATE_EMAIL. Attendees created by hand carry no ticket id and are never planned for removal,
  * until a ticket of their address arrives: it then joins them (R-96).
  */
+const fold = (value) =>
+  String(value ?? '')
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .trim()
+    .toLowerCase();
+
+/**
+ * Tickets of one order bought for one beneficiary (the day and the lunch cocktail, 18/11/2026) are one person. The main ticket is
+ * an active one first, then the one with the most custom field answers (the cocktail tariff asks none), then the oldest. -> [{ main,
+ * companions }] ; a ticket without order is alone.
+ */
+function groupTickets(items) {
+  const groups = new Map();
+  for (const item of items) {
+    const key = item.order?.id == null ? `item:${item.id}` : `${item.order.id}|${fold(item.user?.firstName)}|${fold(item.user?.lastName)}`;
+    if (groups.has(key)) groups.get(key).push(item);
+    else groups.set(key, [item]);
+  }
+  const answers = (item) => (item.customFields ?? []).filter((field) => clean(field.answer)).length;
+  const active = (item) => (decide(item).decision === 'active' ? 1 : 0);
+  return [...groups.values()].map((group) => {
+    const [main, ...companions] = [...group].sort((a, b) => active(b) - active(a) || answers(b) - answers(a) || Number(a.id) - Number(b.id));
+    return { main, companions };
+  });
+}
+
 function planSync({ items, attendees, fieldMap, isErased = () => false }) {
   const known = new Map(attendees.filter((attendee) => attendee.helloassoItemId != null).map((attendee) => [String(attendee.helloassoItemId), attendee]));
   const taken = new Set(attendees.map((attendee) => normalizeEmail(attendee.email)));
@@ -83,12 +112,18 @@ function planSync({ items, attendees, fieldMap, isErased = () => false }) {
     return Object.fromEntries(fields.map((field) => [field, mapped[field]]));
   };
 
-  for (const item of [...items].sort((a, b) => Number(a.id) - Number(b.id))) {
+  for (const { main: item, companions } of groupTickets(items).sort((a, b) => Number(a.main.id) - Number(b.main.id))) {
     const mapped = mapItem(item, fieldMap);
-    const attendee = known.get(mapped.helloassoItemId);
+    // An Attendee created earlier from a companion ticket (the cocktail one) is the same person: it moves to the main ticket.
+    const viaCompanion = known.has(mapped.helloassoItemId) ? null : companions.map((companion) => known.get(String(companion.id))).find(Boolean);
+    const attendee = known.get(mapped.helloassoItemId) ?? viaCompanion;
     const fail = (code, extra) => plan.errors.push({ itemId: mapped.helloassoItemId, code, ...extra });
 
-    if (mapped.decision === 'ignored') fail(mapped.reason);
+    if (viaCompanion && mapped.decision === 'active') {
+      const changes = { helloassoItemId: mapped.helloassoItemId, helloassoOrderId: mapped.helloassoOrderId, ...refreshed(viaCompanion, mapped) };
+      if (viaCompanion.status === 'cancelled' && !viaCompanion.statusLockedAt) changes.status = 'active';
+      plan.update.push({ documentId: viaCompanion.documentId, changes });
+    } else if (mapped.decision === 'ignored') fail(mapped.reason);
     else if (mapped.decision === 'cancelled') {
       if (attendee && attendee.status !== 'cancelled' && !attendee.statusLockedAt) plan.cancel.push(attendee.documentId);
     } else if (attendee) {
@@ -120,4 +155,4 @@ function planSync({ items, attendees, fieldMap, isErased = () => false }) {
   return plan;
 }
 
-module.exports = { normalizeEmail, mapItem, planSync };
+module.exports = { normalizeEmail, mapItem, planSync, groupTickets };
