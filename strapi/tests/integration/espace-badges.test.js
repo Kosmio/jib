@@ -27,6 +27,7 @@ const path = require('node:path');
 
 const { freshIp, sha256, useEspace } = require('../helpers/espace');
 const { UID, createAttendee, createEdition, createProgram, link } = require('../helpers/espace-data');
+const { createExhibitor, createMeetingEdition, seedMeeting } = require('../helpers/meetings-world');
 const { makePng } = require('../helpers/png');
 const { CARD_TOKEN_PATTERN, cardUrl, deriveCardToken, qrMatrix } = require('../../src/api/espace/lib/badges');
 const items = require('../../scripts/espace/fixtures/helloasso-items.json');
@@ -45,6 +46,7 @@ const skip = PDFTOPPM && PDFTOTEXT ? false : 'poppler (pdftoppm, pdftotext) abse
 const MM = 72 / 25.4;
 const A4 = { width: 595.28, height: 841.89 };
 const MID = A4.width / 2;
+const HALF = A4.height / 2; // pli horizontal : les deux faces d’identité au-dessus, programme et rendez-vous en dessous
 const MARGIN = 10 * MM;
 const DPI = 150;
 
@@ -120,7 +122,7 @@ async function withFiles(pdf, check) {
 
 const normalize = (text) => text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 const byName = (a, b) => normalize(`${a.lastName} ${a.firstName}`).localeCompare(normalize(`${b.lastName} ${b.firstName}`), 'fr');
-const rectoText = (words) => words.filter((word) => word.x0 >= MID).map((word) => word.text).join(' ');
+const rectoText = (words) => words.filter((word) => word.y1 <= HALF).map((word) => word.text).join(' ');
 
 /** Le texte qui sort sur stdout et stderr pendant `run`, le journal de Strapi étant ouvert au niveau le plus bavard (NF-55). */
 async function captured(app, run) {
@@ -812,7 +814,7 @@ describe('badges et carte publique (V4-D1 : F-95 à F-99, R-80 à R-84, NF-54 à
 
   // ----------------------------------------------------------------------------------------------------------------------------------
   describe('T-66 : nom de 40 caractères, entreprise de 60, programme de 30 interventions, de bout en bout par Strapi', { skip }, () => {
-    it('le PDF de l’édition garde tout dans ses marges, le recto dans la demi-page droite, le verso dans la gauche', async () => {
+    it('le PDF de l’édition garde tout dans ses marges et dans ses volets, l’identité sur la moitié haute, le programme sur la moitié basse', async () => {
       const edition = await newEdition({ enabled: false });
       const organisation = await espace().app.documents(UID.organisation).create({ data: { name: 'Organisation de recette', slug: `org-t66-${counter}` }, status: 'published' });
       for (let index = 0; index < 30; index += 1) {
@@ -836,9 +838,10 @@ describe('badges et carte publique (V4-D1 : F-95 à F-99, R-80 à R-84, NF-54 à
         for (const word of words) {
           assert.ok(word.x0 >= MARGIN - 0.5 && word.x1 <= A4.width - MARGIN + 0.5, `« ${word.text} » hors des marges latérales (${word.x0.toFixed(1)} à ${word.x1.toFixed(1)})`);
           assert.ok(word.y0 >= MARGIN - 0.5 && word.y1 <= A4.height - MARGIN + 0.5, `« ${word.text} » hors des marges verticales`);
-          assert.ok(word.x0 >= MID - 0.5 || word.x1 <= MID + 0.5, `« ${word.text} » à cheval sur le pli`);
+          assert.ok(word.x0 >= MID - 0.5 || word.x1 <= MID + 0.5, `« ${word.text} » à cheval sur le pli vertical`);
+          assert.ok(word.y0 >= HALF - 0.5 || word.y1 <= HALF + 0.5, `« ${word.text} » à cheval sur le pli horizontal`);
         }
-        const verso = words.filter((word) => word.x1 <= MID + 0.5).map((word) => word.text).join(' ');
+        const verso = words.filter((word) => word.y0 >= HALF - 0.5).map((word) => word.text).join(' ');
         const recto = rectoText(words);
         assert.ok(recto.includes('Jean-Christophe') && recto.includes('Montgolfier'), recto);
         assert.ok(verso.includes('Intervention 1 sur'), 'programme lu sur le verso (édition fermée comprise)');
@@ -847,11 +850,46 @@ describe('badges et carte publique (V4-D1 : F-95 à F-99, R-80 à R-84, NF-54 à
   });
 
   // ----------------------------------------------------------------------------------------------------------------------------------
+  describe('rendez-vous sur le badge (décision du 18 novembre 2026)', { skip }, () => {
+    it('le badge porte les rendez-vous confirmés du porteur, côté demandeur, côté cible et côté représentant d’un exposant, jamais les autres', async () => {
+      counter += 1;
+      const { edition, slotList } = await createMeetingEdition(espace().app, { slug: `badges-rdv-${counter}`, title: `Badges rendez-vous ${counter}` });
+      const { exhibitor } = await createExhibitor(espace().app, edition, { name: 'Sylvadour Fictif', standNumber: '7' });
+      const lea = await person(edition, { firstName: 'Léa', lastName: 'Demandeuse', company: 'Atelier Fictif' });
+      const marc = await person(edition, { firstName: 'Marc', lastName: 'Cible', company: 'Scierie Fictive' });
+      const rep = await person(edition, { firstName: 'Rose', lastName: 'Stand', role: 'exhibitor_rep', exhibitor: link(exhibitor) });
+      const other = await person(edition, { firstName: 'Paul', lastName: 'Etranger' });
+      await seedMeeting(espace().app, { edition, slot: slotList[0], requester: lea, target: marc, status: 'accepted', tableNumber: 2 });
+      await seedMeeting(espace().app, { edition, slot: slotList[1], requester: lea, exhibitor, status: 'accepted' });
+      await seedMeeting(espace().app, { edition, slot: slotList[2], requester: lea, target: other, status: 'pending' });
+      const { cookie } = await organizerOf(edition);
+
+      const lower = async (attendee) => {
+        const response = await binary(admin(edition, `/attendees/${attendee.documentId}/badge`), { cookie });
+        assert.equal(response.status, 200);
+        return withFiles(response.bytes, ({ file }) => pdfWords(file)[0].filter((word) => word.y0 >= HALF - 0.5).map((word) => word.text).join(' '));
+      };
+      const ofLea = await lower(lea);
+      for (const expected of ['Marc Cible', 'Table 2', 'Scierie Fictive', 'Sylvadour Fictif', 'Stand 7', slotList[0].label, slotList[1].label]) assert.ok(ofLea.includes(expected), `« ${expected} » absent du badge de la demandeuse : ${ofLea.slice(0, 300)}`);
+      assert.ok(!ofLea.includes('Etranger'), 'une demande en attente n’est pas imprimée');
+      assert.ok(ofLea.indexOf('Marc Cible') < ofLea.indexOf('Sylvadour Fictif'), 'dans l’ordre de la journée');
+      const ofMarc = await lower(marc);
+      assert.ok(ofMarc.includes('Léa Demandeuse') && ofMarc.includes('Atelier Fictif') && !ofMarc.includes('Sylvadour'), ofMarc.slice(0, 300));
+      const ofRep = await lower(rep);
+      assert.ok(ofRep.includes('Léa Demandeuse') && ofRep.includes('Stand 7') && !ofRep.includes('Marc Cible'), ofRep.slice(0, 300));
+      assert.ok((await lower(other)).includes('Aucun rendez-vous confirmé'));
+    });
+  });
+
+  // ----------------------------------------------------------------------------------------------------------------------------------
   describe('T-68, F-99 : plan du lieu et couleur d’accent', { skip }, () => {
-    const bandColor = (image) => {
+    const bandColor = (image, words) => {
       const scale = DPI / 72;
-      const x = Math.round(330 * scale);
-      const y = Math.round(473 * scale); // dans le bandeau de type, au-dessus de son libellé (bandeau de 470 à 524 pt)
+      // Dans le bandeau de type, à mi-hauteur de son libellé et juste à sa gauche (le bandeau va du bord du volet au pli).
+      const label = words.find((word) => ['PARTICIPANT', 'INTERVENANT', 'EXPOSANT', 'ORGANISATEUR'].includes(word.text));
+      assert.ok(label, 'libellé du bandeau lu');
+      const x = Math.round((label.x0 - 8) * scale);
+      const y = Math.round(((label.y0 + label.y1) / 2) * scale);
       const at = (y * image.width + x) * 3;
       return [...image.data.subarray(at, at + 3)];
     };
@@ -860,7 +898,10 @@ describe('badges et carte publique (V4-D1 : F-95 à F-99, R-80 à R-84, NF-54 à
     async function renderedBand(edition, attendee, cookie) {
       const response = await binary(admin(edition, `/attendees/${attendee.documentId}/badge`), { cookie });
       assert.equal(response.status, 200);
-      return withFiles(response.bytes, ({ file, directory }) => ({ rgb: bandColor(renderPages(file, directory, { color: true })[0]), words: pdfWords(file)[0] }));
+      return withFiles(response.bytes, ({ file, directory }) => {
+        const [words] = pdfWords(file);
+        return { rgb: bandColor(renderPages(file, directory, { color: true })[0], words), words };
+      });
     }
 
     it('sans réglage de badge : verso complet, aucune zone « PLAN DU LIEU », bandeau de la couleur de l’édition (hero_bg_color)', async () => {

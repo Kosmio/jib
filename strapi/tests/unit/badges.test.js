@@ -362,6 +362,7 @@ const skip = PDFTOPPM && PDFTOTEXT ? false : 'poppler (pdftoppm, pdftotext) abse
 const MM = 72 / 25.4;
 const A4 = { width: 595.28, height: 841.89 };
 const MID = A4.width / 2;
+const HALF = A4.height / 2; // pli horizontal : identité au-dessus, programme et rendez-vous (à l’envers) en dessous
 const MARGIN = 10 * MM; // marges d'une imprimante de bureau (D-13)
 const DPI = 150;
 
@@ -471,8 +472,8 @@ describe('buildBadgesPdf : une page A4 par badge, QR relu sur le rendu (T-65, I-
       assert.equal(pages.length, 4);
       const expected = [['Léa', 'Ducasse', 'PARTICIPANT'], ['Hélène', 'Marques', 'INTERVENANT'], ['Benoît', 'Tastet', 'EXPOSANT'], ['Odile', 'Organisatrice', 'ORGANISATEUR']];
       expected.forEach((words, index) => {
-        // Le verso (demi-page gauche) est le programme, identique sur toutes les pages : seul le recto désigne la personne.
-        const text = wordsOf(pages[index].filter((word) => word.x0 >= MID));
+        // La moitié basse porte le programme, identique sur toutes les pages : seule la moitié haute désigne la personne.
+        const text = wordsOf(pages[index].filter((word) => word.y1 <= HALF));
         for (const word of words) assert.ok(text.includes(word), `page ${index + 1} sans « ${word} » : ${text}`);
         for (const other of expected.filter((_, rank) => rank !== index)) assert.ok(!text.includes(other[1]), `page ${index + 1} porte « ${other[1]} »`);
       });
@@ -526,8 +527,14 @@ describe('buildBadgesPdf : une page A4 par badge, QR relu sur le rendu (T-65, I-
   });
 });
 
-describe('buildBadgesPdf : rien ne déborde de sa colonne (T-66)', { skip }, () => {
-  const bounds = (word) => ({ rectoLeft: word.x0 >= MID - 0.5, versoRight: word.x1 <= MID + 0.5 });
+describe('buildBadgesPdf : rien ne déborde de son volet (T-66, pli en quatre)', { skip }, () => {
+  /** Aucun mot ne franchit un pli : chacun tient dans un des quatre volets. */
+  function expectInsidePanels(words, label) {
+    for (const word of words) {
+      assert.ok(word.x1 <= MID + 0.5 || word.x0 >= MID - 0.5, `${label}, « ${word.text} » franchit le pli vertical (${word.x0.toFixed(1)} à ${word.x1.toFixed(1)})`);
+      assert.ok(word.y1 <= HALF + 0.5 || word.y0 >= HALF - 0.5, `${label}, « ${word.text} » franchit le pli horizontal (${word.y0.toFixed(1)} à ${word.y1.toFixed(1)})`);
+    }
+  }
 
   function expectInsidePage(pages, label) {
     pages.forEach((words, index) => {
@@ -547,7 +554,7 @@ describe('buildBadgesPdf : rien ne déborde de sa colonne (T-66)', { skip }, () 
 
   const longName = { firstName: 'Jean-Christophe', lastName: 'Montgolfier-Delacroix', jobTitle: 'Directeur général délégué aux affaires', company: 'Société Coopérative Régionale des Industries du Bois et des Forêts', type: 'participant' };
 
-  it('un nom de 40 caractères, une entreprise de 60 : tout le texte du recto reste dans la demi-page droite et au-dessus du bandeau de type', async () => {
+  it('un nom de 40 caractères, une entreprise de 60 : le texte des deux faces du haut reste dans son volet et au-dessus du bandeau de type', async () => {
     const person = badge(1, { ...longName, firstName: 'Jean-Christophe', lastName: 'Montgolfier-Delacroix-XY' });
     assert.equal(`${person.firstName} ${person.lastName}`.length, 40);
     assert.equal(person.company.slice(0, 60).length, 60);
@@ -555,12 +562,13 @@ describe('buildBadgesPdf : rien ne déborde de sa colonne (T-66)', { skip }, () 
     await withFiles(pdf, ({ file }) => {
       const [words] = pdfWords(file);
       expectInsidePage([words], 'recto');
-      const band = words.find((word) => word.text === 'PARTICIPANT');
-      assert.ok(band, 'libellé du bandeau lu');
-      const recto = words.filter((word) => word.x0 >= MID);
-      assert.ok(recto.some((word) => word.text.startsWith('Jean')), 'prénom présent');
+      expectInsidePanels(words, 'recto');
+      const bands = words.filter((word) => word.text === 'PARTICIPANT');
+      assert.equal(bands.length, 2, 'un bandeau par face');
+      const [band] = bands;
+      const recto = words.filter((word) => word.y1 <= HALF);
+      for (const side of [(word) => word.x1 <= MID + 0.5, (word) => word.x0 >= MID - 0.5]) assert.ok(recto.filter(side).some((word) => word.text.startsWith('Jean')), 'prénom présent sur chaque face');
       for (const word of recto.filter((candidate) => candidate.y0 < band.y0 - 5)) assert.ok(word.y1 <= band.y0 + 0.5, `« ${word.text} » recouvre le bandeau`);
-      assert.ok(!recto.some((word) => word.x1 > A4.width - MARGIN + 0.5));
     });
   });
 
@@ -570,23 +578,25 @@ describe('buildBadgesPdf : rien ne déborde de sa colonne (T-66)', { skip }, () 
     await withFiles(pdf, ({ file }) => {
       const [words] = pdfWords(file);
       expectInsidePage([words], 'recto démesuré');
-      const recto = words.filter((word) => word.x0 >= MID);
+      expectInsidePanels(words, 'recto démesuré');
+      const recto = words.filter((word) => word.y1 <= HALF);
       assert.ok(recto.some((word) => word.text.endsWith('…')), 'troncature marquée par « … »');
       const band = words.find((word) => word.text === 'PARTICIPANT');
       for (const word of recto.filter((candidate) => candidate.y0 < band.y0 - 5)) assert.ok(word.y1 <= band.y0 + 0.5);
     });
   });
 
-  it('un programme de 30 interventions : le verso reste dans la demi-page gauche, dans les marges, sur une seule page', async () => {
+  it('un programme de 30 interventions : il reste dans son volet de la moitié basse, dans les marges, sur une seule page', async () => {
     const pdf = await buildBadgesPdf({ badges: [badge(1, longName)], edition: EDITION, program: { sessions: interventions(30), notes: [] } });
     assert.equal(pageCount(pdf), 1);
     await withFiles(pdf, ({ file }) => {
       const [words] = pdfWords(file);
       expectInsidePage([words], 'verso, 30 interventions');
-      const verso = words.filter((word) => word.x0 < MID);
-      assert.ok(verso.length > 50, 'programme lu');
-      for (const word of verso) assert.ok(bounds(word).versoRight, `« ${word.text} » du verso passe dans la demi-page droite (${word.x1.toFixed(1)})`);
-      for (const word of words.filter((candidate) => candidate.x0 >= MID)) assert.ok(bounds(word).rectoLeft);
+      expectInsidePanels(words, 'verso, 30 interventions');
+      // La moitié basse est tournée de 180 degrés : le programme, premier volet une fois retourné, est à droite sur la feuille.
+      const program = words.filter((word) => word.y0 >= HALF - 0.5 && word.x0 >= MID - 0.5);
+      assert.ok(program.length > 50, 'programme lu');
+      assert.ok(program.some((word) => word.text === 'PROGRAMME'));
     });
   });
 
@@ -620,44 +630,75 @@ describe('buildBadgesPdf : rien ne déborde de sa colonne (T-66)', { skip }, () 
   });
 });
 
-describe('buildBadgesPdf : plan du lieu et verso (T-68, F-99)', { skip }, () => {
+describe('buildBadgesPdf : rendez-vous et plan du lieu (T-68, F-99)', { skip }, () => {
   const sessions = Array.from({ length: 6 }, (_, index) => ({ start: `${9 + index}h00`, title: `Table ronde ${index + 1} sur la forêt et la construction bois de demain en Nouvelle-Aquitaine`, speakers: [] }));
-  const versoRight = (words) => Math.max(...words.filter((word) => word.x0 < MID && word.y0 > 90).map((word) => word.x1));
+  const meetings = (count) => Array.from({ length: count }, (_, index) => ({ time: `10h${String(index).padStart(2, '0')}`, name: `Vis-à-vis${index + 1} Durand`, detail: `Table ${index + 1} · Scierie Fictive` }));
+  const lower = (words) => words.filter((word) => word.y0 >= HALF - 0.5);
+  const printedAt = new Date('2026-11-18T10:00:00Z');
 
-  it('sans plan : pas de zone « PLAN DU LIEU », le programme occupe toute la largeur du verso', async () => {
+  it('les rendez-vous confirmés sont sur la moitié basse, dans leur volet, avec la date d’impression', async () => {
+    const pdf = await buildBadgesPdf({ badges: [badge(1, { meetings: meetings(3) })], edition: EDITION, program: { sessions, notes: [] }, printedAt });
+    await withFiles(pdf, ({ file }) => {
+      const [words] = pdfWords(file);
+      const text = wordsOf(lower(words));
+      for (const expected of ['RENDEZ-VOUS', 'Vis-à-vis1', 'Vis-à-vis3', '10h02', 'Scierie', '18 novembre 2026']) assert.ok(text.includes(expected), `« ${expected} » absent : ${text.slice(0, 300)}`);
+      assert.ok(!wordsOf(words.filter((word) => word.y1 <= HALF)).includes('Vis-à-vis'), 'aucun rendez-vous sur les faces du haut');
+      // Second volet une fois la moitié basse retournée : à gauche sur la feuille.
+      for (const word of lower(words).filter((candidate) => candidate.text.startsWith('Vis-à-vis'))) assert.ok(word.x1 <= MID + 0.5, `« ${word.text} » hors de son volet`);
+      for (const word of words) assert.ok(word.x0 >= MARGIN - 0.5 && word.x1 <= A4.width - MARGIN + 0.5 && word.y1 <= A4.height - MARGIN + 0.5);
+    });
+  });
+
+  it('sans rendez-vous : une phrase le dit ; trop de rendez-vous : la liste est coupée et compte le reste', async () => {
+    const pdf = await buildBadgesPdf({ badges: [badge(1), badge(2, { meetings: meetings(40) })], edition: EDITION, program: { sessions, notes: [] }, printedAt });
+    await withFiles(pdf, ({ file }) => {
+      const [none, many] = pdfWords(file);
+      assert.ok(wordsOf(none).includes('Aucun rendez-vous confirmé'));
+      const text = wordsOf(many);
+      const left = Number(/(\d+) autres rendez-vous dans l’application/.exec(text)?.[1]);
+      assert.ok(left > 0 && left < 40, text.slice(0, 300));
+      assert.equal(many.filter((word) => word.text.startsWith('Vis-à-vis')).length, 40 - left, 'les rendez-vous montrés et le reste font le compte');
+      for (const word of many) assert.ok(word.y1 <= A4.height - MARGIN + 0.5 && (word.y1 <= HALF + 0.5 || word.y0 >= HALF - 0.5), `« ${word.text} » déborde`);
+    });
+  });
+
+  it('sans plan : pas de zone « PLAN DU LIEU » ; avec un plan, le programme garde toute la largeur de son volet', async () => {
     const plan = makePng({ width: 200, height: 150 });
     const [without, withPlan] = await Promise.all([
       buildBadgesPdf({ badges: [badge(1)], edition: EDITION, program: { sessions, notes: [] } }),
       buildBadgesPdf({ badges: [badge(1)], edition: EDITION, program: { sessions, notes: [] }, plan }),
     ]);
-    const right = {};
+    const programLeft = (words) => Math.min(...lower(words).filter((word) => word.x0 >= MID - 0.5).map((word) => word.x0));
+    const left = {};
     await withFiles(without, ({ file }) => {
       const [words] = pdfWords(file);
       assert.ok(!wordsOf(words).includes('PLAN'), 'aucune zone de plan');
-      right.without = versoRight(words);
-      assert.ok(right.without > 200, `le programme s’étend sur la colonne (${right.without.toFixed(0)})`);
+      left.without = programLeft(words);
     });
     await withFiles(withPlan, ({ file }) => {
       const [words] = pdfWords(file);
       assert.ok(wordsOf(words).includes('PLAN DU LIEU'));
-      const programWords = words.filter((word) => word.x0 < MID && word.y0 > 90 && word.text !== 'PLAN' && word.text !== 'DU' && word.text !== 'LIEU');
-      assert.ok(programWords.length > 10);
-      right.withPlan = Math.max(...programWords.filter((word) => word.x0 < 170).map((word) => word.x1));
+      left.withPlan = programLeft(words);
     });
-    assert.ok(right.without > right.withPlan + 20, `programme plus large sans plan (${right.without.toFixed(0)} contre ${right.withPlan.toFixed(0)})`);
+    assert.ok(Math.abs(left.without - left.withPlan) < 0.5, `programme de même largeur (${left.without.toFixed(0)} et ${left.withPlan.toFixed(0)})`);
   });
 
-  it('avec un plan, l’image est dans la demi-page gauche et dans les marges', async () => {
+  it('avec un plan, l’image est sous les rendez-vous, dans son volet et dans les marges', async () => {
     const plan = makePng({ width: 300, height: 200 });
-    const pdf = await buildBadgesPdf({ badges: [badge(1)], edition: EDITION, program: { sessions, notes: [] }, plan, compress: false });
+    const pdf = await buildBadgesPdf({ badges: [badge(1, { meetings: meetings(2) })], edition: EDITION, program: { sessions, notes: [] }, plan, compress: false });
     const raw = pdf.toString('latin1');
-    // Deux images : le logo (recto) et le plan (verso). Le plan est posé par `cm` dans la demi-page gauche.
+    // Trois images : le logo de chaque face du haut, puis le plan, posé par `cm` dans le repère retourné de la moitié basse.
     const placements = [...raw.matchAll(/q\n([\d.\-]+) 0 0 ([\d.\-]+) ([\d.\-]+) ([\d.\-]+) cm\n\/I\d+ Do\n/g)];
-    assert.equal(placements.length, 2, 'logo et plan');
-    const planBox = placements.map((m) => ({ w: Number(m[1]), h: Math.abs(Number(m[2])), x: Number(m[3]) })).find((box) => box.x < MID);
-    assert.ok(planBox, 'plan à gauche');
-    assert.ok(planBox.x + planBox.w <= MID + 0.5, 'plan dans la demi-page gauche');
-    assert.ok(planBox.x >= MARGIN - 0.5);
+    assert.equal(placements.length, 3, 'deux logos et le plan');
+    const planBox = placements.map((m) => ({ w: Number(m[1]), x: Number(m[3]) }))[2];
+    assert.ok(planBox.x >= MID - 0.5, 'plan dans le second volet');
+    assert.ok(planBox.x + planBox.w <= A4.width - MARGIN + 0.5, 'plan dans les marges');
+  });
+
+  it('trop de rendez-vous pour laisser 70 points : le plan est omis plutôt qu’écrasé', async () => {
+    const plan = makePng({ width: 300, height: 200 });
+    const raw = (await buildBadgesPdf({ badges: [badge(1, { meetings: meetings(12) })], edition: EDITION, plan, compress: false })).toString('latin1');
+    assert.equal([...raw.matchAll(/\/I\d+ Do\n/g)].length, 2, 'les deux logos seulement');
   });
 
   it('couleur d’accent : le bandeau de type prend l’accent de l’édition s’il tient AA, sinon le bleu des titres', async () => {

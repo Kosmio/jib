@@ -4,9 +4,10 @@ Statut : **DRAFT**, demandé par Xylofutur le 9 novembre 2026, hors périmètre 
 
 ## Décisions de cadrage (Mathieu, 9 novembre)
 
-- Format : A4 plié, deux colonnes (modèle de référence fourni par Xylofutur), identité visuelle de l'édition et logo des Journées de l'Innovation.
-- Recto : logo, prénom et nom, entreprise, fonction, type (participant, intervenant, exposant), QR code.
-- Verso : **programme de l'édition** (fixe, pris dans Strapi) et, à droite, **plan du lieu** si l'édition en porte un. Aucune donnée de rendez-vous : les badges sont imprimables à l'avance et ne se périment pas.
+- Format : A4 plié, identité visuelle de l'édition et logo des Journées de l'Innovation. **Révisé le 18 novembre 2026 (retour de recette de Mathieu, après vérification des porte-badges) : la feuille se plie en quatre**, d'abord en deux dans la hauteur, puis en deux dans la largeur (format fini A6). La mise en page en deux colonnes du 9 novembre est abandonnée.
+- Moitié haute, deux faces A6 identiques : logo, prénom et nom, entreprise, fonction, type (participant, intervenant, exposant, organisateur), QR code. Le badge se lit quelle que soit la face visible.
+- Moitié basse, imprimée à l'envers (tournée de 180 degrés, pour se lire à l'endroit une fois la feuille rabattue sur le pli) : **programme de l'édition** sur une face, **rendez-vous confirmés du porteur** sur l'autre, suivis du **plan du lieu** si l'édition en porte un et que la place reste.
+- **Révisé le 18 novembre 2026 : les rendez-vous confirmés figurent sur le badge** (ils en étaient écartés le 9 novembre). Conséquence assumée : un badge reflète l'agenda au moment de sa génération ; la date d'impression est écrite au-dessus de la liste, avec le renvoi vers l'application, et les badges se génèrent au plus près du jour J.
 - Le QR renvoie vers la fiche du participant dans l'espace, pas vers LinkedIn : aucune collecte d'URL.
 - Visibilité (option 2) : le scan du QR affiche la fiche **sans connexion**. Un profil visible (`directoryOptIn = true`) montre sa fiche R-42 ; un profil masqué montre une **carte réduite** limitée à ce qui est imprimé sur le badge. La navigation web suit R-41 comme avant.
 
@@ -28,8 +29,11 @@ Statut : **DRAFT**, demandé par Xylofutur le 9 novembre 2026, hors périmètre 
 
 ## Mise en page du badge
 
-- A4 portrait, pli au milieu : deux demi-pages A5 côte à côte, verso et recto imprimés sur la même feuille comme sur le modèle de référence (colonne gauche et colonne droite). Repères de pli et de coupe discrets.
+- A4 portrait, impression sur une seule face, deux plis : horizontal à mi-hauteur, puis vertical à mi-largeur. Quatre volets A6 ; aucun texte ne franchit un pli. Repères de coupe aux quatre coins et repères de pli au milieu de chaque bord, dans la marge.
+- Moitié haute : les deux volets portent la même face d'identité (logo, nom, entreprise, fonction, bandeau de type, QR code en bas à gauche et sa légende). L'annotation de lien du PDF n'est posée que sur un QR, pour que le jeton ne soit écrit qu'une fois dans le fichier (NF-55).
+- Moitié basse, tournée de 180 degrés : programme sur un volet ; sur l'autre, « Mes rendez-vous » (heure, vis-à-vis, table ou stand, entreprise), dans l'ordre de la journée, puis le plan du lieu s'il reste au moins 70 points de hauteur.
 - Le bandeau de type (participant, intervenant, exposant) prend la couleur d'accent de l'édition ; texte en contraste AA minimum.
+- **R-91** Rendez-vous imprimés : les rendez-vous `accepted` de l'édition dont le porteur est le demandeur, la cible, ou un représentant actif de l'exposant ciblé. Jamais une demande en attente, refusée, annulée ou expirée. Nom et entreprise du vis-à-vis seulement (R-42), jamais d'e-mail ni de téléphone. Sans rendez-vous, une phrase le dit. Une liste trop longue est coupée et la dernière ligne compte les rendez-vous restants, à lire dans l'application.
 - QR code de 28 mm de côté au moins, niveau de correction M, zone de silence de 4 modules, noir sur blanc. URL courte par construction : `PUBLIC_URL` + chemin + jeton.
 - Texte long : le nom et l'entreprise se réduisent par paliers puis se tronquent avec points de suspension ; un test couvre un nom de 40 caractères.
 - Le programme est celui des séquences et interventions publiées de l'édition (même source que E8). Si le programme dépasse la place, il se réduit puis se coupe avec la mention « Programme complet dans l'application ».
@@ -67,14 +71,15 @@ Modèle : champ `cardTokenHash` (string, unique, indexé) et `cardTokenCreatedAt
 - **T-65** Étant donné une édition de 17 participants de recette, quand l'organisateur génère les badges, alors le PDF compte 17 pages A4, chaque page porte le bon nom et un QR qui, décodé, donne l'URL attendue.
 - **T-66** Étant donné un nom de 40 caractères, une entreprise de 60, un programme de 30 interventions, alors rien ne déborde de sa colonne.
 - **T-67** Étant donné un scan sans session puis une connexion par lien magique, alors le retour se fait sur la fiche visée si R-41 l'autorise.
-- **T-68** Étant donné une édition sans `badgePlan`, alors le verso est complet sans zone vide.
+- **T-68** Étant donné une édition sans `badgePlan`, alors aucune zone « Plan du lieu » n'apparaît.
+- **T-74** Étant donné un participant avec deux rendez-vous confirmés et une demande en attente, quand on génère son badge, alors la moitié basse porte les deux rendez-vous (heure, vis-à-vis, lieu) dans l'ordre de la journée et pas la demande en attente ; le badge de chaque vis-à-vis porte le rendez-vous symétrique.
+- **T-75** Étant donné un badge quelconque, alors aucun mot ne franchit le pli horizontal ni le pli vertical, et le nom figure sur les deux volets du haut.
 - **T-69** Contrôle de conventions : aucun tiret cadratin dans les gabarits et fichiers du lot (`conventions.test.js` étendu).
 
 ## Hors lot
 
 - Impression, découpe et pliage, matériel du jour J.
 - Contrôle d'accès, scan d'entrée, émargement (toujours hors périmètre).
-- Rendez-vous B2B sur le badge (écarté le 9 novembre : le verso est le programme fixe).
 - QR vers LinkedIn (écarté : le QR renvoie vers l'espace).
 
 ## Questions ouvertes

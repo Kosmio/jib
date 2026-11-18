@@ -87,7 +87,7 @@ export default function BadgesCard({ edition, strapiUrl }: CardProps) {
   return (
     <Card heading="Badges">
       <p className="mt-2 text-muted">
-        Un badge A4 plié par inscrit actif, avec son QR code. Un badge réimprimé garde son QR&nbsp;: seul « Régénérer le jeton », dans la fiche d’un inscrit, l’invalide.
+        Une feuille A4 par inscrit actif, à plier en quatre&nbsp;: le nom et le QR code sur les deux faces, le programme et les rendez-vous confirmés à l’intérieur. Les rendez-vous sont ceux du moment de la génération&nbsp;: générer au plus près du jour J. Un badge réimprimé garde son QR&nbsp;: seul « Régénérer le jeton », dans la fiche d’un inscrit, l’invalide.
       </p>
       <fieldset className="mt-4">
         <legend className="font-semibold">Types de badges</legend>

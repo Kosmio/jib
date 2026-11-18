@@ -9,6 +9,7 @@ const { buildBadgesPdf, cardUrl, deriveCardToken, hashCardToken, isoOf, isReduce
 
 const ATTENDEE = 'api::espace.attendee';
 const SETTING = 'api::espace.badge-setting';
+const MEETING = 'api::espace.meeting';
 const SEQUENCE = 'api::sequence.sequence';
 const LIMIT = 1000;
 const IMAGE_TYPES = new Set(['image/png', 'image/jpeg']);
@@ -96,9 +97,52 @@ module.exports = ({ strapi }) => {
     };
   }
 
-  const toBadge = async (attendee, edition, emails) => {
+  /**
+   * Confirmed meetings of the edition, by attendee: those a person asked for, received, or received as an active representative of an
+   * exhibitor. Each one is { time, name, detail } for the badge, in the order of the day. A meeting whose slot or other party is gone is skipped.
+   * -> (attendee) => [...]
+   */
+  async function meetingsOf(edition, attendees) {
+    const meetings = await documents(MEETING).findMany({
+      filters: { edition: { documentId: edition.documentId }, status: 'accepted' },
+      populate: {
+        slot: { fields: ['startsAt', 'label'] },
+        requester: { fields: ['firstName', 'lastName', 'company'] },
+        targetAttendee: { fields: ['firstName', 'lastName', 'company'] },
+        targetExhibitor: { fields: ['standNumber'], populate: { organisation: { fields: ['name'] } } },
+      },
+      limit: 5000,
+    });
+    const fullName = (person) => [person.firstName, person.lastName].filter(Boolean).join(' ');
+    const byAttendee = new Map();
+    const add = (attendeeId, startsAt, row) => byAttendee.set(attendeeId, [...(byAttendee.get(attendeeId) ?? []), { startsAt, row }]);
+    const reps = new Map();
+    for (const attendee of attendees) {
+      const exhibitorId = attendee.exhibitor?.documentId;
+      if (exhibitorId) reps.set(exhibitorId, [...(reps.get(exhibitorId) ?? []), attendee.documentId]);
+    }
+
+    for (const meeting of meetings) {
+      const { slot, requester, targetAttendee, targetExhibitor } = meeting;
+      if (!slot || !requester || (!targetAttendee && !targetExhibitor)) continue;
+      const place = meeting.tableNumber ? `Table ${meeting.tableNumber}` : meeting.location || (targetExhibitor?.standNumber ? `Stand ${targetExhibitor.standNumber}` : '');
+      const detail = (company) => [place, company].filter(Boolean).join(' · ');
+      const asked = { time: slot.label, name: fullName(requester), detail: detail(requester.company) };
+      if (targetAttendee) {
+        add(requester.documentId, slot.startsAt, { time: slot.label, name: fullName(targetAttendee), detail: detail(targetAttendee.company) });
+        add(targetAttendee.documentId, slot.startsAt, asked);
+      } else {
+        add(requester.documentId, slot.startsAt, { time: slot.label, name: targetExhibitor.organisation?.name ?? 'Exposant', detail: detail('') });
+        for (const attendeeId of reps.get(targetExhibitor.documentId) ?? []) if (attendeeId !== requester.documentId) add(attendeeId, slot.startsAt, asked);
+      }
+    }
+    return (attendee) => (byAttendee.get(attendee.documentId) ?? []).sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt)).map(({ row }) => row);
+  }
+
+  const toBadge = async (attendee, edition, emails, meetings) => {
     const { token } = await ensureToken(attendee);
     return {
+      meetings: meetings(attendee),
       firstName: attendee.firstName,
       lastName: attendee.lastName,
       jobTitle: attendee.jobTitle || attendee.speaker?.title || '',
@@ -135,7 +179,8 @@ module.exports = ({ strapi }) => {
       if (!wanted.length) throw new EspaceError(404, 'NO_BADGES', 'Aucun badge à générer pour ce choix.');
 
       const badges = [];
-      for (const attendee of wanted) badges.push(await toBadge(attendee, edition, emails));
+      const meetings = await meetingsOf(edition, everyone);
+      for (const attendee of wanted) badges.push(await toBadge(attendee, edition, emails, meetings));
       const reduced = wanted.filter((attendee) => isReduced(attendee, typeOf(attendee, emails))).length;
       return { pdf: await buildBadgesPdf({ badges, ...(await context(edition)) }), count: wanted.length, reduced };
     },
@@ -143,7 +188,8 @@ module.exports = ({ strapi }) => {
     /** GET /admin/:edition/attendees/:id/badge (F-98): { pdf, filename } of one badge, for a reprint on the spot. */
     async single(edition, id) {
       const attendee = await findActive(edition, id);
-      const badge = await toBadge(attendee, edition, organizerEmails());
+      const everyone = await loaded({ edition: { documentId: edition.documentId }, status: 'active' });
+      const badge = await toBadge(attendee, edition, organizerEmails(), await meetingsOf(edition, everyone));
       const name = normalizeText(`${attendee.firstName} ${attendee.lastName}`).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'participant';
       return { pdf: await buildBadgesPdf({ badges: [badge], ...(await context(edition)) }), filename: `badge-${name}.pdf` };
     },
