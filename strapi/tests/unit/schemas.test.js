@@ -26,6 +26,7 @@ const EDITION_FIELDS = [
   'welcomeStartedAt',
   'readOnlyAt', // V4-F (NF-70) : instant de bascule en lecture seule, privé
   'participantSpaceEnabled',
+  'b2bEnabled', // AD-1 (F-178) : rendez-vous B2B de l'édition, privé, vrai par défaut
   'helloassoOrgSlug',
   'helloassoFormType',
   'helloassoFormSlug',

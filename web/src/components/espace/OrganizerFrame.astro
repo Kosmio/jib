@@ -1,0 +1,55 @@
+---
+// Cadre commun des pages de l'interface organisation (15-administration.md) : titre de l'édition, onglets (F-153), puis la page.
+// `refused` : participant non organisateur, la page affiche le refus (statut 403 posé par `organizerPage`).
+import AppShell from "./AppShell.astro";
+import EspaceButton from "./EspaceButton.astro";
+import Notice from "./Notice.astro";
+import OrganizerTabs from "./OrganizerTabs.astro";
+import type { EspaceEdition } from "../../lib/espace/api";
+import type { Me } from "../../lib/espace/client";
+import type { OrganizerTab } from "../../lib/espace/organizer";
+import { editionLine } from "../../lib/espace/format";
+
+interface Props {
+  /** Titre de l'onglet du navigateur ; aussi le titre de la page sauf `heading`. */
+  title: string;
+  heading?: string;
+  tab: OrganizerTab;
+  edition: EspaceEdition;
+  me: Me;
+  slug: string;
+  base: string;
+  refused?: boolean;
+  /** Pages larges (grille B2B, programme) : toute la largeur utile. */
+  wide?: boolean;
+}
+
+const { title, heading, tab, edition, me, slug, base, refused = false, wide = false } = Astro.props;
+const line = editionLine(edition).replace(/^./, (c) => c.toLowerCase());
+---
+
+<AppShell title={refused ? "Accès réservé" : title} active={refused ? "home" : "organizer"} editionSlug={slug} me={me} themeColor={edition.themeColor}>
+  {
+    refused ? (
+      <div class="mx-auto max-w-180 px-4 pt-8">
+        <h1 class="text-2xl md:text-3xl">Accès réservé</h1>
+        <Notice kind="alert">L’interface organisation est réservée aux organisateurs de l’édition.</Notice>
+        <EspaceButton variant="secondary" href={`${base}/`} class="mt-6">
+          Retour à l’accueil
+        </EspaceButton>
+      </div>
+    ) : (
+      <div class={`mx-auto px-4 pt-8 ${wide ? "max-w-7xl" : "max-w-6xl"}`}>
+        <p class="font-semibold text-muted">
+          {edition.title}
+          {line && <span class="font-normal">, {line}</span>}
+        </p>
+        <h1 class="mt-1 text-2xl md:text-3xl">{heading ?? title}</h1>
+        <OrganizerTabs base={base} active={tab} readOnly={edition.readOnly} />
+        <div class="pt-6 pb-12">
+          <slot />
+        </div>
+      </div>
+    )
+  }
+</AppShell>

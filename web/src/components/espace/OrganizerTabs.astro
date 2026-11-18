@@ -1,0 +1,45 @@
+---
+// Onglets de l'interface organisation (F-153) : liens de page, l'onglet courant annoncé par `aria-current`. Sur une édition terminée
+// (F-103, NF-70), seuls les onglets de consultation restent. Le lien « Administration Strapi » (F-185) s'ouvre dans un nouvel onglet.
+import { ORGANIZER_TABS, strapiAdminUrl, type OrganizerTab } from "../../lib/espace/organizer";
+import { publicStrapiUrl } from "../../lib/espace/api";
+
+interface Props {
+  base: string;
+  active: OrganizerTab;
+  readOnly?: boolean;
+}
+
+const { base, active, readOnly = false } = Astro.props;
+const tabs = ORGANIZER_TABS.filter((tab) => !readOnly || tab.readOnly);
+---
+
+<nav aria-label="Interface organisation" class="mt-6 flex items-end gap-4 border-b-2 border-surface-alt">
+  <ul class="-mb-0.5 flex min-w-0 flex-1 gap-1 overflow-x-auto">
+    {
+      tabs.map((tab) => (
+        <li class="shrink-0">
+          <a
+            href={`${base}/organisateur${tab.path}`}
+            aria-current={tab.id === active ? "page" : undefined}
+            class={`inline-flex min-h-12 items-center border-b-4 px-3 font-semibold whitespace-nowrap focus-visible:outline-offset-[-4px] ${
+              tab.id === active ? "border-primary text-title" : "border-transparent text-muted hover:border-surface-alt hover:text-title"
+            }`}
+          >
+            {tab.label}
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+  <a
+    href={strapiAdminUrl(publicStrapiUrl)}
+    target="_blank"
+    rel="noopener"
+    class="mb-2 hidden shrink-0 items-center gap-1 text-sm font-semibold text-muted underline-offset-4 hover:text-title hover:underline md:inline-flex"
+  >
+    Administration Strapi
+    <svg aria-hidden="true" class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg>
+    <span class="sr-only">(nouvel onglet)</span>
+  </a>
+</nav>

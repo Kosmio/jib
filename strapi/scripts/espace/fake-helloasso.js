@@ -247,6 +247,15 @@ async function startFakeHelloAsso({ port = 0, items = defaultItems, tokenTtlSeco
         });
       }
 
+      // GET /v5/organizations/{org}/forms/{formType}/{formSlug}/public (F-156: name of the form)
+      if (parts.length === 7 && parts[1] === 'organizations' && parts[3] === 'forms' && parts[6] === 'public') {
+        const [, , organizationSlug, , formType, formSlug] = parts;
+        const known = tickets.some((t) => t.order.organizationSlug === organizationSlug && t.order.formType === formType && t.order.formSlug === formSlug);
+        const isDefaultForm = organizationSlug === FORM.organizationSlug && formType === FORM.formType && formSlug === FORM.formSlug;
+        if (!known && !isDefaultForm) return send(404, { message: `Form ${formType}/${formSlug} not found` });
+        return send(200, { title: `Formulaire ${formSlug}`, formType, formSlug, organizationSlug });
+      }
+
       // GET /v5/orders/{orderId}
       if (parts.length === 3 && parts[1] === 'orders') {
         counters.orderRequests += 1;

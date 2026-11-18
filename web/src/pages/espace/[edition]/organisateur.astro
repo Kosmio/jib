@@ -1,80 +1,60 @@
 ---
-// E9, tableau de bord organisateur (F-90) : réservé au rôle organisateur de l'édition de l'URL ; un participant reçoit 403.
-// Le serveur lit les statistiques et l'historique de synchronisation ; l'îlot OrganizerPanel les affiche et déclenche
-// « Synchroniser maintenant » et « Régénérer les créneaux ». V5-C : sélecteur d'édition et duplication, montés ici hors de l'îlot. Aucun contenu de message n'est lu ni affiché (R-63).
-import AppShell from "../../../components/espace/AppShell.astro";
-import EspaceButton from "../../../components/espace/EspaceButton.astro";
+// E9, tableau de bord organisateur (F-90), onglet « Pilotage » de l'interface organisation (F-153) : réservé au rôle organisateur
+// de l'édition de l'URL ; un participant reçoit 403. Le serveur lit les statistiques et l'historique de synchronisation ; l'îlot
+// OrganizerPanel les affiche et déclenche « Synchroniser maintenant » et « Régénérer les créneaux ». V5-C : sélecteur d'édition et
+// duplication, montés ici hors de l'îlot. Aucun contenu de message n'est lu ni affiché (R-63).
+import OrganizerFrame from "../../../components/espace/OrganizerFrame.astro";
 import Notice from "../../../components/espace/Notice.astro";
 import OrganizerPanel from "../../../react-components/espace/OrganizerPanel";
 import DuplicateEditionCard from "../../../react-components/espace/organizer/DuplicateEditionCard";
 import EditionSwitcher, { type PilotableEdition } from "../../../react-components/espace/organizer/EditionSwitcher";
-import { espaceGet, guardSession, publicStrapiUrl } from "../../../lib/espace/api";
+import { espaceGet, publicStrapiUrl } from "../../../lib/espace/api";
 import type { Stats, SyncRun } from "../../../lib/espace/admin";
-import { bannerColor, editionLine } from "../../../lib/espace/format";
+import { bannerColor } from "../../../lib/espace/format";
+import { organizerPage } from "../../../lib/espace/organizer";
 
-const slug = Astro.params.edition ?? "";
-const cookie = Astro.request.headers.get("cookie");
-const guard = await guardSession(slug, cookie, { pilotage: true });
-if ("redirect" in guard) return Astro.redirect(guard.redirect);
-if ("notFound" in guard) return Astro.rewrite("/espace/introuvable");
-const { edition, me } = guard;
+const page = await organizerPage(Astro, "pilotage");
+if (page.kind === "response") return page.response;
+const { edition, me, slug, base } = page;
+const cookie = page.kind === "page" ? page.cookie : null;
 
-const base = `/espace/${encodeURIComponent(slug)}`;
-const forbidden = !me.isOrganizer;
-if (forbidden) Astro.response.status = 403;
-
-const [stats, runs, editions] = forbidden
-  ? [null, null, null]
-  : await Promise.all([
-      espaceGet<Stats>(`/admin/${encodeURIComponent(slug)}/stats`, cookie),
-      espaceGet<SyncRun[]>(`/admin/${encodeURIComponent(slug)}/sync-runs`, cookie),
-      espaceGet<PilotableEdition[]>("/admin/editions", cookie),
-    ]);
+const [stats, runs, editions] =
+  page.kind === "refused"
+    ? [null, null, null]
+    : await Promise.all([
+        espaceGet<Stats>(`/admin/${encodeURIComponent(slug)}/stats`, cookie),
+        espaceGet<SyncRun[]>(`/admin/${encodeURIComponent(slug)}/sync-runs`, cookie),
+        espaceGet<PilotableEdition[]>("/admin/editions", cookie),
+      ]);
 if (stats && !stats.ok && stats.status === 401) return Astro.redirect(`${base}/connexion`);
 if (stats && !stats.ok && stats.status === 403) Astro.response.status = 403;
-const refused = forbidden || (stats !== null && !stats.ok && stats.status === 403);
+const refused = page.kind === "refused" || (stats !== null && !stats.ok && stats.status === 403);
 ---
 
-<AppShell title={refused ? "Accès réservé" : "Pilotage"} active={refused ? "home" : "organizer"} editionSlug={slug} me={me} themeColor={edition.themeColor}>
+<OrganizerFrame title="Pilotage" heading="Pilotage de l’édition" tab="pilotage" edition={edition} me={me} slug={slug} base={base} refused={refused}>
+  {editions?.ok && <EditionSwitcher editions={editions.data} strapiUrl={publicStrapiUrl} />}
+  <div class="mt-6">
+    {
+      stats?.ok ? (
+        <OrganizerPanel
+          client:load
+          strapiUrl={publicStrapiUrl}
+          editionSlug={slug}
+          nowIso={new Date().toISOString()}
+          themeColor={bannerColor(edition.themeColor)}
+          initialStats={stats.data}
+          initialRuns={runs?.ok ? runs.data : []}
+        />
+      ) : (
+        <Notice kind="alert">Les statistiques ne sont pas disponibles pour le moment. Rechargez la page dans quelques instants.</Notice>
+      )
+    }
+  </div>
   {
-    refused ? (
-      <div class="mx-auto max-w-180 px-4 pt-8">
-        <h1 class="text-2xl md:text-3xl">Accès réservé</h1>
-        <Notice kind="alert">Le tableau de bord est réservé aux organisateurs de l’édition.</Notice>
-        <EspaceButton variant="secondary" href={`${base}/`} class="mt-6">
-          Retour à l’accueil
-        </EspaceButton>
-      </div>
-    ) : (
-      <div class="mx-auto max-w-6xl px-4 pt-8">
-        <h1 class="text-2xl md:text-3xl">Pilotage de l’édition</h1>
-        <p class="mt-2 text-lg text-muted">{editionLine(edition)}</p>
-        {editions?.ok && (
-          <div class="mt-6">
-            <EditionSwitcher editions={editions.data} strapiUrl={publicStrapiUrl} />
-          </div>
-        )}
-        <div class="mt-6">
-          {stats?.ok ? (
-            <OrganizerPanel
-              client:load
-              strapiUrl={publicStrapiUrl}
-              editionSlug={slug}
-              nowIso={new Date().toISOString()}
-              themeColor={bannerColor(edition.themeColor)}
-              initialStats={stats.data}
-              initialRuns={runs?.ok ? runs.data : []}
-            />
-          ) : (
-            <Notice kind="alert">Les statistiques ne sont pas disponibles pour le moment. Rechargez la page dans quelques instants.</Notice>
-          )}
-        </div>
-        {stats?.ok && (
-          <div class="mt-6">
-            <DuplicateEditionCard edition={slug} strapiUrl={publicStrapiUrl} client:load />
-          </div>
-        )}
+    stats?.ok && (
+      <div class="mt-6">
+        <DuplicateEditionCard edition={slug} strapiUrl={publicStrapiUrl} client:load />
       </div>
     )
   }
-</AppShell>
+</OrganizerFrame>

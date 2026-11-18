@@ -299,6 +299,11 @@
         "private": true,
         "description": "Réglage de l'espace participant, privé : modifiable mais jamais renvoyé par l'API (impossible de relire la valeur). Ouvre l'espace participant de cette édition (défaut false). À activer seulement quand l'organisation le demande."
       },
+      "b2bEnabled": {
+        "type": "boolean",
+        "private": true,
+        "description": "Réglage de l'espace participant, privé. Active les rendez-vous B2B de l'édition (agenda, demandes, suggestions, relances associées). Vide ou true : activés. false : l'annuaire, la messagerie et le programme restent, sans rendez-vous."
+      },
       "welcomeStartedAt": {
         "type": "datetime",
         "private": true,

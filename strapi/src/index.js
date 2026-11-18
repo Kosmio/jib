@@ -1437,7 +1437,8 @@ async function setFrenchLabels(strapi) {
 const ADMIN_CONFIG = {
   'api::edition.edition': {
     labels: {
-      participantSpaceEnabled: ['Espace participant ouvert', 'Active l’espace participant de cette édition. Publier pour appliquer. Les inscrits ne peuvent se connecter que si cette case est cochée.'],
+      participantSpaceEnabled: ['Espace participant ouvert', 'Active l’espace participant de cette édition. Publier pour appliquer. Ces réglages se font plus simplement dans l’interface organisation : /espace/{identifiant URL}/organisateur/edition.'],
+      b2bEnabled: ['Rendez-vous B2B', 'Coché (ou vide) : agenda et demandes de rendez-vous actifs. Décoché : l’annuaire, la messagerie et le programme restent, sans rendez-vous.'],
       helloassoOrgSlug: ['Identifiant HelloAsso de l’association', 'Le texte qui suit /associations/ dans l’adresse de la page HelloAsso. Utilisé pour importer les inscrits.'],
       helloassoFormType: ['Type de formulaire HelloAsso', 'Le plus souvent « Event » (billetterie). À ne changer que si le formulaire HelloAsso est d’un autre type.'],
       helloassoFormSlug: ['Identifiant du formulaire HelloAsso', 'Le texte qui suit /evenements/ dans l’adresse du formulaire. Sans lui, aucune inscription n’est importée.'],
@@ -1450,7 +1451,7 @@ const ADMIN_CONFIG = {
       welcomeStartedAt: ['Envoi des e-mails de bienvenue lancé le', 'Rempli automatiquement quand l’envoi des welcome part depuis le pilotage. À ne pas modifier à la main.'],
     },
     tail: [
-      ['participantSpaceEnabled'],
+      ['participantSpaceEnabled', 'b2bEnabled'],
       ['helloassoOrgSlug', 'helloassoFormType'],
       ['helloassoFormSlug'],
       ['helloassoFieldMap'],

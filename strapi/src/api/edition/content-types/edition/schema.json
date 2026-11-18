@@ -116,6 +116,11 @@
       "default": false,
       "private": true
     },
+    "b2bEnabled": {
+      "type": "boolean",
+      "default": true,
+      "private": true
+    },
     "readOnlyAt": {
       "type": "datetime",
       "private": true

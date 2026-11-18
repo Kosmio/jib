@@ -83,6 +83,18 @@ function createHelloAssoClient({ apiBase, clientId, clientSecret, fetch = global
       throw new HelloAssoError(undefined, `HelloAsso returned more than ${MAX_PAGES} pages of items`);
     },
 
+    /**
+     * I-45, F-156: first page of the tickets only, nothing written. -> { title, totalCount, fieldNames } ; `title` is null when
+     * the public description of the form cannot be read (it is optional: the tickets prove the access).
+     */
+    async previewForm({ organizationSlug, formType, formSlug }) {
+      const form = `/organizations/${slug(organizationSlug)}/forms/${slug(formType)}/${slug(formSlug)}`;
+      const { data = [], pagination } = await get(`${form}/items?${new URLSearchParams({ withDetails: 'true', pageSize: String(PAGE_SIZE) })}`);
+      const fieldNames = [...new Set(data.flatMap((item) => (item.customFields ?? []).map((field) => field.name)).filter(Boolean))];
+      const title = await get(`${form}/public`).then((body) => body?.title ?? null, () => null);
+      return { title, totalCount: Number(pagination?.totalCount ?? data.length), fieldNames };
+    },
+
     /** An order with its tickets (targeted resynchronization, I-13). */
     getOrder: (orderId) => get(`/orders/${slug(orderId)}`),
   };
