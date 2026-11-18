@@ -32,25 +32,7 @@ const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 const BLOCKING = new Set(['critical', 'serious']);
 
 /** Défauts constatés et non corrigés : `<règle> | <écran>`. Retirer la ligne quand le défaut est corrigé. */
-const KNOWN_VIOLATIONS: Record<string, string> = {
-  // A-1 : initiales visibles, étiquette « Mon profil » (aria-label sans le texte visible). W/pages/espace/[edition]/index.astro, lot V2-A.
-  'label-content-name-mismatch | E1': 'avatar de l’en-tête de l’accueil, 390 px (V2-A)',
-  // A-2 : même défaut sur l'avatar fixe de la coquille, 390 px (aria-label « Mon profil, Prénom Nom », initiales visibles). W/components/espace/AppShell.astro, lot V4-B (F-149).
-  'label-content-name-mismatch | E3': 'avatar de AppShell.astro, 390 px (V4-B)',
-  'label-content-name-mismatch | E3 Mes données': 'avatar de AppShell.astro, 390 px (V4-B)',
-  'label-content-name-mismatch | E4': 'avatar de AppShell.astro, 390 px (V4-B)',
-  'label-content-name-mismatch | E5': 'avatar de AppShell.astro, 390 px (V4-B)',
-  'label-content-name-mismatch | E6': 'avatar de AppShell.astro, 390 px (V4-B)',
-  'label-content-name-mismatch | E7': 'avatar de AppShell.astro, 390 px (V4-B)',
-  'label-content-name-mismatch | E7 fil': 'avatar de AppShell.astro, 390 px (V4-B)',
-  'label-content-name-mismatch | E8': 'avatar de AppShell.astro, 390 px (V4-B)',
-  'label-content-name-mismatch | E9 fiche participant': 'avatar de AppShell.astro, 390 px (V4-B)',
-  // A-3 : bouton de ligne « Ouvrir la fiche de X » dont l'aria-label ne reprend pas le texte visible (nom, société, e-mail). R/organizer/AttendeesCard.tsx, lot V3-E.
-  'label-content-name-mismatch | E9': 'AttendeesCard.tsx, boutons de la liste des inscrits (V3-E) ; E9 relances : même page',
-  'label-content-name-mismatch | E9 relances': 'AttendeesCard.tsx, boutons de la liste des inscrits (V3-E) ; E9 relances : même page',
-  // A-4 : <ol role="log"> : le rôle remplace celui de la liste, les <li> n'ont plus de parent liste. R/ChatThread.tsx, lot V3-D.
-  'listitem | E7 fil': 'ChatThread.tsx, journal des messages (V3-D)',
-};
+const KNOWN_VIOLATIONS: Record<string, string> = {};
 
 type Finding = { screen: string; width: number; rule: string; impact: string; nodes: string[]; help: string };
 type Cookies = Awaited<ReturnType<BrowserContext['cookies']>>;
