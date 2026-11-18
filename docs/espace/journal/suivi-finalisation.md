@@ -16,7 +16,7 @@ Consigne de Mathieu du 17 novembre : coder toutes les vagues à la suite, sans a
 | V2-C | 2 | intégré | 7 | lot/v2-c-admin-lisible | 4a1c098 | time 63, admin-libelles 28 | 17/11 | |
 | V2-D | 2 | intégré | 13 | lot/v2-d-pilotage | 1918f54 | pilotage 23, e2e 16, program-stats 38 | 17/11 | |
 | V2-E | 2 | intégré | 8 | lot/v2-e-finitions | 62d2533 | templates 132, pwa 6, finitions 2 | 17/11 | theme-color à relayer par AppShell (V2-D) ; test:visual non lancé |
-| V2-Q | 2 | à relancer | | | | | | audit axe et Lighthouse final après intégration de tout |
+| V2-Q | 2 | intégré | | lot/v2-q-audits, lot/a11y-corrections | 52fc697, faf16be | axe WCAG 2.1 AA sur E0 à E10 en 390 et 1280 px : aucune violation critical ni serious après correction ; Lighthouse mobile 99 à 100 ; JS 67 à 72 Ko gzip | 18/11 | |
 | V3-A | 3 | intégré | 10 | lot/v3-a-relances | 2152115 | reminders 73, templates 57, relances 38 | 17/11 | |
 | V3-B | 3 | intégré | 15 | lot/v3-b-relance-manuelle | dd9183d | e2e 11 (+1 envoi réel entre 8h et 20h) | 18/11 | |
 | V3-C | 3 | intégré | 16 | lot/v3-c-hors-ligne | 4857471 | hors-ligne 9, pwa 6 | 18/11 | expiration 48 h à vérifier sur preprod |
@@ -53,7 +53,7 @@ Consigne de Mathieu du 17 novembre : coder toutes les vagues à la suite, sans a
 
 ## Lots d’intégration ajoutés par le superviseur
 
-INT-1 à INT-6 : tests anciens alignés sur les changements voulus des lots intégrés (routes admises, cadences, clés de Me, gardes), e2e rendus indépendants de leur ordre, et un défaut réel corrigé (R-88 appliqué au filtre de conversations.js). PERF : /meetings et statistiques sans parcours quadratique. V4-F2 et V4-F3 : bandeau et actions désactivées après la fin de l’édition sur tous les écrans.
+INT-1 à INT-7 : tests anciens alignés sur les changements voulus des lots intégrés (routes admises, cadences, clés de Me, gardes), e2e rendus indépendants de leur ordre, et un défaut réel corrigé (R-88 appliqué au filtre de conversations.js). INT-7 : suite e2e complète au vert (337 réussis, 2 ignorés hors 8h-20h) par la réutilisation des sessions des personas et l’isolation de l’état entre fichiers. Correctifs : NF-67 rétabli sur le chemin de lecture de PERF, avatar sans nom masqué sur la page d’erreur. PERF : /meetings et statistiques sans parcours quadratique. V4-F2 et V4-F3 : bandeau et actions désactivées après la fin de l’édition sur tous les écrans.
 
 ## Décisions du superviseur
 
