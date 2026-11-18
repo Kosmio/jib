@@ -129,6 +129,19 @@ function operations(strapi) {
   }
 
   /**
+   * NF-67: a reading limited to one person does not load the meetings of the others, so an orphan of someone else would never be
+   * reported. One light query on the meetings that lost a link (requester, slot or both targets), documentId only.
+   */
+  async function reportDetachedMeetings(filters) {
+    const detached = await documents(MEETING).findMany({
+      filters: { ...filters, $or: [{ requester: { $null: true } }, { slot: { $null: true } }, { $and: [{ targetAttendee: { $null: true } }, { targetExhibitor: { $null: true } }] }] },
+      fields: ['documentId'],
+      limit: 1000,
+    });
+    for (const meeting of detached) reportOrphan(strapi, meeting);
+  }
+
+  /**
    * What a reading for one person needs, and no more (NF-21): the slots, the dedicated tables (the people who hold one), the person and,
    *  - `own`: her meetings (sent, received, received as a representative of an exhibitor) and the cards they show ;
    *  - `statuses` + `target`: the pending and accepted meetings of the edition (they take the slots and the tables) and the target.
@@ -159,6 +172,7 @@ function operations(strapi) {
       limit: 10000,
     });
     const meetings = intactMeetings(stored, { attendeeIds, exhibitorIds, slotIds: idsOf(slots) });
+    await reportDetachedMeetings(filters);
 
     const exhibitorsWanted = new Set(target?.kind === 'x' ? [target.id] : []);
     if (own) {
