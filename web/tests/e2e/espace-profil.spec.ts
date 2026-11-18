@@ -308,7 +308,7 @@ test.describe('F-149 : avatar menant au profil sous 1024 px', () => {
       await signIn(page, MARION);
       await page.goto(`${ESPACE}/${path}`);
       await expect(avatar(page)).toBeVisible();
-      await expect(avatar(page)).toHaveAttribute('aria-label', 'Mon profil, Marion Lacoste');
+      await expect(avatar(page)).toHaveAccessibleName('Mon profil, Marion Lacoste');
       await expect(avatar(page)).toHaveAttribute('href', `${ESPACE}/profil`);
       const box = await avatar(page).boundingBox();
       expect(box!.width, 'cible tactile de 44 px').toBeGreaterThanOrEqual(44);

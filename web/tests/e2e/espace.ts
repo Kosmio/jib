@@ -1,8 +1,9 @@
+import { spawnSync } from 'node:child_process';
 import { randomInt } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import type { Page } from '@playwright/test';
-import { expect, test as base } from './fixtures';
+import type { BrowserContext, Page } from '@playwright/test';
+import { STRAPI_URL, expect, test as base } from './fixtures';
 
 /**
  * Aides des tests de bout en bout de l'espace participant (lot 7, phase 1).
@@ -18,6 +19,13 @@ import { expect, test as base } from './fixtures';
 // Même formule que le serveur e2e : un fichier par base, dans le dossier temporaire du système.
 const { buildTestEnv, e2eDatabaseName } = createRequire(import.meta.url)('../../../strapi/tests/helpers/env.js');
 export const OUTBOX_FILE: string = buildTestEnv({ database: e2eDatabaseName() }).EMAIL_OUTBOX_FILE;
+
+/** Requête SQL sur la base e2e (conteneur jib-postgres) : le résultat en lignes, colonnes séparées par « | ». Pour poser ou restaurer un état de départ. */
+export function psql(sql: string): string[] {
+  const result = spawnSync('docker', ['exec', 'jib-postgres', 'psql', '-U', 'strapi', '-d', e2eDatabaseName(), '-At', '-c', sql], { encoding: 'utf8', timeout: 60_000 });
+  if (result.status !== 0) throw new Error(`psql a échoué : ${result.stderr}`);
+  return result.stdout.split('\n').filter(Boolean);
+}
 
 export const EDITION = 'nouvelle-aquitaine-test';
 export const ESPACE = `/espace/${EDITION}`;
@@ -103,13 +111,52 @@ export async function receiveLink(page: Page, email: string): Promise<string> {
 }
 
 /**
- * Ouvre une session par le parcours réel : E0, e-mail, lien lu dans la boîte de sortie, « Ouvrir mon espace ». Rend l'adresse de la page
- * d'arrivée : l'accueil (E1), ou E2 pour qui n'a pas encore donné son consentement.
+ * Ouvre une session par le parcours réel : E0, e-mail, lien lu dans la boîte de sortie, « Ouvrir mon espace ». Chaque appel consomme une
+ * demande de lien de l'adresse (5 par 15 minutes, NF-03) : à réserver aux tests qui vérifient ce parcours. Les autres appellent `openSpace`.
  */
-export async function openSpace(page: Page, email: string): Promise<void> {
+export async function openSpaceByLink(page: Page, email: string): Promise<void> {
   await page.goto(await receiveLink(page, email));
   await page.getByRole('button', { name: 'Ouvrir mon espace' }).click();
   await expect(page).toHaveURL(new RegExp(`${ESPACE}/(bienvenue)?$`));
+  rememberSession(email, await page.context().cookies());
+}
+
+type Cookies = Awaited<ReturnType<BrowserContext['cookies']>>;
+
+// Sessions des personas, partagées par tous les fichiers de la suite : Strapi limite les liens à 5 par adresse et par 15 minutes (NF-03) et
+// la suite entière tourne contre un seul Strapi. Le fichier survit au redémarrage du worker après un échec ; il est propre à la base e2e,
+// et une session périmée (autre exécution, déconnexion, effacement) est détectée par GET /api/espace/me, puis remplacée.
+const SESSIONS_FILE = `${OUTBOX_FILE}.sessions.json`;
+
+function loadSessions(): Record<string, Cookies> {
+  try {
+    return JSON.parse(readFileSync(SESSIONS_FILE, 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+function rememberSession(email: string, cookies: Cookies) {
+  writeFileSync(SESSIONS_FILE, JSON.stringify({ ...loadSessions(), [email]: cookies }));
+}
+
+/**
+ * Arrive sur l'accueil de l'espace (ou sur E2) avec la session de ce persona. La session déjà ouverte par un test précédent est reprise
+ * (cookie) après vérification par GET /api/espace/me ; sinon, le parcours réel du lien est suivi (`openSpaceByLink`).
+ */
+export async function openSpace(page: Page, email: string): Promise<void> {
+  const known = loadSessions()[email];
+  if (known) {
+    await page.context().addCookies(known);
+    const response = await page.request.get(`${STRAPI_URL}/api/espace/me`, { failOnStatusCode: false });
+    if (response.ok()) {
+      await page.goto(`${ESPACE}/`);
+      await expect(page).toHaveURL(new RegExp(`${ESPACE}/(bienvenue)?$`));
+      return;
+    }
+    await page.context().clearCookies();
+  }
+  await openSpaceByLink(page, email);
 }
 
 /**

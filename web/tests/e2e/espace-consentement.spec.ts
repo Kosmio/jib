@@ -17,19 +17,8 @@ const NEWS = 'Recevoir des nouvelles des prochaines éditions';
 const DIRECTORY_EFFECT = 'Vous ne serez pas visible et ne recevrez aucune demande.';
 const MEETINGS_EFFECT = 'Vous pourrez proposer des rendez-vous, pas en recevoir.';
 
-// Strapi limite les liens de connexion à 5 par adresse et par 15 minutes (NF-03) : le premier test d'une adresse ouvre la session, les suivants
-// en reprennent le cookie.
-const sessions = new Map<string, Awaited<ReturnType<import('@playwright/test').BrowserContext['cookies']>>>();
-
-async function signIn(page: import('@playwright/test').Page, email: string) {
-  const known = sessions.get(email);
-  if (known) {
-    await page.context().addCookies(known);
-    return;
-  }
-  await openSpace(page, email);
-  sessions.set(email, await page.context().cookies());
-}
+// La session de chaque inscrit est ouverte une fois pour toute la suite par `openSpace` (cinq demandes de lien par adresse et par 15 minutes, NF-03).
+const signIn = openSpace;
 
 async function openWelcome(page: import('@playwright/test').Page, email: string) {
   await signIn(page, email);

@@ -20,7 +20,9 @@ const PAGE_ERROR = 'Les profils suivants n’ont pas pu être chargés. Vérifie
 const search = (page: Page) => page.getByRole('searchbox', { name: SEARCH });
 const cards = (page: Page) => page.locator('ul[aria-busy] > li');
 const names = (page: Page) => cards(page).locator('a').evaluateAll((nodes) => nodes.map((node) => node.querySelector('span.text-ink')?.textContent ?? ''));
-const settled = (page: Page) => expect(page.getByRole('status').first()).toHaveText(/profils?$/);
+// Le compteur de l'annuaire : la zone d'annonce de la coquille (badges, F-132) est aussi un role=status, en tête du document.
+const counterOf = (page: Page) => page.locator('#main-content').getByRole('status').first();
+const settled = (page: Page) => expect(counterOf(page)).toHaveText(/profils?$/);
 const query = (page: Page) => new URL(page.url()).search;
 
 // Strapi limite les liens de connexion à 5 par adresse et par 15 minutes (NF-03) : le premier test ouvre la session, les suivants en reprennent le cookie.
@@ -46,7 +48,7 @@ test('F-45 : Exposants + « bois », fiche, retour par le lien : mêmes filtres,
   await settled(page);
   const before = await names(page);
   expect(before.length).toBeGreaterThan(0);
-  const counter = await page.getByRole('status').first().textContent();
+  const counter = await counterOf(page).textContent();
 
   await page.getByRole('link', { name: /^Sylvadour/ }).click();
   await expect(page).toHaveURL(new RegExp(`${ESPACE}/annuaire/x/[^/?]+\\?q=bois&type=exhibitor$`));
@@ -60,7 +62,7 @@ test('F-45 : Exposants + « bois », fiche, retour par le lien : mêmes filtres,
   await expect(page.getByRole('radio', { name: 'Exposants' })).toBeChecked();
   await expect(search(page)).toHaveValue('bois');
   expect(await names(page)).toEqual(before);
-  await expect(page.getByRole('status').first()).toHaveText(counter ?? '');
+  await expect(counterOf(page)).toHaveText(counter ?? '');
 });
 
 test('F-45 : retour par le navigateur, mêmes filtres et sujets', async ({ page }) => {
@@ -125,13 +127,13 @@ test('F-45 : l’URL copiée dans un autre onglet donne la même liste', async (
   const url = page.url();
   await settled(page);
   const names1 = await names(page);
-  const counter = await page.getByRole('status').first().textContent();
+  const counter = await counterOf(page).textContent();
 
   const other = await context.newPage();
   await other.goto(url);
   await hydrated(other);
   expect(await names(other)).toEqual(names1);
-  await expect(other.getByRole('status').first()).toHaveText(counter ?? '');
+  await expect(counterOf(other)).toHaveText(counter ?? '');
   await expect(other.getByRole('radio', { name: 'Exposants' })).toBeChecked();
   await expect(other.getByRole('checkbox', { name: 'Construction bois' })).toBeChecked();
   await expect(search(other)).toHaveValue('bois');

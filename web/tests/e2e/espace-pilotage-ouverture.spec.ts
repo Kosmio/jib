@@ -1,7 +1,9 @@
-import { spawnSync } from 'node:child_process';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { createRequire } from 'node:module';
 import type { BrowserContext, Page } from '@playwright/test';
-import { ESPACE, expect, hydrated, openSpace, readOutbox, test, watchConsole } from './espace';
+import { ESPACE, expect, hydrated, openSpace, psql, readOutbox, test, watchConsole } from './espace';
 
 /**
  * Pilotage de l'édition, lot V1-C (A-39, F-105, R-85, F-106) : carte « État du service » en tête, carte « E-mail de bienvenue »,
@@ -17,12 +19,30 @@ const ORGANIZER = 'organisation@example.org';
 const GUESTS = ['lea.ducasse@example.org', 'mathis.lagrange@example.org', 'ines.castaing@example.org'];
 const { e2eDatabaseName } = createRequire(import.meta.url)('../../../strapi/tests/helpers/env.js');
 
-/** Rend jamais invités les trois participants : supprime leurs EmailLog welcome. */
+/**
+ * Rend jamais invités les trois participants : supprime leurs EmailLog welcome. Les autres inscrits actifs sans « welcome » (les invités
+ * laissés par les fichiers précédents) sont mis à « cancelled » le temps du test, pour que « à inviter » compte exactement trois personnes ;
+ * `restoreOthers` les remet à « active ».
+ */
 function forgetWelcomes(): void {
   const list = GUESTS.map((email) => `'${email}'`).join(',');
-  const sql = `delete from espace_email_logs where template = 'welcome' and id in (select l.email_log_id from espace_email_logs_attendee_lnk l join espace_attendees a on a.id = l.attendee_id where a.email in (${list}))`;
-  const result = spawnSync('docker', ['exec', 'jib-postgres', 'psql', '-U', 'strapi', '-d', e2eDatabaseName(), '-c', sql], { encoding: 'utf8', timeout: 60_000 });
-  if (result.status !== 0) throw new Error(`psql a échoué : ${result.stderr}`);
+  psql(`delete from espace_email_logs where template = 'welcome' and id in (select l.email_log_id from espace_email_logs_attendee_lnk l join espace_attendees a on a.id = l.attendee_id where a.email in (${list}))`);
+  const others = psql(
+    `select a.id from espace_attendees a where a.status = 'active' and a.role <> 'organizer' and a.email not in (${list}) and a.id not in (select l.attendee_id from espace_email_logs_attendee_lnk l join espace_email_logs e on e.id = l.email_log_id where e.template = 'welcome')`,
+  );
+  if (!others.length) return;
+  writeFileSync(PARKED_FILE, JSON.stringify([...new Set([...parked(), ...others])]));
+  psql(`update espace_attendees set status = 'cancelled' where id in (${others.join(',')})`);
+}
+
+// Écrit dans un fichier : après un test en échec, Playwright relance un worker, qui n'a plus la mémoire du premier.
+const PARKED_FILE = path.join(tmpdir(), `pilotage-ouverture-${e2eDatabaseName()}.json`);
+const parked = (): string[] => (existsSync(PARKED_FILE) ? JSON.parse(readFileSync(PARKED_FILE, 'utf8')) : []);
+
+function restoreOthers(): void {
+  const ids = parked();
+  if (ids.length) psql(`update espace_attendees set status = 'active' where id in (${ids.join(',')})`);
+  rmSync(PARKED_FILE, { force: true });
 }
 
 const parisHour = () => Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Paris', hour: 'numeric', hourCycle: 'h23' }).format(new Date()));
@@ -30,6 +50,7 @@ const welcomeMailsTo = (emails: string[]) => readOutbox().filter((mail) => email
 
 test.describe('pilotage : ouverture contrôlée et état du service (V1-C)', () => {
   test.describe.configure({ mode: 'serial' });
+  test.afterAll(() => restoreOthers());
 
   // Strapi limite les liens de connexion à 5 par adresse et par 15 minutes (NF-03) : une seule connexion, cookie repris ensuite.
   let session: Awaited<ReturnType<BrowserContext['cookies']>> | undefined;

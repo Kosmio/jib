@@ -128,7 +128,8 @@ test.describe('F-107 : Strapi arrêté, une page de l’espace donne la page d�
 
   test('la barre d’onglets de l’édition est présente quand l’édition est connue de l’URL', async ({ page }) => {
     await page.goto(`${DEAD}${ESPACE}/agenda`);
-    await expect(page.locator(`nav a[href^="${ESPACE}/"]`).first()).toBeVisible();
+    // Le premier lien de la navigation est l'avatar du profil (masqué dès 1024 px) : on cherche l'onglet.
+    await expect(page.getByRole('navigation', { name: 'Espace participant' }).getByRole('link', { name: 'Accueil' })).toBeVisible();
   });
 
   test('sans édition connue (/espace/introuvable réécrit vers l’erreur n’existe pas) : pas de lien d’accueil vers une édition inventée', async ({ page }) => {

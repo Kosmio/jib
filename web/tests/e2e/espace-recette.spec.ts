@@ -7,6 +7,7 @@ import {
   hydrated,
   NBSP,
   openSpace,
+  psql,
   readOutbox,
   tab,
   test,
@@ -57,6 +58,9 @@ const slotButton = (page: import('@playwright/test').Page, time: string) => page
 test('Léa : E1, E3, E4, E5, E6, E7 et E8 sur le seed, sans erreur de console', async ({ page, baseURL }) => {
   test.setTimeout(120_000);
   const consoleWatch = watchConsole(page);
+  // Le seed laisse deux messages non lus à Léa (les messages du 29 octobre) ; les fichiers qui ouvrent la messagerie de Léa avant celui-ci en
+  // ont lu un : la recette repart de l'état du seed.
+  psql(`update espace_messages set read_at = null where created_at in ('2026-10-29 17:10:00', '2026-10-29 16:35:00')`);
   await openSpace(page, LEA);
 
   await test.step('E1 : édition, compte à rebours, profil à 85 %, prochain rendez-vous, suggestions, badges (F-20 à F-24, R-50)', async () => {
@@ -478,10 +482,12 @@ test('l’organisateur ouvre E9 : indicateurs égaux aux comptes de l’API, auc
   expect(JSON.stringify(stats)).not.toContain('échantillons');
 
   // Synchronisation sur le faux HelloAsso (démarré par le serveur e2e) : rien à créer, rien à mettre à jour, rien à annuler.
+  // Les fichiers du pilotage lancent aussi des synchronisations : l'historique grandit de une, il ne vaut pas forcément 1.
+  const historyBefore = Number((await page.locator('details').filter({ hasText: 'Historique des synchronisations' }).locator('summary').innerText()).match(/\((\d+)\)/)?.[1] ?? 0);
   await page.getByRole('button', { name: 'Synchroniser maintenant' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Synchronisation terminée' })).toHaveText(/Synchronisation terminée\s*:\s*0\s+inscrit\s+créé,\s*0\s+mis\s+à\s+jour,\s*0\s+annulé\./);
   const history = page.locator('details').filter({ hasText: 'Historique des synchronisations' });
-  await expect(history.locator('summary')).toContainText('Historique des synchronisations (1)');
+  await expect(history.locator('summary')).toContainText(`Historique des synchronisations (${historyBefore + 1})`);
   await history.locator('summary').click();
   await expect(history.getByRole('table').locator('tbody tr').first().locator('td')).toHaveText(['0', '0', '0', '0']);
   consoleWatch.expectClean();

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import type { BrowserContext, Page, Route } from '@playwright/test';
-import { ESPACE, EDITION, expect, hydrated, openSpace, tab, test, watchConsole } from './espace';
+import { ESPACE, EDITION, expect, hydrated, openSpace, psql, tab, test, watchConsole } from './espace';
 import { STRAPI_URL } from './fixtures';
 
 /**
@@ -62,18 +62,25 @@ test.describe('pilotage lisible (V2-D)', () => {
   }
 
   test('F-124 : un organisateur de ORGANIZER_EMAILS qui n’a jamais passé la bienvenue arrive directement au pilotage', async ({ page, baseURL }) => {
-    await openSpace(page, ORGANIZER);
-    expect(page.url(), 'première connexion : la page d’arrivée est l’écran de bienvenue').toMatch(/\/bienvenue$/);
-    session = await page.context().cookies();
+    // L'organisateur a pu passer la bienvenue dans un autre fichier (la suite partage sa session) : le test pose son état de départ, puis le restaure.
+    const [saved] = psql(`select consent_at from espace_attendees where email = '${ORGANIZER}'`);
+    psql(`update espace_attendees set consent_at = null where email = '${ORGANIZER}'`);
+    try {
+      await openSpace(page, ORGANIZER);
+      expect(page.url(), 'première connexion : la page d’arrivée est l’écran de bienvenue').toMatch(/\/bienvenue$/);
+      session = await page.context().cookies();
 
-    await page.goto(`${ESPACE}/organisateur`);
-    await expect(page).toHaveURL(`${baseURL}${ESPACE}/organisateur`);
-    await hydrated(page);
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Pilotage de l’édition');
+      await page.goto(`${ESPACE}/organisateur`);
+      await expect(page).toHaveURL(`${baseURL}${ESPACE}/organisateur`);
+      await hydrated(page);
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText('Pilotage de l’édition');
 
-    // Les écrans du participant exigent toujours la bienvenue : seule la page de pilotage fait exception.
-    await page.goto(`${ESPACE}/`);
-    await expect(page).toHaveURL(`${baseURL}${ESPACE}/bienvenue`);
+      // Les écrans du participant exigent toujours la bienvenue : seule la page de pilotage fait exception.
+      await page.goto(`${ESPACE}/`);
+      await expect(page).toHaveURL(`${baseURL}${ESPACE}/bienvenue`);
+    } finally {
+      if (saved) psql(`update espace_attendees set consent_at = '${saved}' where email = '${ORGANIZER}'`);
+    }
   });
 
   test('F-119, critère 1 : à 375 px, l’organisateur voit « Pilotage » dans la barre, sans débordement ; à 1280 px il reste « Organisation » dans la colonne', async ({ page }) => {
@@ -239,7 +246,7 @@ test.describe('pilotage lisible (V2-D)', () => {
     await expect(indicator(page, 'Profils complets')).toContainText(new RegExp(`profils?\\s+à\\s+70\\s%\\s+et\\s+plus,\\s+sur\\s+${stats.attendees.active}`));
     await expect(indicator(page, 'Inscrits importés')).toContainText(`${byRole.exhibitor_rep} représentant`);
     await expect(indicator(page, 'Inscrits importés')).toContainText(new RegExp(`${byRole.speaker}\\s+intervenants?`));
-    await expect(indicator(page, 'Inscrits importés')).toContainText('1 inscription annulée');
+    await expect(indicator(page, 'Inscrits importés')).toContainText(`${stats.attendees.cancelled} inscription${stats.attendees.cancelled > 1 ? 's' : ''} annulée${stats.attendees.cancelled > 1 ? 's' : ''}`);
   });
 
   test('F-125 : les chiffres se rechargent toutes les 60 s quand l’onglet est visible, jamais onglet masqué', async ({ page }) => {
@@ -270,6 +277,7 @@ test.describe('pilotage lisible (V2-D)', () => {
 
   test('F-123 : l’export des participants se télécharge avec l’édition et la date dans son nom, les nouvelles colonnes et les annulés en fin', async ({ page }) => {
     await openPilotage(page);
+    const { cancelled } = (await (await page.request.get(`${STRAPI_URL}/api/espace/admin/${EDITION}/stats`)).json()).attendees;
     const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('link', { name: /^Participants/ }).click()]);
     expect(download.suggestedFilename()).toMatch(new RegExp(`^participants-${EDITION}-\\d{4}-\\d{2}-\\d{2}\\.csv$`));
     const text = readFileSync((await download.path())!, 'utf8').replace(/^﻿/, '');
@@ -281,7 +289,7 @@ test.describe('pilotage lisible (V2-D)', () => {
     expect(header).not.toContain('Inscription');
     const statuses = rows.slice(1).map((row) => row[header.indexOf('Statut')]);
     expect(statuses.at(-1), 'le seed a une inscription annulée : elle ferme le fichier').toBe('Annulé');
-    expect(statuses.filter((status) => status === 'Annulé')).toHaveLength(1);
+    expect(statuses.filter((status) => status === 'Annulé')).toHaveLength(cancelled);
     expect(statuses.slice(0, -1).every((status) => status === 'Actif')).toBe(true);
   });
 

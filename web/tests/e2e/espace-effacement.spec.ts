@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import type { BrowserContext, Page } from '@playwright/test';
 import { STRAPI_URL } from './fixtures';
-import { ACCESS_LINK_SUBJECT, EDITION, ESPACE, expect, hydrated, mailsTo, openSpace, test } from './espace';
+import { ACCESS_LINK_SUBJECT, EDITION, ESPACE, expect, hydrated, mailsTo, openSpace, psql, test } from './espace';
 
 /**
  * Effacement et export individuel, lot V5-A (F-33, R-44, NF-12) : depuis son profil, une personne télécharge ses données puis les supprime ;
@@ -26,6 +26,12 @@ const MESSAGE_FROM_B = `Merci pour votre message, MESSAGE-B-${STAMP}`;
 const DELETED = 'Participant supprimé';
 
 test.describe.configure({ mode: 'serial' });
+
+// Les invités de ce fichier (et les fiches anonymisées qu'ils laissent) fausseraient les comptes du seed (inscrits actifs et annulés, intervenants)
+// que les fichiers suivants relisent : ils sont supprimés à la fin.
+test.afterAll(() => {
+  psql(`delete from espace_attendees where email like '%.${STAMP}@example.org' or email like 'erased-%@erased.invalid'`);
+});
 
 // La demande de lien est limitée par adresse (NF-03) : chaque personne ouvre sa session une fois, ses cookies sont repris ensuite.
 const sessions = new Map<string, Awaited<ReturnType<BrowserContext['cookies']>>>();

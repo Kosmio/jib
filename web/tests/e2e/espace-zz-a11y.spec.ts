@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 import type { BrowserContext, Locator, Page } from '@playwright/test';
 import { STRAPI_URL } from './fixtures';
-import { ACCESS_LINK_SUBJECT, EDITION, ESPACE, expect, hydrated, linkOf, mailsTo, nextMail, tab, test } from './espace';
+import { ACCESS_LINK_SUBJECT, EDITION, ESPACE, expect, hydrated, linkOf, mailsTo, nextMail, openSpace, psql, tab, test } from './espace';
 
 /**
  * Audits d'accessibilité de l'espace participant (V2-Q, T-70, NF-30, T-43).
@@ -18,8 +18,9 @@ import { ACCESS_LINK_SUBJECT, EDITION, ESPACE, expect, hydrated, linkOf, mailsTo
  *   - Parcours clavier seul : connexion par code à six chiffres, demande de rendez-vous, acceptation, envoi d'un message. Chaque cible est
  *     atteinte à la touche Tab (échec sur un piège clavier ou un élément hors de l'ordre de tabulation) et activée par Entrée ou Espace.
  *
- * Chaque session est ouverte une seule fois pour le fichier (limites de demande de lien en mémoire : 5 par adresse et par 15 minutes) :
- * les cookies sont gardés dans un fichier temporaire, validés à chaque réutilisation, et la session est rouverte si elle ne vaut plus.
+ * Les sessions viennent de `openSpace` (limites de demande de lien en mémoire : 5 par adresse et par 15 minutes). Le fichier porte `zz` pour
+ * passer en dernier : le parcours clavier accepte la demande d'Inès, envoie des messages et crée un rendez-vous, ce que les autres fichiers
+ * (qui repartent du seed) n'ont pas à subir.
  *
  * `AXE_DUMP=<fichier>` ajoute au fichier une ligne JSON par violation (toutes gravités), pour le rapport daté de reports/quality/.
  */
@@ -51,26 +52,10 @@ async function passWelcome(page: Page) {
   await expect(page).toHaveURL(`${new URL(page.url()).origin}${ESPACE}/`);
 }
 
-/** Ouvre une session par le parcours réel (E0, e-mail, lien, bouton), une seule fois par adresse pour tout le fichier. */
+/** Session du persona (partagée avec les autres fichiers : `openSpace` ne redemande un lien que si la session ne vaut plus), bienvenue passée. */
 async function openSession(page: Page, email: string) {
-  const known = readSessions()[email];
-  if (known) {
-    await page.context().clearCookies();
-    await page.context().addCookies(known);
-    await page.goto(`${ESPACE}/`);
-    if (!page.url().includes('/connexion')) return;
-  }
-  await page.context().clearCookies();
-  const already = mailsTo(email, ACCESS_LINK_SUBJECT).length;
-  await page.goto(`${ESPACE}/connexion`);
-  await page.getByLabel('Adresse e-mail utilisée pour l’inscription').fill(email);
-  await page.getByRole('button', { name: 'Recevoir mon lien' }).click();
-  await expect(page).toHaveURL(/\?envoye=1$/);
-  await page.goto(linkOf(await nextMail(email, already)));
-  await page.getByRole('button', { name: 'Ouvrir mon espace' }).click();
-  await expect(page).toHaveURL(new RegExp(`${ESPACE}/(bienvenue)?$`));
+  await openSpace(page, email);
   await passWelcome(page);
-  writeFileSync(SESSIONS_FILE, JSON.stringify({ ...readSessions(), [email]: await page.context().cookies() }));
 }
 
 async function scan(page: Page, screen: string, findings: Finding[]) {
@@ -286,6 +271,16 @@ test.describe('parcours clavier seul (T-43)', () => {
 
   test('Léa : acceptation de la demande d’Inès, message à Mathis', async ({ page }) => {
     test.setTimeout(120_000);
+    // La recette (fichier précédent) a pu accepter la demande d'Inès : elle redevient en attente, comme dans le seed.
+    psql(`
+      with m as (
+        select r.meeting_id as id from espace_meetings_requester_lnk r
+        join espace_attendees a on a.id = r.attendee_id and a.email = 'ines.castaing@example.org'
+        join espace_meetings_target_attendee_lnk t on t.meeting_id = r.meeting_id
+        join espace_attendees b on b.id = t.attendee_id and b.email = '${LEA}'
+      ), gone as (delete from espace_meetings_answered_by_lnk where meeting_id in (select id from m))
+      update espace_meetings set status = 'pending', location = null, table_number = null, table_key = null, answered_at = null
+      where id in (select id from m) and status in ('accepted', 'declined')`);
     await openSession(page, LEA);
     await hydrated(page);
 

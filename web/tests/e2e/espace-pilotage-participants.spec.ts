@@ -1,5 +1,5 @@
 import type { BrowserContext, Page } from '@playwright/test';
-import { ACCESS_LINK_SUBJECT, ESPACE, expect, hydrated, mailsTo, openSpace, test, watchConsole } from './espace';
+import { ACCESS_LINK_SUBJECT, ESPACE, expect, hydrated, mailsTo, openSpace, psql, test, watchConsole } from './espace';
 
 /**
  * Pilotage de l'édition, lot V3-E (F-134 à F-138, R-89) : carte « Participants » (liste, recherche, filtres), fiche d'un inscrit
@@ -17,6 +17,10 @@ const GUEST_NAME = `${GUEST.firstName} ${GUEST.lastName}`;
 
 test.describe('pilotage : participants (V3-E)', () => {
   test.describe.configure({ mode: 'serial' });
+  // L'invité ajouté par F-136 est un intervenant : il fausserait les comptes (annuaire, totaux) des fichiers suivants.
+  test.afterAll(() => {
+    psql(`delete from espace_attendees where email = '${GUEST.email}'`);
+  });
 
   // Une seule connexion (NF-03) : le cookie est repris ensuite.
   let session: Awaited<ReturnType<BrowserContext['cookies']>> | undefined;
@@ -96,7 +100,9 @@ test.describe('pilotage : participants (V3-E)', () => {
     await expect(page.getByRole('button', { name: 'Renvoyer un lien de connexion' })).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Désinscrire' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Enregistrer les corrections' })).toBeVisible();
-    expect(await page.locator('body').innerText()).not.toMatch(/conversation|messagerie/i);
+    // La fiche seule : la carte « Messages signalés » du même tableau de bord parle de « conversation », sans rapport avec la fiche.
+    const sheet = page.locator('section, div').filter({ has: page.getByRole('heading', { level: 3, name: 'Léa Ducasse' }) }).filter({ has: page.getByRole('heading', { level: 4, name: 'Derniers e-mails' }) }).last();
+    expect(await sheet.innerText()).not.toMatch(/conversation|messagerie/i);
     consoleWatch.expectClean();
   });
 
