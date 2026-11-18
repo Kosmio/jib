@@ -13,9 +13,10 @@
 | `09-phases.md` | Découpage en phases, dates, portes de validation | architect |
 | `10-recette.md` | Scénarios de bout en bout et jeu de données de recette | tester |
 | `11-questions-ouvertes.md` | Points non tranchés et hypothèses par défaut | architect |
-| `12-badges.md` | Lot badges (DRAFT, P1, après le 20 novembre) : badge PDF A4 pliable, QR et carte réduite | tous |
+| `12-badges.md` | Lot badges (P1, après le 20 novembre) : badge PDF A4 à plier en quatre, QR, rendez-vous confirmés et carte réduite | tous |
 | `13-orchestration.md` | Finalisation : rôle du superviseur, branches et arbres de travail, propriété des fichiers, intégration, suivi | architect |
 | `14-lots-finalisation.md` | Finalisation : lots de travail par vague, exigences, fichiers possédés, critères d'acceptation, tâches humaines | tous |
+| `15-administration.md` | Lot administration (DRAFT, après le 3 décembre) : HelloAsso, programme, personnes et rôles, B2B, bascule vers Strapi et documentation depuis l'interface organisation | tous |
 
 ## Maquettes de référence
 
