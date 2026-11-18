@@ -27,6 +27,9 @@
  * the real one (the fake address of a test account is replaced). Without an account, a speaker account is created. When
  * another attendee already holds the address (HelloAsso registration), that attendee becomes the speaker account and the
  * other one is reported, never removed.
+ * `settings` (participantSpaceEnabled, tablesCount, slotDurationMinutes, meetingRequestsOpenAt, meetingRequestsCloseAt): written on the
+ * draft and the published edition alike. `b2bSessions`: titles of the sequences that become B2B breaks, then the slots are regenerated.
+ * `showTestSpeakers: true`: the speaker accounts with an @example.org address tick the directory and the meetings (test environments).
  * Idempotent: a second run changes nothing. No e-mail is sent here ; the next synchronization sends `welcome` to new accounts.
  */
 
@@ -163,6 +166,92 @@ async function importExhibitors(app, edition, rows, replace, apply, log) {
   }
 }
 
+const SETTING_KEYS = ['participantSpaceEnabled', 'tablesCount', 'slotDurationMinutes', 'meetingRequestsOpenAt', 'meetingRequestsCloseAt'];
+const shown = (value) => (value === null || value === undefined ? 'vide' : String(value));
+const sameSetting = (key, a, b) => (key.endsWith('At') ? (a ? new Date(a).getTime() : null) === (b ? new Date(b).getTime() : null) : (a ?? null) === (b ?? null));
+
+/**
+ * Private settings of the edition. Written on the draft and the published rows at once (scalar fields only), so that the
+ * other unpublished edits of the draft are not published with them. Same checks as the admin guards (NF-63, NF-64).
+ */
+async function importSettings(app, edition, settings, apply, log) {
+  const data = {};
+  for (const [key, value] of Object.entries(settings)) {
+    if (!SETTING_KEYS.includes(key)) log(`réglage inconnu, ignoré : ${key}`);
+    else if (sameSetting(key, edition[key], value)) log(`réglage déjà en place : ${key} = ${shown(value)}`);
+    else {
+      log(`réglage à changer : ${key}, ${shown(edition[key])} -> ${shown(value)}`);
+      data[key] = value;
+    }
+  }
+  const after = { ...edition, ...data };
+  if (after.meetingRequestsOpenAt && after.meetingRequestsCloseAt && new Date(after.meetingRequestsOpenAt) >= new Date(after.meetingRequestsCloseAt)) {
+    throw new Error('la fenêtre de rendez-vous se ferme avant de s’ouvrir');
+  }
+  if (data.tablesCount !== undefined) {
+    const beyond = await app.documents('api::espace.meeting').count({ filters: { edition: link(edition), status: 'accepted', tableNumber: { $gt: data.tablesCount } } });
+    if (beyond) {
+      log(`  tablesCount conservé : ${beyond} rendez-vous accepté(s) occupent une table au-delà de ${data.tablesCount}`);
+      delete data.tablesCount;
+    }
+  }
+  if (apply && Object.keys(data).length) await app.db.query(UID.edition).updateMany({ where: { documentId: edition.documentId }, data });
+  Object.assign(edition, data);
+}
+
+/** Sequences that are B2B breaks (kind b2b_break, R-01), then the slots regenerated from them (R-02). */
+async function importB2bSessions(app, edition, titles, apply, log) {
+  const lib = (name) => require(path.join(app.dirs.dist.src, 'api', 'espace', 'lib', name));
+  const { parseProgramTime } = lib('time.js');
+  const { computeSlots } = lib('slots.js');
+  const sequences = await app.documents(UID.sequence).findMany({
+    filters: { edition: link(edition) },
+    status: 'published',
+    fields: ['title', 'kind', 'start_time', 'end_time'],
+    limit: 1000,
+  });
+
+  // A title names every sequence that bears it: a program often has several « Pause et B2B ».
+  const named = titles.flatMap((title) => {
+    const found = sequences.filter((item) => squeezed(item.title) === squeezed(title));
+    if (!found.length) log(`séquence introuvable : ${title}`);
+    return found;
+  });
+  for (const sequence of new Set(named)) {
+    if (!parseProgramTime(sequence.start_time) || !parseProgramTime(sequence.end_time)) {
+      log(`horaires illisibles (${shown(sequence.start_time)} à ${shown(sequence.end_time)}), séquence laissée hors B2B : ${sequence.title}`);
+    } else if (sequence.kind === 'b2b_break') log(`pause B2B déjà en place : ${sequence.title}`);
+    else {
+      log(`séquence à passer en pause B2B : ${sequence.title} (${sequence.start_time} à ${sequence.end_time})`);
+      if (apply) await app.db.query(UID.sequence).updateMany({ where: { documentId: sequence.documentId }, data: { kind: 'b2b_break' } });
+      sequence.kind = 'b2b_break';
+    }
+  }
+
+  if (!edition.date) throw new Error('l’édition n’a pas de date : aucun créneau possible');
+  const { slots, warnings } = computeSlots({ date: edition.date, durationMinutes: edition.slotDurationMinutes ?? 15, sessions: sequences });
+  log(`${slots.length} créneau(x) de ${edition.slotDurationMinutes ?? 15} min sur ${edition.tablesCount ?? 20} table(s) : ${slots.map(({ label }) => label).join(', ')}`);
+  for (const { title, code } of warnings) log(`  avertissement ${code} : ${title}`);
+  if (!apply) return;
+  const report = await app.service('api::espace.slots').regenerate(edition.documentId);
+  log(`créneaux écrits : ${report.created} créé(s), ${report.kept} conservé(s), ${report.removed} retiré(s), ${report.orphans.length} orphelin(s)`);
+}
+
+/** Test environments: the speaker accounts with a fake address (SPEAKER_TEST_ACCOUNTS) appear in full and take meeting requests. */
+async function showTestSpeakers(app, edition, apply, log) {
+  const accounts = await app.documents(UID.attendee).findMany({
+    filters: { edition: link(edition), role: 'speaker', status: 'active', email: { $endsWith: '@example.org' } },
+    fields: ['firstName', 'lastName', 'directoryOptIn', 'meetingsOptIn'],
+    limit: 1000,
+  });
+  const hidden = accounts.filter(({ directoryOptIn, meetingsOptIn }) => !directoryOptIn || !meetingsOptIn);
+  log(`${accounts.length} compte(s) de test d’intervenant, ${hidden.length} à rendre visible(s) et joignable(s)`);
+  for (const account of hidden) {
+    log(`  ${account.firstName} ${account.lastName}`);
+    if (apply) await app.documents(UID.attendee).update({ documentId: account.documentId, data: { directoryOptIn: true, meetingsOptIn: true } });
+  }
+}
+
 async function importSpeakers(app, edition, rows, apply, log) {
   // Intervenants of the published program first, then any intervenant of the same name.
   const sequences = await app.documents(UID.sequence).findMany({
@@ -247,6 +336,10 @@ async function main() {
     console.log(`${apply ? 'Écriture' : 'Simulation (rien n’est écrit, ajouter --apply)'} : édition ${edition.slug}, base ${database}`);
     const log = (line) => console.log(`  ${line}`);
 
+    if (input.settings) {
+      console.log('Réglages');
+      await importSettings(app, edition, input.settings, apply, log);
+    }
     if (input.topics) {
       console.log('Sujets');
       await importTopics(app, edition, input.topics, input.replaceTopics === true, apply, log);
@@ -258,6 +351,14 @@ async function main() {
     if (input.speakers) {
       console.log('Intervenants');
       await importSpeakers(app, edition, input.speakers, apply, log);
+    }
+    if (input.b2bSessions) {
+      console.log('Pauses B2B et créneaux');
+      await importB2bSessions(app, edition, input.b2bSessions, apply, log);
+    }
+    if (input.showTestSpeakers === true) {
+      console.log('Comptes de test des intervenants');
+      await showTestSpeakers(app, edition, apply, log);
     }
   } finally {
     // Strapi emits the entry.* events without awaiting them: leave them the time to end before the connection closes.
