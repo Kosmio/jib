@@ -132,3 +132,10 @@
 .b2b-blocked {
   background: repeating-linear-gradient(-45deg, var(--color-surface-alt) 0 6px, var(--color-surface) 6px 12px);
 }
+
+/* Espace, textes riches de l'interface organisation (éditeur et aperçu, D-23) */
+.rich-text p + p, .rich-text p + ul, .rich-text p + ol, .rich-text ul + p, .rich-text ol + p { margin-top: 0.5em; }
+.rich-text ul { list-style: disc; padding-left: 1.25rem; }
+.rich-text ol { list-style: decimal; padding-left: 1.25rem; }
+.rich-text h3, .rich-text h4 { font-weight: 700; font-size: 1.05em; margin-top: 0.5em; text-transform: none; }
+.rich-text a { text-decoration: underline; }
