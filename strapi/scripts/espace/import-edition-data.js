@@ -30,6 +30,7 @@
  * `settings` (participantSpaceEnabled, tablesCount, slotDurationMinutes, meetingRequestsOpenAt, meetingRequestsCloseAt): written on the
  * draft and the published edition alike. `b2bSessions`: titles of the sequences that become B2B breaks, then the slots are regenerated.
  * `showTestSpeakers: true`: the speaker accounts with an @example.org address tick the directory and the meetings (test environments).
+ * `testExhibitorReps: true`: a representative with an @example.org address for each exhibitor that has no active one (test environments).
  * Idempotent: a second run changes nothing. No e-mail is sent here ; the next synchronization sends `welcome` to new accounts.
  */
 
@@ -252,6 +253,51 @@ async function showTestSpeakers(app, edition, apply, log) {
   }
 }
 
+/**
+ * Test environments: an exhibitor without an active representative cannot take a meeting request (R-14). Each one gets a
+ * representative account « Stand <organisation> », stand.<organisation>@example.org, in the directory and open to meetings.
+ */
+async function createTestExhibitorReps(app, edition, apply, log) {
+  const exhibitors = await app.documents(UID.exhibitor).findMany({
+    filters: { edition: link(edition) },
+    populate: { organisation: { fields: ['name'] }, representatives: { fields: ['status'] } },
+    limit: 1000,
+  });
+  const attendees = await app.documents(UID.attendee).findMany({ filters: { edition: link(edition) }, fields: ['email'], limit: 10000 });
+  const emails = new Set(attendees.map(({ email }) => email.toLowerCase()));
+
+  for (const exhibitor of exhibitors) {
+    const name = exhibitor.organisation?.name;
+    if (!name) continue;
+    if ((exhibitor.representatives ?? []).some(({ status }) => status === 'active')) {
+      log(`représentant déjà en place : ${name}`);
+      continue;
+    }
+    const email = `stand.${slugOf(name).replace(/-/g, '.')}@example.org`;
+    if (emails.has(email)) {
+      log(`adresse déjà prise, rien créé : ${email}`);
+      continue;
+    }
+    log(`représentant de test à créer : Stand ${name}, ${email}`);
+    if (!apply) continue;
+    await app.documents(UID.attendee).create({
+      data: {
+        edition: link(edition),
+        exhibitor: link(exhibitor),
+        email,
+        firstName: 'Stand',
+        lastName: name,
+        company: name,
+        role: 'exhibitor_rep',
+        status: 'active',
+        directoryOptIn: true,
+        meetingsOptIn: true,
+      },
+    });
+    emails.add(email);
+  }
+}
+
 async function importSpeakers(app, edition, rows, apply, log) {
   // Intervenants of the published program first, then any intervenant of the same name.
   const sequences = await app.documents(UID.sequence).findMany({
@@ -359,6 +405,10 @@ async function main() {
     if (input.showTestSpeakers === true) {
       console.log('Comptes de test des intervenants');
       await showTestSpeakers(app, edition, apply, log);
+    }
+    if (input.testExhibitorReps === true) {
+      console.log('Représentants de test des exposants');
+      await createTestExhibitorReps(app, edition, apply, log);
     }
   } finally {
     // Strapi emits the entry.* events without awaiting them: leave them the time to end before the connection closes.
