@@ -17,6 +17,8 @@ export type EspaceEdition = {
   participantSpaceEnabled: boolean;
   /** NF-70 : l'édition est terminée (readOnlyAt passé) ; l'espace reste consultable, toute écriture répond 409 EDITION_READ_ONLY. */
   readOnly: boolean;
+  /** F-178 : rendez-vous B2B de l'édition ; faux, l'agenda et les demandes disparaissent. */
+  b2bEnabled: boolean;
   /** Fenêtre de prise de rendez-vous (instants ISO) ; null : pas de borne. */
   meetingRequestsOpenAt: string | null;
   meetingRequestsCloseAt: string | null;

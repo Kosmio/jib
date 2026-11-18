@@ -264,6 +264,8 @@ module.exports = ({ strapi }) => {
     /** GET /suggestions (R-50, F-23): 0 to 3 cards. */
     async suggestions(session, { now = new Date() } = {}) {
       const { edition } = session;
+      // F-178: no meeting suggestion when the B2B meetings of the edition are turned off.
+      if (edition.b2bEnabled === false) return [];
       const viewer = await strapi.service('api::espace.me').loadAttendee(session);
       const [cards, { engaged }] = await Promise.all([visibleCards(edition), relations({ attendee: viewer, edition })]);
       return suggest({

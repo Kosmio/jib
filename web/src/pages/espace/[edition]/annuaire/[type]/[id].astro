@@ -170,7 +170,7 @@ const role = person ? [person.jobTitle, person.company].filter(Boolean) : [];
           <noscript>
             <p class="font-semibold">Cette étape demande JavaScript. Activez-le ou utilisez un autre navigateur.</p>
           </noscript>
-          {!publicOnly && (
+          {!publicOnly && edition.b2bEnabled !== false && (
           <SlotPicker
             client:load
             strapiUrl={publicStrapiUrl}

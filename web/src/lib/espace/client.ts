@@ -40,7 +40,7 @@ export type Me = {
   company: string | null;
   role: string;
   isOrganizer: boolean;
-  edition: { slug: string; title: string };
+  edition: { slug: string; title: string; b2bEnabled?: boolean };
   consent: {
     directoryOptIn: boolean;
     meetingsOptIn: boolean;

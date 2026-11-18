@@ -24,6 +24,8 @@ const { edition, me } = guard;
 const base = `/espace/${encodeURIComponent(slug)}`;
 const count = countdown(edition.date);
 const over = count?.state === "after";
+// F-178 : sans rendez-vous B2B, ni demandes, ni prochain rendez-vous, ni suggestions de rendez-vous.
+const b2b = edition.b2bEnabled !== false;
 
 const [meetingsResult, suggestionsResult] = await Promise.all([
   espaceGet<MeetingsResponse>("/meetings", cookie).catch(() => null),
@@ -170,7 +172,7 @@ const headingClass = "font-heading text-lg font-semibold normal-case sm:text-xl"
     }
 
     {
-      !over && received.length > 0 && (
+      b2b && !over && received.length > 0 && (
         <section class="rounded-xl border-2 border-gold bg-white p-5" aria-labelledby="demandes-titre">
           <h2 id="demandes-titre" class={headingClass}>
             {plural(received.length, "demande")} à traiter
@@ -187,7 +189,7 @@ const headingClass = "font-heading text-lg font-semibold normal-case sm:text-xl"
     }
 
     {
-      !over && (
+      b2b && !over && (
         <section class="rounded-xl border border-surface-alt bg-white p-5" aria-labelledby="rdv-titre">
           <div class="flex flex-wrap items-baseline justify-between gap-x-4">
             <h2 id="rdv-titre" class={headingClass}>

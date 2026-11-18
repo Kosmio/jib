@@ -19,6 +19,7 @@ module.exports = {
       themeColor: edition.hero_bg_color ?? null,
       participantSpaceEnabled: Boolean(edition.participantSpaceEnabled),
       readOnly: isReadOnly(edition),
+      b2bEnabled: edition.b2bEnabled !== false,
       meetingRequestsOpenAt: edition.meetingRequestsOpenAt ?? null,
       meetingRequestsCloseAt: edition.meetingRequestsCloseAt ?? null,
     };

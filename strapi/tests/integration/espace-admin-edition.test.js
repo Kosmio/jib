@@ -110,6 +110,29 @@ describe('écran « Édition » de l’interface organisation (AD-1)', { timeout
     assert.equal(confirmed.json.helloasso.formSlug, 'autre-formulaire');
   });
 
+  it('T-84 : rendez-vous B2B désactivés, ni demande ni suggestion, l’annuaire et le programme restent', async () => {
+    const { app } = espace();
+    const edition = await newEdition({ settings: { b2bEnabled: false } });
+    const sequences = await createProgram(app, edition);
+    await app.service('api::espace.slots').regenerate(edition.documentId);
+    const [slot] = await app.documents(UID.slot).findMany({ filters: { edition: link(edition) }, limit: 1 });
+    const lea = await person(edition, { meetingsOptIn: true, directoryOptIn: true });
+    const hugo = await createAttendee(app, edition, { meetingsOptIn: true, directoryOptIn: true, consentAt: new Date().toISOString() });
+    const get = (path) => espace().request(`/api/espace${path}`, { cookie: lea.cookie });
+
+    assert.equal((await get('/me')).json.edition.b2bEnabled, false);
+    assert.equal((await espace().request(`/api/espace/editions/${edition.slug}`)).json.b2bEnabled, false);
+    assert.deepEqual((await get('/suggestions')).json, []);
+    const slots = await get(`/slots?target=p:${hugo.documentId}`);
+    assert.equal(slots.json.blocked?.code, 'WINDOW_CLOSED');
+    assert.match(slots.json.blocked.message, /ne sont pas proposés/);
+    const asked = await espace().request('/api/espace/meetings', { method: 'POST', cookie: lea.cookie, json: { slotId: slot.documentId, target: `p:${hugo.documentId}`, message: 'Bonjour.' } });
+    assert.equal(asked.status, 409);
+    assert.equal(asked.json.error.code, 'WINDOW_CLOSED');
+    assert.equal((await get('/directory?type=all')).status, 200);
+    assert.ok(sequences.length > 0 && (await get(`/editions/${edition.slug}/program`)).status !== 500);
+  });
+
   it('F-180, T-79 : une séquence devient pause B2B, et une pause qui porte un rendez-vous accepté le reste', async () => {
     const { app } = espace();
     const edition = await newEdition();

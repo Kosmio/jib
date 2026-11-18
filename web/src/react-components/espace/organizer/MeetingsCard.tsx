@@ -7,9 +7,9 @@ import { Card, FeedbackArea, Icon, LOAD_FAILED, type CardProps, type Feedback } 
 // le blocage de tables et la fermeture d'un créneau. Routes : GET /meetings, POST /meetings/{id}/cancel, POST /meetings/{id}/move,
 // PUT /slots/{id}/blocks, sous /admin/{edition}.
 
-type Status = "pending" | "accepted" | "declined" | "cancelled" | "expired";
-type Party = { kind: "attendee" | "exhibitor"; name: string; subtitle: string | null };
-type AdminSlot = {
+export type Status = "pending" | "accepted" | "declined" | "cancelled" | "expired";
+export type Party = { kind: "attendee" | "exhibitor"; name: string; subtitle: string | null };
+export type AdminSlot = {
   id: string;
   label: string;
   startsAt: string;
@@ -18,7 +18,7 @@ type AdminSlot = {
   blockedTables: number[];
   freeTables: number[];
 };
-type AdminMeeting = {
+export type AdminMeeting = {
   id: string;
   status: Status;
   slot: { id: string; label: string; startsAt: string; sessionTitle: string | null };
@@ -31,13 +31,13 @@ type AdminMeeting = {
   canMove: boolean;
   freeTables: number[];
 };
-type AdminData = { tablesCount: number; dedicatedTables: number[]; slots: AdminSlot[]; meetings: AdminMeeting[] };
-type BlocksResult = { id: string; blockedTables: number[]; closed: boolean; affected: string[] };
+export type AdminData = { tablesCount: number; dedicatedTables: number[]; slots: AdminSlot[]; meetings: AdminMeeting[] };
+export type BlocksResult = { id: string; blockedTables: number[]; closed: boolean; affected: string[] };
 
 const REASON_MAX = 200;
 const ACTION_FAILED = "L’action a échoué. Vérifiez votre connexion et réessayez.";
 
-const STATUS_LABELS: Record<Status, string> = {
+export const STATUS_LABELS: Record<Status, string> = {
   pending: "En attente",
   accepted: "Confirmé",
   declined: "Refusé",

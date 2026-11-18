@@ -109,6 +109,8 @@ function audience(scenario, attendee) {
 function planReminders({ scenario, edition, attendees, sentKeys = new Set(), failures = new Map(), now, manual = false }) {
   const plan = { recipients: [], skipped: { alreadySent: 0, optedOut: 0 } };
   if (!edition.participantSpaceEnabled || (scenario === 'welcome' && !edition.welcomeStartedAt)) return plan;
+  // F-178: the "no meeting yet" reminder makes no sense once the B2B meetings are turned off.
+  if (scenario === 'no-meeting' && edition.b2bEnabled === false) return plan;
 
   for (const attendee of attendees) {
     const verdict = audience(scenario, attendee);

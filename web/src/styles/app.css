@@ -127,3 +127,8 @@
   .hero-node, .hero-line, .hero-card { animation: none; }
   .hero-cta:hover { transform: none; }
 }
+
+/* Espace, Vue B2B de l'interface organisation : table bloquée, hachurée (F-181, R-90) */
+.b2b-blocked {
+  background: repeating-linear-gradient(-45deg, var(--color-surface-alt) 0 6px, var(--color-surface) 6px 12px);
+}

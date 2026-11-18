@@ -57,7 +57,7 @@ module.exports = ({ strapi }) => {
     company: attendee.company ?? null,
     role: attendee.role,
     isOrganizer,
-    edition: { slug: edition.slug, title: edition.title },
+    edition: { slug: edition.slug, title: edition.title, b2bEnabled: edition.b2bEnabled !== false },
     consent: {
       directoryOptIn: Boolean(attendee.directoryOptIn),
       meetingsOptIn: Boolean(attendee.meetingsOptIn),

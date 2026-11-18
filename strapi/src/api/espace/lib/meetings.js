@@ -66,13 +66,15 @@ function defaultCloseAt(date) {
 
 /**
  * Window of the meeting requests (R-17, F-55, A-32). An empty opening is open without a lower bound ; an empty closing is
- * the eve of the edition at 18:00 in Paris. -> { state: 'open' | 'not_open' | 'closed', openAt, closeAt } (Date or null)
+ * the eve of the edition at 18:00 in Paris. -> { state: 'open' | 'not_open' | 'closed' | 'disabled' (F-178), openAt, closeAt } (Date or null)
  */
 function requestWindow(edition, now) {
   const openAt = edition.meetingRequestsOpenAt ? new Date(edition.meetingRequestsOpenAt) : null;
   const closeAt = edition.meetingRequestsCloseAt ? new Date(edition.meetingRequestsCloseAt) : defaultCloseAt(edition.date);
   let state = 'open';
-  if (closeAt && time(now) >= closeAt.getTime()) state = 'closed';
+  // F-178: B2B meetings turned off for the edition ; requests, bookings and answers are refused like a closed window.
+  if (edition.b2bEnabled === false) state = 'disabled';
+  else if (closeAt && time(now) >= closeAt.getTime()) state = 'closed';
   else if (openAt && time(now) < openAt.getTime()) state = 'not_open';
   return { state, openAt, closeAt };
 }

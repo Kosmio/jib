@@ -494,7 +494,12 @@ function operations(strapi) {
       const code = rules.isOwnProfile(snap, me, target) ? 'SELF' : snap.window.state !== 'open' ? 'WINDOW_CLOSED' : rules.requestBlock(snap, me, target);
       const messages = {
         SELF: 'C’est votre profil.',
-        WINDOW_CLOSED: snap.window.state === 'not_open' ? 'La prise de rendez-vous n’est pas encore ouverte.' : 'La prise de rendez-vous est terminée.',
+        WINDOW_CLOSED:
+          snap.window.state === 'disabled'
+            ? 'Les rendez-vous B2B ne sont pas proposés pour cette édition.'
+            : snap.window.state === 'not_open'
+              ? 'La prise de rendez-vous n’est pas encore ouverte.'
+              : 'La prise de rendez-vous est terminée.',
       };
       const blocked = code ? { code, message: messages[code] ?? rules.meetingError(code).message } : null;
 
