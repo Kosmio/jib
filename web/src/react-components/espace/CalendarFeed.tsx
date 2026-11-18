@@ -14,8 +14,23 @@ type Notice = { kind: "status" | "alert"; text: string };
 /** « https://…/x.ics » -> « webcal://…/x.ics » : les applications de calendrier s'abonnent au flux au lieu de le télécharger. */
 const webcal = (url: string): string => url.replace(/^https?:\/\//, "webcal://");
 
+const CALENDAR_NAME = "Journées de l’Innovation : mes rendez-vous";
+
+/**
+ * Abonnement en un clic (retour de recette du 18 novembre) : chaque service ouvre sa page d'ajout d'agenda avec l'adresse remplie.
+ * Google prend l'adresse webcal dans `cid` ; Outlook (compte personnel ou Microsoft 365) l'adresse https dans `url`.
+ * Apple Calendrier, Outlook installé et Thunderbird ouvrent directement l'adresse webcal.
+ */
+const PROVIDERS: { id: string; label: string; link: (https: string) => string }[] = [
+  { id: "google", label: "Google Agenda", link: (https) => `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(webcal(https))}` },
+  { id: "outlook", label: "Outlook.com", link: (https) => `https://outlook.live.com/calendar/0/addfromweb?url=${encodeURIComponent(https)}&name=${encodeURIComponent(CALENDAR_NAME)}` },
+  { id: "office", label: "Outlook Microsoft 365", link: (https) => `https://outlook.office.com/calendar/0/addfromweb?url=${encodeURIComponent(https)}&name=${encodeURIComponent(CALENDAR_NAME)}` },
+  { id: "apple", label: "Apple Calendrier ou autre", link: (https) => webcal(https) },
+];
+
 export default function CalendarFeed({ strapiUrl }: Props) {
   const [feed, setFeed] = useState<string | null>(null);
+  const [feedHttps, setFeedHttps] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
   const fieldId = useId();
@@ -25,20 +40,52 @@ export default function CalendarFeed({ strapiUrl }: Props) {
     text: error instanceof EspaceApiError && error.status !== 0 && error.message ? error.message : "L’opération a échoué. Réessayez.",
   });
 
+  /** Crée l'abonnement (ou le remplace) ; rend l'adresse https du flux, ou null après avoir affiché l'échec. */
+  async function create(): Promise<string | null> {
+    try {
+      const { path } = await request<{ path: string }>(strapiUrl, "/me/calendar-feed", "POST");
+      // `strapiUrl` est l'adresse publique de Strapi (préfixe `/strapi` compris) : le serveur ne la connaît pas.
+      const https = `${strapiUrl.replace(/\/+$/, "")}${path}`;
+      setFeedHttps(https);
+      setFeed(webcal(https));
+      return https;
+    } catch (error) {
+      setNotice(failure(error));
+      return null;
+    }
+  }
+
   async function subscribe() {
     if (busy) return;
     setBusy(true);
     setNotice(null);
-    try {
-      const { path } = await request<{ path: string }>(strapiUrl, "/me/calendar-feed", "POST");
-      // `strapiUrl` est l'adresse publique de Strapi (préfixe `/strapi` compris) : le serveur ne la connaît pas.
-      const url = webcal(`${strapiUrl.replace(/\/+$/, "")}${path}`);
-      setFeed(url);
-      setNotice({ kind: "status", text: "Votre abonnement est créé. Copiez cette adresse maintenant : elle ne sera plus affichée." });
-    } catch (error) {
-      setNotice(failure(error));
-    }
+    if (await create()) setNotice({ kind: "status", text: "Votre abonnement est créé. Copiez cette adresse maintenant : elle ne sera plus affichée." });
     setBusy(false);
+  }
+
+  /** Un clic : l'onglet du service s'ouvre aussitôt (sinon le navigateur le bloquerait), puis reçoit l'adresse une fois l'abonnement créé. */
+  async function addTo(provider: (typeof PROVIDERS)[number]) {
+    if (busy) return;
+    const external = provider.id !== "apple";
+    const tab = external ? window.open("about:blank", "_blank") : null;
+    setBusy(true);
+    setNotice(null);
+    const https = feedHttps ?? (await create());
+    setBusy(false);
+    if (!https) {
+      tab?.close();
+      return;
+    }
+    const link = provider.link(https);
+    if (tab) {
+      tab.opener = null;
+      tab.location.href = link;
+    } else if (external) window.open(link, "_blank", "noopener");
+    else window.location.href = link;
+    setNotice({
+      kind: "status",
+      text: `${provider.label} s’ouvre : confirmez l’ajout de l’agenda. Les rendez-vous apparaissent au 3 décembre ; ${provider.id === "google" ? "Google met parfois plusieurs heures à rafraîchir un agenda abonné." : "les mises à jour arrivent en général dans l’heure."}`,
+    });
   }
 
   async function revoke() {
@@ -48,6 +95,7 @@ export default function CalendarFeed({ strapiUrl }: Props) {
     try {
       await request<{ revoked: boolean }>(strapiUrl, "/me/calendar-feed", "DELETE");
       setFeed(null);
+      setFeedHttps(null);
       setNotice({ kind: "status", text: "L’abonnement est révoqué. Votre application de calendrier ne recevra plus de mises à jour." });
     } catch (error) {
       setNotice(failure(error));
@@ -74,9 +122,20 @@ export default function CalendarFeed({ strapiUrl }: Props) {
         Abonnez votre application de calendrier : vos rendez-vous acceptés et le programme s’y mettent à jour seuls. Créer un nouvel abonnement remplace le précédent.
       </p>
 
-      <div className="mt-3 flex flex-wrap gap-3">
+      <p className="mt-3 font-semibold text-ink">Ajouter en un clic à</p>
+      <ul className="mt-2 flex flex-wrap gap-3">
+        {PROVIDERS.map((provider) => (
+          <li key={provider.id}>
+            <button type="button" onClick={() => void addTo(provider)} disabled={busy} className={BUTTON}>
+              {provider.label}
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      <div className="mt-4 flex flex-wrap gap-3 border-t border-surface-alt pt-3">
         <button type="button" onClick={subscribe} disabled={busy} className={BUTTON}>
-          S’abonner à mon agenda
+          Afficher l’adresse de l’abonnement
         </button>
         <button type="button" onClick={revoke} disabled={busy} className={DANGER}>
           Révoquer

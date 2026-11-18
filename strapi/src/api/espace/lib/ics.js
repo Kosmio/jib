@@ -105,6 +105,9 @@ function buildCalendar({ name, events = [], now = new Date() }) {
     'METHOD:PUBLISH',
     ...(name ? [`X-WR-CALNAME:${escapeText(name)}`] : []),
     `X-WR-TIMEZONE:${TIME_ZONE}`,
+    // Subscription hints (I-42): Outlook and Apple Calendar fetch the feed again every hour ; Google keeps its own pace.
+    'REFRESH-INTERVAL;VALUE=DURATION:PT1H',
+    'X-PUBLISHED-TTL:PT1H',
     ...TIME_ZONE_BLOCK,
     ...events.flatMap((event) => eventLines(event, now)),
     'END:VCALENDAR',

@@ -17,6 +17,8 @@ async function openAgenda(page: Page) {
   await openSpace(page, LEA);
   if (page.url().endsWith('/bienvenue')) {
     await hydrated(page);
+    // Retour de recette du 18/11 : au moins un sujet à l’arrivée.
+    if (!(await page.locator('input[id^="sujet-"]:checked').count()) && (await page.locator('input[id^="sujet-"]').count())) await page.locator('input[id^="sujet-"]').first().check();
     await page.getByRole('button', { name: 'Continuer' }).click();
     await page.getByRole('button', { name: 'Continuer sans apparaître' }).click();
     await expect(page).toHaveURL(new RegExp(`${ESPACE}/$`));
@@ -30,14 +32,14 @@ const feedField = (page: Page) => page.getByLabel('Adresse de l’abonnement');
 let firstUrl = '';
 let secondUrl = '';
 
-test('« S’abonner à mon agenda » affiche l’adresse webcal une seule fois, avec « Copier »', async ({ page, context }) => {
+test('« Afficher l’adresse de l’abonnement » affiche l’adresse webcal une seule fois, avec « Copier »', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   const console_ = watchConsole(page);
   await openAgenda(page);
   await expect(page.getByRole('heading', { name: 'Agenda dans mon calendrier' })).toBeVisible();
   await expect(feedField(page)).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'S’abonner à mon agenda' }).click();
+  await page.getByRole('button', { name: 'Afficher l’adresse de l’abonnement' }).click();
   await expect(feedField(page)).toBeVisible();
   firstUrl = await feedField(page).inputValue();
   expect(firstUrl).toMatch(FEED_URL);
@@ -65,7 +67,7 @@ test('l’adresse affichée sert un calendrier .ics à qui la connaît, sans ses
 
 test('« S’abonner » de nouveau remplace l’abonnement : l’ancienne adresse répond 404, la nouvelle 200', async ({ page, playwright }) => {
   await openAgenda(page);
-  await page.getByRole('button', { name: 'S’abonner à mon agenda' }).click();
+  await page.getByRole('button', { name: 'Afficher l’adresse de l’abonnement' }).click();
   await expect(feedField(page)).toBeVisible();
   secondUrl = await feedField(page).inputValue();
   expect(secondUrl).toMatch(FEED_URL);
@@ -79,7 +81,7 @@ test('« S’abonner » de nouveau remplace l’abonnement : l’ancienne adress
 
 test('« Révoquer » masque l’adresse et le flux répond 404', async ({ page, playwright }) => {
   await openAgenda(page);
-  await page.getByRole('button', { name: 'S’abonner à mon agenda' }).click();
+  await page.getByRole('button', { name: 'Afficher l’adresse de l’abonnement' }).click();
   await expect(feedField(page)).toBeVisible();
   const url = await feedField(page).inputValue();
 
