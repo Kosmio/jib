@@ -176,6 +176,27 @@ Routes ajoutées par les lots V1-C, V3-E, V3-F, V4-D, V5-A, V5-B et V5-C, toutes
 | POST | `/admin/{edition}/switch` | organisateur de la cible | ouvre une session pour l'édition cible sans nouveau lien, révoque la précédente, remplace le cookie → 303 vers `/espace/{edition}/organisateur` (formulaire sans JavaScript). 403 `FORBIDDEN`, 404 `EDITION_NOT_FOUND`, 400 `INSECURE_REQUEST` si le cookie `Secure` ne peut pas être posé (A-25) |
 | POST | `/admin/{edition}/duplicate` | organisateur du modèle | `{ title, slug, date }` → 201 `{ slug }` : édition en brouillon avec les réglages de l'espace, les sujets et les séquences en brouillon ; ni participant, ni exposant, ni rendez-vous, ni formulaire HelloAsso, espace fermé. 400 `VALIDATION`, 409 `SLUG_TAKEN` |
 
+### Interface organisation (AD-1 à AD-4, `15-administration.md`)
+
+Toutes réservées à l'organisateur de l'édition (NF-71) ; les écritures refusent une édition en lecture seule (409 `EDITION_READ_ONLY`). Une écriture qui porte `updatedAt` est refusée par 409 `STALE` si l'objet a changé depuis (NF-75). Un refus des gardes de l'administration (NF-63, NF-64) répond 409 `REFUSED`.
+
+| Méthode | Chemin | Corps / réponse |
+|---|---|---|
+| GET | `/admin/{edition}/settings` | `{ id, updatedAt, readOnly, attendees, general, helloasso: { orgSlug, formType, formSlug, fieldMap, credentials, syncs }, space: { participantSpaceEnabled, b2bEnabled, tablesCount, slotDurationMinutes, meetingRequestsOpenAt, meetingRequestsCloseAt, checklist }, sequences }` ; aucun secret (D-21) |
+| PATCH | `/admin/{edition}/settings` | champs de `general`, `helloasso*`, `space` (noms de l'API : `inscriptionUrl`, `helloassoFieldMap`…), `updatedAt`, `confirmFormChange` → les réglages ; l'édition est publiée. 400 `VALIDATION` `{ fields }`, 409 `FORM_CHANGE_CONFIRM` (R-92) |
+| POST | `/admin/{edition}/helloasso/test` | `{ orgSlug, formType, formSlug }` → `{ title, totalCount, fieldNames, suggestedFieldMap }`, rien n'est importé (I-45). 409 `HELLOASSO_CREDENTIALS_MISSING`, 404 `HELLOASSO_FORM_NOT_FOUND`, 409 `HELLOASSO_ACCESS_DENIED`, 502 `HELLOASSO_UNREACHABLE` |
+| PATCH | `/admin/{edition}/sequences/{id}/break` | `{ isBreak, updatedAt }` : pause B2B ou non, publiée tout de suite → les réglages. 409 `BREAK_TIMES_MISSING` (R-86), `BREAK_HAS_MEETINGS` (R-93) |
+| GET | `/admin/{edition}/program` | programme en brouillon : `{ sequences: [{ …, state, interventions: [{ …, speakers }] }], changes }`, `state` vaut `new`, `modified` ou `published` |
+| POST | `/admin/{edition}/program/publish` | publie intervenants, séquences puis interventions nouveaux ou modifiés (D-22) → `{ published, breaksChanged, program }` |
+| POST, PATCH, DELETE | `/admin/{edition}/sequences`, `/sequences/{id}` | F-160 ; PATCH accepte `move` (`up` ou `down`) (même heure, F-161). 409 `BREAK_HAS_MEETINGS` (R-93, R-94) ; la suppression est immédiate et emporte les interventions |
+| POST, PATCH, DELETE | `/admin/{edition}/sequences/{id}/interventions`, `/interventions/{id}` | `{ description, speakers: [documentId], move, updatedAt }` (F-161, F-162) |
+| POST, PATCH | `/admin/{edition}/intervenants`, `/intervenants/{id}` | `{ name, title, organisation, bio, linkedinUrl, topic }` sur le brouillon (F-163) ; POST → 201 `{ id }` |
+| GET | `/admin/{edition}/intervenants?q=` | 20 fiches au plus, avec `linkedTo` (la personne de l'édition rattachée) |
+| GET, POST, PATCH | `/admin/{edition}/organisations`, `/organisations/{id}` | `?q=&exhibitors=true` ; POST 409 `SIMILAR_ORGANISATIONS` `{ candidates, exact }` sauf `force` (T-83) ; PATCH accepte `exhibitor: { enabled, standNumber }` (F-172), 409 `EXHIBITOR_HAS_REPRESENTATIVES` |
+| GET, PATCH | `/admin/{edition}/attendees/{id}/roles` | `{ speaker, exhibitor, standNumber, organizer, hostedTableNumber }` : `speaker` vaut un documentId, `new` ou null ; `exhibitor` un documentId d'organisation ou null → `{ role, roles, speaker, exhibitor, hostedTableNumber }` (D-20, F-171, F-173). 409 `ROLE_HAS_MEETINGS` (R-97), `SPEAKER_TAKEN`, `TABLE_TAKEN`, `SELF_FORBIDDEN` |
+
+`b2bEnabled` (F-178) est aussi rendu par `GET /editions/{slug}` et dans `edition` de `GET /me`.
+
 ## Relances, désabonnement (V3-A)
 
 | Méthode | Chemin | Accès | Réponse |
