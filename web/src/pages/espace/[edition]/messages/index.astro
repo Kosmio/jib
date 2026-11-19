@@ -1,0 +1,40 @@
+---
+// E7, liste des conversations (F-70) : dernier message d'abord, avatar, nom, extrait, heure, pastille de messages non lus.
+// Premier affichage rendu par le serveur (sans JavaScript aussi) ; l'îlot ConversationList relit la liste toutes les 60 s (F-133).
+// Le fil ouvert est interrogé toutes les 20 s (F-71).
+import AppShell from "../../../../components/espace/AppShell.astro";
+import Notice from "../../../../components/espace/Notice.astro";
+import ConversationList from "../../../../react-components/espace/ConversationList";
+import { espaceGet, guardSession, publicStrapiUrl } from "../../../../lib/espace/api";
+import type { ConversationSummary } from "../../../../lib/espace/messages";
+
+const slug = Astro.params.edition ?? "";
+const cookie = Astro.request.headers.get("cookie");
+const guard = await guardSession(slug, cookie);
+if ("redirect" in guard) return Astro.redirect(guard.redirect);
+if ("notFound" in guard) return Astro.rewrite("/espace/introuvable");
+const { me, edition } = guard;
+
+const base = `/espace/${encodeURIComponent(slug)}`;
+const result = await espaceGet<ConversationSummary[]>("/conversations", cookie);
+if (!result.ok && result.status === 401) return Astro.redirect(`${base}/connexion`);
+const conversations = result.ok ? result.data : [];
+const now = new Date();
+---
+
+<AppShell title="Messages" active="messages" editionSlug={slug} me={me} eventDate={edition.date ?? null} readOnly={edition.readOnly}>
+  <div class="mx-auto max-w-180 px-4 pt-8">
+    <h1 class="text-2xl md:text-3xl">Messages</h1>
+
+    {!result.ok && <Notice kind="alert">Les messages ne sont pas disponibles pour le moment. Réessayez dans quelques instants.</Notice>}
+
+    <ConversationList
+      client:visible
+      strapiUrl={publicStrapiUrl}
+      editionSlug={slug}
+      initialConversations={conversations}
+      initialNow={now.toISOString()}
+      unavailable={!result.ok}
+    />
+  </div>
+</AppShell>

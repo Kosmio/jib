@@ -2,6 +2,7 @@
 
 const path = require('path');
 const fs = require('fs');
+const { ensureOrganisationRole } = require('./admin-role');
 
 const SEED_ASSETS_DIR = path.join(__dirname, '..', 'seed-assets');
 
@@ -832,8 +833,36 @@ Cette politique de confidentialité peut être mise à jour à tout moment. Date
 // BOOTSTRAP
 // =============================================================================
 
+// @strapi/utils is not a direct dependency (pnpm): resolved from @strapi/strapi, as in api::espace.admin-guards.
+const { ApplicationError } = require(require.resolve('@strapi/utils', { paths: [require.resolve('@strapi/strapi')] })).errors;
+const { programTimeRefusal } = require('./api/espace/lib/time');
+
+/** R-86: a b2b_break sequence is saved only with readable times ("10h45"). An update that omits a field reads it from the stored draft. */
+async function checkSequenceTimes(strapi, { uid, action, params }) {
+  if (uid !== 'api::sequence.sequence' || (action !== 'create' && action !== 'update') || !params?.data) return;
+  const { kind, start_time: start, end_time: end } = params.data;
+  let current = {};
+  if (action === 'update' && params.documentId && (kind === undefined || start === undefined || end === undefined)) {
+    current = (await strapi.db.query(uid).findOne({ where: { documentId: params.documentId, publishedAt: null } })) || {};
+  }
+  const message = programTimeRefusal({
+    kind: kind ?? current.kind ?? 'talk',
+    start_time: start ?? current.start_time,
+    end_time: end ?? current.end_time,
+  });
+  if (message) throw new ApplicationError(message);
+}
+
 module.exports = {
-  register(/*{ strapi }*/) {},
+  register({ strapi }) {
+    // NF-63 to NF-65: admin guards, the decision lives in api::espace.admin-guards (resolved at call time)
+    // R-86: the same middleware refuses an unreadable time on a b2b_break sequence
+    strapi.documents.use(async (context, next) => {
+      await strapi.service('api::espace.admin-guards').check(context);
+      await checkSequenceTimes(strapi, context);
+      return next();
+    });
+  },
 
   async bootstrap({ strapi }) {
     // Set French as default locale if not already configured
@@ -868,6 +897,15 @@ module.exports = {
 
     // Set French labels on content types
     await setFrenchLabels(strapi);
+    await lockAttendeeFields(strapi);
+    await applyAdminConfig(strapi);
+
+    // V5-G: rôle d'administration restreint « Organisation Xylofutur » (idempotent)
+    try {
+      await ensureOrganisationRole(strapi);
+    } catch (err) {
+      strapi.log.error(`[admin-role] failed: ${err.message}`);
+    }
 
     // Apply data migrations (must run before any content-type validation)
     try {
@@ -876,14 +914,40 @@ module.exports = {
       strapi.log.error(`[migration] failed: ${err.message}`);
     }
 
-    // Seed demo data if no editions exist yet
-    await seedData(strapi);
+    // Participant space: indexes Strapi cannot declare (idempotent)
+    await strapi.service('api::espace.schema').ensureIndexes();
+
+    // Seed demo data if no editions exist yet (DEMO_SEED=false turns it off)
+    if (process.env.DEMO_SEED !== 'false') {
+      await seedData(strapi);
+    }
 
     // Re-upload missing media on existing entities (recovery from lost uploads volume)
     try {
       await restoreMissingMedia(strapi);
     } catch (err) {
       strapi.log.error(`[restore] failed: ${err.message}`);
+    }
+
+    // Test environments only: an attendee account with a fake address for each intervenant of the program (SPEAKER_TEST_ACCOUNTS)
+    try {
+      await ensureSpeakerTestAccounts(strapi);
+    } catch (err) {
+      strapi.log.error(`[speaker-test-accounts] failed: ${err.message}`);
+    }
+
+    // One-shot recovery of an admin login (ADMIN_RESET="email:password", unset by default)
+    try {
+      await resetAdminUser(strapi);
+    } catch (err) {
+      strapi.log.error(`[admin-reset] failed: ${err.message}`);
+    }
+
+    // V1-C: checks the e-mail sender at startup once that service exists
+    try {
+      await strapi.service('api::espace.service-status')?.checkSenderAtStartup?.();
+    } catch (err) {
+      strapi.log.error(`[sender-check] failed: ${err.message}`);
     }
   },
 };
@@ -1197,6 +1261,128 @@ const FRENCH_LABELS = {
   },
 };
 
+/**
+ * SPEAKER_TEST_ACCOUNTS="slug,slug": for each intervenant of the published program of these editions that no attendee
+ * stands for (linked by `speaker`, or with the same name), creates a speaker account with a fake address
+ * firstname.lastname@example.org, so that the participant space can be tested with speakers who can log in and receive
+ * requests (e-mails stay in the test inbox). Placeholders (« à confirmer ») are skipped. Idempotent ; unset outside test environments.
+ */
+async function ensureSpeakerTestAccounts(strapi) {
+  const slugs = String(process.env.SPEAKER_TEST_ACCOUNTS ?? '').split(',').map((slug) => slug.trim()).filter(Boolean);
+  if (!slugs.length) return;
+  const ATTENDEE = 'api::espace.attendee';
+  const plain = (text) => String(text ?? '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/\s+/g, ' ').trim();
+
+  for (const slug of slugs) {
+    const edition = await strapi.documents('api::edition.edition').findFirst({ filters: { slug }, status: 'published' });
+    if (!edition) {
+      strapi.log.warn(`[speaker-test-accounts] edition ${slug} not found`);
+      continue;
+    }
+    const sequences = await strapi.documents('api::sequence.sequence').findMany({
+      filters: { edition: { documentId: edition.documentId } },
+      status: 'published',
+      populate: { interventions: { populate: { intervenants: { fields: ['documentId', 'name'] } } } },
+      limit: 1000,
+    });
+    const intervenants = new Map();
+    for (const { interventions = [] } of sequences) {
+      for (const { intervenants: people = [] } of interventions) for (const person of people) intervenants.set(person.documentId, person);
+    }
+    const attendees = await strapi.documents(ATTENDEE).findMany({
+      filters: { edition: { documentId: edition.documentId } },
+      fields: ['email', 'firstName', 'lastName'],
+      populate: { speaker: { fields: ['documentId'] } },
+      limit: 5000,
+    });
+    const covered = new Set(attendees.flatMap((a) => [a.speaker?.documentId, plain(`${a.firstName} ${a.lastName}`)]).filter(Boolean));
+    const emails = new Set(attendees.map((a) => a.email.toLowerCase()));
+
+    let created = 0;
+    for (const intervenant of intervenants.values()) {
+      const name = String(intervenant.name ?? '').trim();
+      if (!name || /confirmer/i.test(name) || covered.has(intervenant.documentId) || covered.has(plain(name))) continue;
+      const email = `${plain(name).replace(/[^a-z0-9]+/g, '.').replace(/^\.|\.$/g, '')}@example.org`;
+      if (emails.has(email)) continue;
+      const [firstName, ...rest] = name.split(/\s+/);
+      await strapi.documents(ATTENDEE).create({
+        data: {
+          edition: { documentId: edition.documentId },
+          email,
+          firstName,
+          lastName: rest.join(' ') || firstName,
+          role: 'speaker',
+          speaker: { documentId: intervenant.documentId },
+          status: 'active',
+        },
+      });
+      emails.add(email);
+      created += 1;
+    }
+    if (created) strapi.log.warn(`[speaker-test-accounts] ${created} speaker test account(s) created for ${slug}`);
+  }
+}
+
+/**
+ * ADMIN_RESET="email:password": sets the password of that admin user, or creates it as super admin.
+ * Meant for a temporary recovery: unset the variable once logged in, or the next start resets it again.
+ * The password is never logged. Does nothing when the variable is empty.
+ */
+async function resetAdminUser(strapi) {
+  const raw = process.env.ADMIN_RESET;
+  if (!raw) return;
+  const split = raw.indexOf(':');
+  const email = raw.slice(0, split).trim().toLowerCase();
+  const password = raw.slice(split + 1);
+  if (split < 1 || !email || !password) {
+    strapi.log.error('[admin-reset] ADMIN_RESET must look like "email:password", ignored');
+    return;
+  }
+
+  const users = strapi.service('admin::user');
+  const existing = await users.findOneByEmail(email);
+  if (existing) {
+    await users.updateById(existing.id, { password, isActive: true });
+    strapi.log.warn(`[admin-reset] password reset for ${email}`);
+    return;
+  }
+  const superAdmin = await strapi.service('admin::role').getSuperAdmin();
+  await users.create({ email, firstname: 'Admin', lastname: 'JIB', password, isActive: true, roles: [superAdmin.id] });
+  strapi.log.warn(`[admin-reset] super admin ${email} created`);
+}
+
+// NF-66: attendee fields the admin shows but does not let edit (they belong to the import and to the attendee's own choices)
+const READ_ONLY_ATTENDEE_FIELDS = [
+  'editedFields', 'emailPrefs', 'unavailableSessions', 'consentAt', 'activatedAt', 'lastSeenAt',
+  'directoryOptIn', 'meetingsOptIn', 'newsOptIn', 'helloassoItemId', 'helloassoOrderId',
+  'cardTokenHash', 'cardTokenCreatedAt',
+];
+// F-95, NF-55: card token fields (badges) are hidden from the admin form as well
+const HIDDEN_ATTENDEE_FIELDS = ['cardTokenHash', 'cardTokenCreatedAt'];
+
+async function lockAttendeeFields(strapi) {
+  const key = 'plugin_content_manager_configuration_content_types::api::espace.attendee';
+  const entry = await strapi.db.query('strapi::core-store').findOne({ where: { key } });
+  if (!entry) return;
+  const config = typeof entry.value === 'string' ? JSON.parse(entry.value) : entry.value;
+  let changed = false;
+  for (const field of READ_ONLY_ATTENDEE_FIELDS) {
+    const edit = config.metadatas?.[field]?.edit;
+    if (edit && edit.editable !== false) {
+      edit.editable = false;
+      changed = true;
+    }
+  }
+  for (const field of HIDDEN_ATTENDEE_FIELDS) {
+    const edit = config.metadatas?.[field]?.edit;
+    if (edit && edit.visible !== false) {
+      edit.visible = false;
+      changed = true;
+    }
+  }
+  if (changed) await strapi.db.query('strapi::core-store').update({ where: { id: entry.id }, data: { value: JSON.stringify(config) } });
+}
+
 async function setFrenchLabels(strapi) {
   const entries = [];
   for (const uid of Object.keys(FRENCH_LABELS)) {
@@ -1242,6 +1428,138 @@ async function setFrenchLabels(strapi) {
 }
 
 // =============================================================================
+// ADMIN CONFIGURATION OF THE PARTICIPANT SPACE (NF-68, NF-69)
+// =============================================================================
+
+// Per content type: labels and help texts ([label, help]), main field, list columns, default sort, and the fields
+// gathered at the end of the edit form (rows, in order of use). An attribute the schema does not have yet
+// (welcomeStartedAt, readOnlyAt, badge settings...) is skipped, so a later lot adds its line without a failing start.
+const ADMIN_CONFIG = {
+  'api::edition.edition': {
+    labels: {
+      participantSpaceEnabled: ['Espace participant ouvert', 'Active l’espace participant de cette édition. Publier pour appliquer. Ces réglages se font plus simplement dans l’interface organisation : /espace/{identifiant URL}/organisateur/edition.'],
+      b2bEnabled: ['Rendez-vous B2B', 'Coché (ou vide) : agenda et demandes de rendez-vous actifs. Décoché : l’annuaire, la messagerie et le programme restent, sans rendez-vous.'],
+      helloassoOrgSlug: ['Identifiant HelloAsso de l’association', 'Le texte qui suit /associations/ dans l’adresse de la page HelloAsso. Utilisé pour importer les inscrits.'],
+      helloassoFormType: ['Type de formulaire HelloAsso', 'Le plus souvent « Event » (billetterie). À ne changer que si le formulaire HelloAsso est d’un autre type.'],
+      helloassoFormSlug: ['Identifiant du formulaire HelloAsso', 'Le texte qui suit /evenements/ dans l’adresse du formulaire. Sans lui, aucune inscription n’est importée.'],
+      helloassoFieldMap: ['Correspondance des champs HelloAsso', 'Réglage technique (JSON) : à ne pas modifier sans l’équipe Kosmio. Une erreur casse l’import des inscrits.'],
+      slotDurationMinutes: ['Durée d’un créneau de rendez-vous (minutes)', 'Par défaut 15. Ne peut plus changer dès qu’un rendez-vous existe. Après un changement, utiliser « Régénérer les créneaux » dans le pilotage.'],
+      tablesCount: ['Nombre de tables', 'Nombre de tables disponibles pour les rendez-vous B2B, par créneau. Ne pas descendre sous le numéro d’une table déjà attribuée.'],
+      meetingRequestsOpenAt: ['Ouverture des demandes de rendez-vous', 'Date et heure (Paris) à partir desquelles on peut demander un rendez-vous. Vide : ouvert dès l’ouverture de l’espace.'],
+      meetingRequestsCloseAt: ['Fermeture des demandes de rendez-vous', 'Date et heure (Paris). Vide : fermeture la veille à 18h00.'],
+      readOnlyAt: ['Lecture seule à partir du', 'Vide : sept jours après la date de l’édition. Passé cette date, l’espace reste consultable mais plus modifiable, et les relances s’arrêtent.'],
+      welcomeStartedAt: ['Envoi des e-mails de bienvenue lancé le', 'Rempli automatiquement quand l’envoi des welcome part depuis le pilotage. À ne pas modifier à la main.'],
+    },
+    tail: [
+      ['participantSpaceEnabled', 'b2bEnabled'],
+      ['helloassoOrgSlug', 'helloassoFormType'],
+      ['helloassoFormSlug'],
+      ['helloassoFieldMap'],
+      ['slotDurationMinutes', 'tablesCount'],
+      ['meetingRequestsOpenAt', 'meetingRequestsCloseAt'],
+      ['readOnlyAt'],
+      ['welcomeStartedAt'],
+    ],
+  },
+  'api::sequence.sequence': {
+    labels: {
+      kind: ['Nature de la séquence', '« Pause rendez-vous B2B » génère les créneaux de rendez-vous entre ses heures de début et de fin. Publier pour appliquer.'],
+      theme: ['Thème', 'Thème affiché sur la séquence dans le programme. Facultatif.'],
+      subtitle: ['Sous-titre', 'Ligne affichée sous le titre dans le programme. Facultatif.'],
+      start_time: ['Heure de début', 'Écrire 10h45 (le format 10:45 est aussi compris). Pas de point : 10.45 est refusé sur une pause B2B.'],
+      end_time: ['Heure de fin', 'Écrire 11h15. Obligatoire sur une pause B2B, sinon aucun créneau n’est généré.'],
+    },
+  },
+  'api::espace.attendee': {
+    mainField: 'lastName',
+    sort: ['lastName', 'ASC'],
+    list: ['lastName', 'firstName', 'company', 'email', 'role', 'status'],
+    labels: {
+      lastName: ['Nom'], firstName: ['Prénom'], company: ['Entreprise'], email: ['E-mail'], role: ['Rôle'], status: ['Statut'],
+      lookingFor: ['Je cherche'], offering: ['Je propose'], phone: ['Téléphone (visible des interlocuteurs d’un rendez-vous confirmé)'],
+    },
+  },
+  'api::espace.badge-setting': {
+    mainField: 'accent',
+    list: ['edition', 'plan', 'accent'],
+    labels: {
+      edition: ['Édition', 'Édition dont ce réglage s’applique aux badges. Une seule entrée par édition.'],
+      plan: ['Plan du lieu (verso du badge, facultatif)', 'Image PNG ou JPEG imprimée à droite du programme. Sans plan, le programme occupe tout le verso.'],
+      accent: ['Couleur d’accent (facultatif, sinon couleur de l’édition)', 'Couleur du bandeau de type, au format #rrggbb. Une couleur trop claire pour du texte blanc est remplacée par le bleu des titres.'],
+    },
+  },
+  'api::espace.exhibitor': {
+    mainField: 'standNumber',
+    list: ['organisation', 'standNumber'],
+    labels: { organisation: ['Organisation'], standNumber: ['Stand'] },
+  },
+  'api::espace.meeting': {
+    mainField: 'status',
+    sort: ['createdAt', 'DESC'],
+    list: ['status', 'slot', 'requester', 'targetAttendee', 'tableNumber'],
+    labels: { status: ['Statut'], slot: ['Créneau'], requester: ['Demandeur'], targetAttendee: ['Participant sollicité'], tableNumber: ['Table'] },
+  },
+  'api::espace.slot': {
+    mainField: 'label',
+    sort: ['startsAt', 'ASC'],
+    list: ['label', 'startsAt', 'endsAt'],
+    labels: { label: ['Créneau'], startsAt: ['Début'], endsAt: ['Fin'] },
+  },
+  'api::espace.email-log': {
+    mainField: 'template',
+    sort: ['sentAt', 'DESC'],
+    list: ['template', 'status', 'sentAt', 'error', 'scenarioKey'],
+    labels: { template: ['Gabarit'], status: ['Statut'], sentAt: ['Envoyé le'], error: ['Motif'], scenarioKey: ['Scénario'] },
+  },
+};
+
+/**
+ * Applies ADMIN_CONFIG to the Content Manager configuration stored by Strapi. Idempotent, runs at every start, so an empty
+ * database (Strapi has just created the configurations) and an existing one end up the same. A type or an attribute that is
+ * missing is skipped.
+ */
+async function applyAdminConfig(strapi) {
+  for (const [uid, spec] of Object.entries(ADMIN_CONFIG)) {
+    const key = `plugin_content_manager_configuration_content_types::${uid}`;
+    const entry = await strapi.db.query('strapi::core-store').findOne({ where: { key } });
+    if (!entry) continue;
+    const config = typeof entry.value === 'string' ? JSON.parse(entry.value) : entry.value;
+    const before = JSON.stringify(config);
+    config.metadatas = config.metadatas || {};
+    config.settings = config.settings || {};
+    config.layouts = config.layouts || {};
+    const known = (field) => Boolean(config.metadatas[field]);
+
+    for (const [field, [label, help]] of Object.entries(spec.labels || {})) {
+      if (!known(field)) continue;
+      const { edit, list } = config.metadatas[field];
+      if (edit) {
+        edit.label = label;
+        if (help) edit.description = help;
+      }
+      if (list) list.label = label;
+    }
+    if (spec.mainField && known(spec.mainField)) config.settings.mainField = spec.mainField;
+    if (spec.sort && known(spec.sort[0])) [config.settings.defaultSortBy, config.settings.defaultSortOrder] = spec.sort;
+    if (spec.list) {
+      const columns = spec.list.filter((field) => known(field));
+      if (columns.length) config.layouts.list = columns;
+    }
+    if (spec.tail && Array.isArray(config.layouts.edit)) {
+      const tail = spec.tail.map((row) => row.filter(known)).filter((row) => row.length);
+      const tailFields = new Set(tail.flat());
+      const head = config.layouts.edit.map((row) => row.filter(({ name }) => !tailFields.has(name))).filter((row) => row.length);
+      config.layouts.edit = [...head, ...tail.map((row) => row.map((name) => ({ name, size: name === 'helloassoFieldMap' ? 12 : 6 })))];
+    }
+
+    if (JSON.stringify(config) !== before) {
+      await strapi.db.query('strapi::core-store').update({ where: { id: entry.id }, data: { value: JSON.stringify(config) } });
+      strapi.log.info(`Configuration d’administration appliquée pour ${uid}`);
+    }
+  }
+}
+
+// =============================================================================
 // DATA MIGRATIONS
 // =============================================================================
 
@@ -1265,6 +1583,16 @@ async function runDataMigrations(strapi) {
 
   // 2026-05-01: ensure home-page single type has a published entry seeded with defaults
   await ensureHomePage(strapi);
+
+  // 2026-11-11 (D-07): receiving meeting requests and messages is on by default, with an opt-out. Whoever has not recorded
+  // a choice yet (no consentAt) was created with the old default: bring them to the new one. An explicit choice stays.
+  if (await knex.schema.hasTable('espace_attendees')) {
+    const attendees = await knex('espace_attendees')
+      .whereNull('consent_at')
+      .andWhere((where) => where.where({ meetings_opt_in: false }).orWhereNull('meetings_opt_in'))
+      .update({ meetings_opt_in: true });
+    if (attendees > 0) strapi.log.info(`[migration] meetingsOptIn on by default for ${attendees} attendee(s) without recorded consent`);
+  }
 }
 
 /**

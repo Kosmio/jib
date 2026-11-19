@@ -1,0 +1,33 @@
+{
+  "kind": "collectionType",
+  "collectionName": "espace_calendar_feeds",
+  "info": {
+    "singularName": "calendar-feed",
+    "pluralName": "calendar-feeds",
+    "displayName": "Flux d’abonnement calendrier (espace participant)",
+    "description": "Flux .ics personnel à jeton révocable (I-42). Seule l’empreinte du jeton est conservée."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {
+    "content-manager": { "visible": false },
+    "content-type-builder": { "visible": false }
+  },
+  "attributes": {
+    "attendee": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::espace.attendee",
+      "required": true
+    },
+    "tokenHash": {
+      "type": "string",
+      "required": true,
+      "unique": true
+    },
+    "revokedAt": {
+      "type": "datetime"
+    }
+  }
+}

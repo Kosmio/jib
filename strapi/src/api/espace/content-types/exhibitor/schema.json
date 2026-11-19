@@ -1,0 +1,41 @@
+{
+  "kind": "collectionType",
+  "collectionName": "espace_exhibitors",
+  "info": {
+    "singularName": "exhibitor",
+    "pluralName": "exhibitors",
+    "displayName": "Exposant (espace participant)",
+    "description": "Exposant d’une édition. Le nom, le logo et la description viennent de l’organisation liée."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "edition": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::edition.edition",
+      "required": true
+    },
+    "organisation": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::organisation.organisation",
+      "required": true
+    },
+    "standNumber": {
+      "type": "string"
+    },
+    "representatives": {
+      "type": "relation",
+      "relation": "oneToMany",
+      "target": "api::espace.attendee",
+      "mappedBy": "exhibitor"
+    },
+    "topics": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::espace.topic"
+    }
+  }
+}

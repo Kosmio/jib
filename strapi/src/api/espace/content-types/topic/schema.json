@@ -1,0 +1,30 @@
+{
+  "kind": "collectionType",
+  "collectionName": "espace_topics",
+  "info": {
+    "singularName": "topic",
+    "pluralName": "topics",
+    "displayName": "Thème (espace participant)",
+    "description": "Thème d’une édition : filtres de l’annuaire, suggestions et programme. Les séquences du thème se rattachent depuis sa fiche."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "edition": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::edition.edition",
+      "required": true
+    },
+    "sessions": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::sequence.sequence"
+    }
+  }
+}

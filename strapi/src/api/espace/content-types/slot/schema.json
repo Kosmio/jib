@@ -1,0 +1,50 @@
+{
+  "kind": "collectionType",
+  "collectionName": "espace_slots",
+  "info": {
+    "singularName": "slot",
+    "pluralName": "slots",
+    "displayName": "Créneau (espace participant)",
+    "description": "Créneau de rendez-vous B2B, généré à partir des séquences de type pause B2B. Ne pas modifier à la main."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {
+    "content-manager": { "visible": false },
+    "content-type-builder": { "visible": false }
+  },
+  "attributes": {
+    "edition": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::edition.edition",
+      "required": true
+    },
+    "session": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::sequence.sequence",
+      "required": true
+    },
+    "startsAt": {
+      "type": "datetime",
+      "required": true
+    },
+    "endsAt": {
+      "type": "datetime",
+      "required": true
+    },
+    "label": {
+      "type": "string",
+      "required": true
+    },
+    "blockedTables": {
+      "type": "json"
+    },
+    "closed": {
+      "type": "boolean",
+      "default": false
+    }
+  }
+}

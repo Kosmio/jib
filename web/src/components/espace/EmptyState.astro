@@ -1,0 +1,26 @@
+---
+// État vide : une phrase d'explication, un appel à l'action facultatif (bouton secondaire ou principal, lien). Pas d'illustration.
+// Exemples : « Aucun rendez-vous pour le moment » (E6), « Aucun message » (E7).
+import EspaceButton from "./EspaceButton.astro";
+
+export interface Props {
+  title: string;
+  text?: string;
+  action?: { label: string; href: string };
+  class?: string;
+}
+
+const { title, text, action, class: extra = "" } = Astro.props;
+---
+
+<div class={`rounded-xl border border-surface-alt bg-white p-6 text-center ${extra}`}>
+  <p class="font-heading text-lg font-semibold text-title">{title}</p>
+  {text && <p class="mt-2 text-muted">{text}</p>}
+  {
+    action && (
+      <EspaceButton variant="secondary" href={action.href} class="mt-4">
+        {action.label}
+      </EspaceButton>
+    )
+  }
+</div>

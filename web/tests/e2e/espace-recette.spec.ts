@@ -1,0 +1,753 @@
+import type { BrowserContext, Locator, Page } from '@playwright/test';
+import {
+  capture,
+  EDITION,
+  ESPACE,
+  expect,
+  hydrated,
+  NBSP,
+  openSpace,
+  psql,
+  readOutbox,
+  tab,
+  test,
+  waitForMails,
+  watchConsole,
+} from './espace';
+import { STRAPI_URL } from './fixtures';
+import { editProgram, TEST_PAUSE_PREFIX } from './programme';
+
+/**
+ * Recette du soir (lot 16 des phases 2 et 3) : le parcours que Mathieu rejoue à la main sur `strapi_demo_e2e`, joué ici sur le seed de
+ * recette (`strapi_e2e`) dans un vrai navigateur.
+ *
+ *   - Léa passe E1, E3, E4, E5, E6, E7 et E8 sans erreur de console, sur les données du seed (lot 12) ;
+ *   - Léa accepte la demande d'Inès (F-60, T-15) : e-mail `meeting-accepted` avec .ics ; Inès voit le rendez-vous confirmé ;
+ *   - un participant réserve un créneau libre de la table 2 d'Antoine (R-19, A-29) ; un autre la voit prise (T-25) ;
+ *   - Manon envoie une demande puis l'annule (F-52, F-63) ;
+ *   - Léa écrit à Mathis, Mathis le reçoit (F-70, F-72, A-37) ;
+ *   - l'organisateur ouvre E9 (F-90, R-63), synchronise sur le faux HelloAsso (0, 0, 0), régénère les créneaux (F-94, R-02) ;
+ *     un participant reçoit 403 (T-42).
+ *
+ * Les tests se suivent (mode `serial`) et partagent la base : chacun a ses personnes, mais certains lisent ce que le précédent a écrit
+ * (Léa accepte avant qu'Inès ne vérifie, Léa écrit avant que Mathis ne lise). Le seed a des dates fixes (fenêtre de rendez-vous ouverte
+ * jusqu'au 2 décembre 2026, jour J le 3) : ces tests valent jusqu'à cette date.
+ */
+
+test.describe.configure({ mode: 'serial' });
+
+const EDITION_TITLE = 'Nouvelle-Aquitaine (test)';
+const LEA = 'lea.ducasse@example.org';
+const INES = 'ines.castaing@example.org';
+const MATHIS = 'mathis.lagrange@example.org';
+const NATHAN = 'nathan.lasserre@example.org';
+const MANON = 'manon.bordenave@example.org';
+const ANTOINE = 'antoine.vergnes@example.org';
+const CLARA = 'clara.dubourdieu@example.org';
+const ORGANIZER = 'organisation@example.org';
+
+/** Libellé du compte à rebours d'E1 pour aujourd'hui (F-20) : « J-34 », « Aujourd’hui », puis « Merci de votre participation ». */
+function countdownLabel(): string {
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const days = Math.round((Date.parse('2026-12-03T00:00:00Z') - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
+  return days > 0 ? `J-${days}` : days === 0 ? 'Aujourd’hui' : 'Merci de votre participation';
+}
+
+const slotButton = (page: import('@playwright/test').Page, time: string) => page.getByRole('button', { name: new RegExp(`^${time}`) });
+
+test('Léa : E1, E3, E4, E5, E6, E7 et E8 sur le seed, sans erreur de console', async ({ page, baseURL }) => {
+  test.setTimeout(120_000);
+  const consoleWatch = watchConsole(page);
+  // Le seed laisse deux messages non lus à Léa (les messages du 29 octobre) ; les fichiers qui ouvrent la messagerie de Léa avant celui-ci en
+  // ont lu un : la recette repart de l'état du seed.
+  psql(`update espace_messages set read_at = null where created_at in ('2026-10-29 17:10:00', '2026-10-29 16:35:00')`);
+  await openSpace(page, LEA);
+
+  await test.step('E1 : édition, compte à rebours, profil à 85 %, prochain rendez-vous, suggestions, badges (F-20 à F-24, R-50)', async () => {
+    await expect(page).toHaveURL(`${baseURL}${ESPACE}/`);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(EDITION_TITLE);
+    await expect(page.getByText('Jeudi 3 décembre 2026 à Bordeaux')).toBeVisible();
+    await expect(page.getByText(countdownLabel(), { exact: true })).toBeVisible();
+
+    // Profil : nom, entreprise, fonction, présentation et sujets donnent 85 % (R-30), il manque la photo (F-21).
+    const profile = page.getByRole('region', { name: 'Votre profil' });
+    await expect(profile).toContainText(/85\s*%/);
+    await expect(profile.getByText('Ajoutez une photo pour compléter votre profil.')).toBeVisible();
+    await expect(profile.getByRole('link', { name: 'Compléter mon profil' })).toHaveAttribute('href', `${ESPACE}/profil`);
+
+    // Prochain rendez-vous (F-22) : celui de 10h45 avec Mathis, à la table 1 ; 4 éléments dans l'agenda (3 rendez-vous et 1 demande reçue).
+    const next = page.getByRole('region', { name: 'Prochain rendez-vous' });
+    await expect(next).toContainText('10h45');
+    await expect(next).toContainText('Table 1');
+    await expect(next).toContainText('Mathis Lagrange');
+    await expect(next).toContainText('Confirmé');
+    await expect(next.getByRole('link', { name: /^Mon agenda\s*\(4\)$/ })).toHaveAttribute('href', `${ESPACE}/agenda`);
+
+    // Suggestions (R-50) : de 1 à 3 cartes, une action « Rencontrer » chacune.
+    const suggestions = page.getByRole('region', { name: 'Ils partagent vos sujets' });
+    const count = await suggestions.getByRole('listitem').count();
+    expect(count).toBeGreaterThanOrEqual(1);
+    expect(count).toBeLessThanOrEqual(3);
+    await expect(suggestions.getByRole('link', { name: /Rencontrer/ })).toHaveCount(count);
+
+    // Badges (F-24) : une demande reçue à traiter, deux messages non lus.
+    await expect(tab(page, 'Agenda')).toHaveAccessibleName(/^Agenda\s*,\s*1 demande reçue en attente$/);
+    await expect(tab(page, 'Messages')).toHaveAccessibleName(/^Messages\s*,\s*2 messages non lus$/);
+    await expect(tab(page, 'Accueil')).toHaveAttribute('aria-current', 'page');
+    await capture(page, 'E1');
+  });
+
+  await test.step('E3 : mon profil, champs du seed, déconnexion (F-30 à F-32)', async () => {
+    await page.getByRole('link', { name: /^Mon profil Léa Ducasse$/ }).click();
+    await expect(page).toHaveURL(`${baseURL}${ESPACE}/profil`);
+    await hydrated(page);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Mon profil');
+    await expect(page.getByLabel('Prénom')).toHaveValue('Léa');
+    await expect(page.getByLabel('Nom', { exact: true })).toHaveValue('Ducasse');
+    await expect(page.getByLabel('Présentation (facultatif)')).toHaveValue(/Charpentes du Pibal/);
+    await expect(page.getByRole('button', { name: 'Me déconnecter' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Tableau de bord organisateur' })).toHaveCount(0);
+    await capture(page, 'E3');
+  });
+
+  await test.step('E4 : annuaire, types, recherche sans accents, état vide (F-40 à F-44)', async () => {
+    await tab(page, 'Annuaire').click();
+    await expect(page).toHaveURL(`${baseURL}${ESPACE}/annuaire`);
+    await hydrated(page);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Annuaire');
+    await expect(page.getByText(/^\d+\s+profils$/)).toBeVisible();
+    await expect(page.getByRole('link', { name: /^Sylvadour/ })).toBeVisible();
+    await capture(page, 'E4');
+
+    await page.getByRole('radio', { name: 'Intervenants' }).check();
+    await expect(page.getByText('2 profils', { exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Antoine Vergnes/ })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Hélène Marquès/ })).toBeVisible();
+
+    await page.getByRole('radio', { name: 'Exposants' }).check();
+    await expect(page.getByText('2 profils', { exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: /^Résinéo/ })).toBeVisible();
+
+    await page.getByRole('radio', { name: 'Tous' }).check();
+    await page.getByRole('searchbox', { name: /Rechercher un profil/ }).fill('econ');
+    await expect(page.getByRole('link', { name: /Mathis Lagrange/ })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Clara Dubourdieu/ })).toHaveCount(0);
+
+    await page.getByRole('searchbox', { name: /Rechercher un profil/ }).fill('zzzzz');
+    await expect(page.getByText('Aucun profil ne correspond. Essayez un autre sujet ou effacez la recherche.')).toBeVisible();
+    await page.getByRole('button', { name: 'Effacer les filtres' }).click();
+    await expect(page.getByRole('searchbox', { name: /Rechercher un profil/ })).toHaveValue('');
+    await expect(page.getByRole('link', { name: /Mathis Lagrange/ })).toBeVisible();
+  });
+
+  await test.step('E5 : fiche de Mathis, rendez-vous confirmé de 10h45, aucun créneau présélectionné (F-50, F-51, F-54)', async () => {
+    await page.getByRole('link', { name: /Mathis Lagrange/ }).click();
+    await expect(page).toHaveURL(new RegExp(`${ESPACE}/annuaire/p/`));
+    await hydrated(page);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Mathis Lagrange');
+    await expect(page.getByRole('heading', { level: 2, name: /^Proposer un rendez-vous, jeudi 3 décembre$/ })).toBeVisible();
+    const confirmed = slotButton(page, '10h45');
+    await expect(confirmed).toContainText('Confirmé');
+    await expect(confirmed).toHaveAttribute('aria-disabled', 'true');
+    const submit = page.getByRole('button', { name: 'Choisissez un créneau' });
+    await expect(submit).toBeDisabled();
+    await slotButton(page, '13h30').click();
+    // D-08 : la demande ne part pas sans un mot de présentation.
+    const send = page.getByRole('button', { name: 'Envoyer la demande pour 13h30' });
+    await expect(send).toBeDisabled();
+    const word = page.getByLabel(/Un mot pour présenter votre demande/);
+    await word.fill('Bonjour Mathis.');
+    await expect(send).toBeEnabled();
+    await word.fill('');
+    await capture(page, 'E5-personne');
+    await expect(page.getByRole('link', { name: /Écrire un message/ })).toBeVisible();
+  });
+
+  await test.step('E5 : fiche d’Hélène, demande déjà envoyée (F-52) ; fiche de Sylvadour, rendez-vous au stand (F-57)', async () => {
+    await tab(page, 'Annuaire').click();
+    await hydrated(page);
+    await page.getByRole('searchbox', { name: /Rechercher un profil/ }).fill('Marquès');
+    await page.getByRole('link', { name: /Hélène Marquès/ }).click();
+    await hydrated(page);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Hélène Marquès');
+    await expect(page.getByText(/Demande envoyée pour .*15h30, Hélène n’a pas encore répondu\./)).toBeVisible();
+
+    await tab(page, 'Annuaire').click();
+    await hydrated(page);
+    await page.getByRole('searchbox', { name: /Rechercher un profil/ }).fill('Sylvadour');
+    await page.getByRole('link', { name: /^Sylvadour/ }).click();
+    await expect(page).toHaveURL(new RegExp(`${ESPACE}/annuaire/x/`));
+    await hydrated(page);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sylvadour');
+    await expect(page.getByRole('heading', { level: 2, name: /^Demander un rendez-vous au stand, jeudi 3 décembre$/ })).toBeVisible();
+    await expect(slotButton(page, '12h30')).toContainText('Confirmé');
+    await expect(page.getByRole('heading', { level: 2, name: 'Représentants' })).toBeVisible();
+    await capture(page, 'E5-exposant');
+  });
+
+  await test.step('E6 : agenda, demandes reçues et envoyées, mes rendez-vous, historique (F-60 à F-66, D-11)', async () => {
+    await tab(page, 'Agenda').click();
+    await expect(page).toHaveURL(`${baseURL}${ESPACE}/agenda`);
+    await hydrated(page);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Mon agenda');
+    await expect(page.getByRole('link', { name: 'Calendrier' })).toHaveAttribute('href', /\/api\/espace\/meetings\.ics$/);
+
+    const received = page.getByRole('region', { name: 'Demandes reçues' });
+    await expect(received).toContainText('Inès Castaing');
+    await expect(received).toContainText('Propose 13h00');
+    await expect(received).toContainText('« Bonjour Léa, échangeons sur la construction bois. »');
+    await expect(received.getByRole('button', { name: /^Accepter/ })).toBeVisible();
+    await expect(received.getByRole('button', { name: /^Proposer un autre créneau/ })).toBeVisible();
+    await expect(received.getByRole('button', { name: /^Refuser/ })).toBeVisible();
+
+    // D-11 : mes rendez-vous confirmés seulement, sans les séquences du programme ni les demandes en attente.
+    const day = page.getByRole('region', { name: /^Mes rendez-vous, jeudi 3 décembre$/ });
+    await expect(day).not.toContainText('Accueil et ouverture');
+    await expect(day).toContainText('Mathis Lagrange');
+    await expect(day).toContainText('Table 1');
+    await expect(day).toContainText('Sylvadour');
+    await expect(day).toContainText('Stand 4');
+    await expect(day).toContainText('Confirmé par Benoît Tastet');
+    await expect(day).not.toContainText('Hélène Marquès');
+
+    const sent = page.getByRole('region', { name: 'Demandes envoyées' });
+    await expect(sent).toContainText('Hélène Marquès');
+    await expect(sent).toContainText('En attente de réponse');
+    await expect(sent.getByRole('button', { name: /^Annuler la demande/ })).toBeVisible();
+
+    const history = page.locator('details').filter({ hasText: 'Historique (1)' });
+    await history.locator('summary').click();
+    await expect(history).toContainText('Jules Mazères');
+    await expect(history).toContainText('Refusé');
+    await capture(page, 'E6');
+  });
+
+  await test.step('E7 : liste des conversations avec les non lus, puis le fil avec le rendez-vous lié (F-70, A-37)', async () => {
+    await tab(page, 'Messages').click();
+    await expect(page).toHaveURL(`${baseURL}${ESPACE}/messages`);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Messages');
+    const rows = page.getByRole('main').getByRole('listitem');
+    await expect(rows.nth(0)).toContainText('Mathis Lagrange');
+    await expect(rows.nth(0)).toContainText('J’apporterai nos échantillons de panneaux.');
+    await expect(rows.nth(0)).toContainText('1 message non lu');
+    await expect(rows.nth(1)).toContainText('Inès Castaing');
+    await expect(rows.nth(1)).toContainText('1 message non lu');
+    await capture(page, 'E7-liste');
+
+    await rows.nth(0).getByRole('link').click();
+    await hydrated(page);
+    const log = page.getByRole('log', { name: 'Messages' });
+    await expect(log.getByRole('listitem').filter({ hasText: 'Quels panneaux vous intéressent ?' })).toBeVisible();
+    await expect(log.getByRole('listitem').filter({ hasText: 'pour les cloisons intérieures' })).toBeVisible();
+    await expect(log.getByRole('listitem').filter({ hasText: 'J’apporterai nos échantillons de panneaux.' })).toBeVisible();
+    await expect(page.getByText(/Rendez-vous confirmé, jeudi 3 décembre à 10h45, table 1/)).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Voir l’agenda' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Envoyer' })).toBeDisabled();
+    await capture(page, 'E7-fil');
+  });
+
+  await test.step('E8 : programme avec session, onglets par ancres, Prendre RDV, intervenants avec lien (F-80, F-81)', async () => {
+    await tab(page, 'Programme').click();
+    await expect(page).toHaveURL(`${baseURL}${ESPACE}/programme`);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Programme');
+    await expect(page.getByRole('heading', { level: 3, name: 'Accueil et ouverture' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Prendre RDV' }).first()).toHaveAttribute('href', `${ESPACE}/annuaire`);
+    await capture(page, 'E8');
+
+    const sections = page.getByRole('navigation', { name: 'Sections du programme' });
+    await sections.getByRole('link', { name: 'Intervenants' }).click();
+    await expect(page).toHaveURL(/#intervenants$/);
+    await expect(page.getByRole('link', { name: /Hélène Marquès/ })).toHaveAttribute('href', new RegExp(`${ESPACE}/annuaire/p/`));
+    await sections.getByRole('link', { name: 'Infos pratiques' }).click();
+    await expect(page.getByRole('heading', { level: 3, name: 'Salle de recette (lieu fictif)' })).toBeVisible();
+  });
+
+  consoleWatch.expectClean();
+});
+
+test('Léa accepte la demande d’Inès : e-mail meeting-accepted avec .ics, rendez-vous confirmé à la table 1 (F-60, T-15, I-41, A-33)', async ({ page }) => {
+  await openSpace(page, LEA);
+  await expect(tab(page, 'Agenda')).toHaveAccessibleName(/1 demande reçue en attente/);
+
+  await tab(page, 'Agenda').click();
+  await hydrated(page);
+  const received = page.getByRole('region', { name: 'Demandes reçues' });
+  await expect(received).toContainText('Inès Castaing');
+  const before = readOutbox().length;
+  await received.getByRole('button', { name: /^Accepter/ }).click();
+
+  await expect(page.getByRole('status').filter({ hasText: 'Rendez-vous confirmé' })).toHaveText('Rendez-vous confirmé avec Inès Castaing, Table 1, 13h00.');
+  await expect(page.getByRole('region', { name: 'Demandes reçues' })).toHaveCount(0);
+  const day = page.getByRole('region', { name: /^Mes rendez-vous/ });
+  await expect(day).toContainText('Inès Castaing');
+  await expect(day.locator('li', { hasText: /Inès Castaing/ }).first()).toContainText('Table 1');
+  await capture(page, 'E6-apres-acceptation');
+
+  // L'e-mail part après la transaction, avec le .ics en pièce jointe (I-41) ; Léa, qui a répondu, n'en reçoit pas.
+  const [mail] = await waitForMails(INES, `Rendez-vous confirmé${NBSP}:`);
+  expect(mail.subject).toBe(`Rendez-vous confirmé${NBSP}: jeudi 3 décembre à 13h00`);
+  expect(mail.attachments, 'une seule pièce jointe').toHaveLength(1);
+  expect(mail.attachments![0].filename).toBe('rendez-vous.ics');
+  const ics = Buffer.from(mail.attachments![0].content, 'base64').toString('utf8');
+  expect(ics.startsWith('BEGIN:VCALENDAR\r\n')).toBe(true);
+  expect(ics).toContain('DTSTART;TZID=Europe/Paris:20261203T130000');
+  expect(ics).toContain('LOCATION:Table 1');
+  expect(ics).not.toMatch(/@example\.org/);
+  expect(readOutbox().slice(before).filter((sent) => sent.to.email === LEA && sent.subject.startsWith('Rendez-vous confirmé'))).toEqual([]);
+
+  // Le fichier .ics de Léa (bouton « Calendrier ») contient ses rendez-vous acceptés, dont celui-ci.
+  const calendar = await page.request.get(await page.getByRole('link', { name: 'Calendrier' }).getAttribute('href') as string);
+  expect(calendar.status()).toBe(200);
+  expect(calendar.headers()['content-type']).toContain('text/calendar');
+  expect(await calendar.text()).toContain('DTSTART;TZID=Europe/Paris:20261203T130000');
+});
+
+test('Inès retrouve le rendez-vous accepté dans son agenda et sur son accueil (F-22, F-64)', async ({ page }) => {
+  await openSpace(page, INES);
+  const next = page.getByRole('region', { name: 'Prochain rendez-vous' });
+  await expect(next).toContainText('13h00');
+  await expect(next).toContainText('Table 1');
+  await expect(next).toContainText('Léa Ducasse');
+  await expect(next).toContainText('Confirmé');
+
+  await tab(page, 'Agenda').click();
+  await hydrated(page);
+  await expect(page.getByRole('region', { name: 'Demandes envoyées' })).toHaveCount(0);
+  const day = page.getByRole('region', { name: /^Mes rendez-vous/ });
+  await expect(day).toContainText('Léa Ducasse');
+  await expect(day).toContainText('Confirmé');
+  await expect(day.getByRole('button', { name: /^Annuler le rendez-vous/ })).toBeVisible();
+});
+
+test('un participant réserve un créneau libre de la table 2 d’Antoine, confirmée d’emblée, avec e-mails aux deux (R-19, A-29, A-33)', async ({ page }) => {
+  await openSpace(page, NATHAN);
+  await tab(page, 'Annuaire').click();
+  await hydrated(page);
+  await page.getByRole('searchbox', { name: /Rechercher un profil/ }).fill('Vergnes');
+  await page.getByRole('link', { name: /Antoine Vergnes/ }).click();
+  await hydrated(page);
+
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Antoine Vergnes');
+  await expect(page.getByRole('heading', { level: 2, name: /^Réserver un créneau, jeudi 3 décembre$/ })).toBeVisible();
+  await expect(page.getByText('Table 2, confirmée dès la réservation')).toBeVisible();
+  await expect(page.getByLabel(/Un mot pour présenter votre demande/)).toHaveCount(0);
+
+  // Hugo a déjà réservé 10h45 (seed) : le créneau est barré et annoncé « indisponible » (F-50).
+  const taken = slotButton(page, '10h45');
+  await expect(taken).toHaveAttribute('aria-disabled', 'true');
+  await expect(taken).toContainText('indisponible');
+  await capture(page, 'E5-table-dediee');
+
+  await slotButton(page, '11h00').click();
+  const before = readOutbox().length;
+  await page.getByRole('button', { name: 'Réserver 11h00' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Réservation confirmée' })).toContainText('Réservation confirmée : Table 2, 11h00.');
+  await expect(slotButton(page, '11h00')).toContainText('Confirmé');
+
+  // Les deux parties reçoivent `meeting-accepted` (A-33) ; celui du demandeur porte le .ics.
+  const [forNathan] = await waitForMails(NATHAN, `Rendez-vous confirmé${NBSP}:`);
+  expect(forNathan.attachments?.[0]?.filename).toBe('rendez-vous.ics');
+  const [forAntoine] = await waitForMails(ANTOINE, `Rendez-vous confirmé${NBSP}:`);
+  expect(forAntoine.subject).toContain('11h00');
+  expect(readOutbox().length).toBeGreaterThan(before);
+
+  await tab(page, 'Agenda').click();
+  await hydrated(page);
+  const card = page.getByRole('region', { name: /^Mes rendez-vous/ }).locator('li', { hasText: /Antoine Vergnes/ }).first();
+  await expect(card).toContainText('Table 2');
+  await expect(card).toContainText('Confirmé');
+});
+
+test('un second participant voit le créneau réservé de la table 2 barré (T-25)', async ({ page }) => {
+  await openSpace(page, MANON);
+  await tab(page, 'Annuaire').click();
+  await hydrated(page);
+  await page.getByRole('searchbox', { name: /Rechercher un profil/ }).fill('Vergnes');
+  await page.getByRole('link', { name: /Antoine Vergnes/ }).click();
+  await hydrated(page);
+  for (const time of ['10h45', '11h00']) {
+    await expect(slotButton(page, time)).toHaveAttribute('aria-disabled', 'true');
+    await expect(slotButton(page, time)).toContainText('indisponible');
+  }
+  await expect(page.getByRole('button', { name: 'Choisissez un créneau' })).toBeDisabled();
+});
+
+test('Manon envoie une demande à Mathis puis l’annule (F-52, F-63, I-31)', async ({ page }) => {
+  await openSpace(page, MANON);
+  await tab(page, 'Annuaire').click();
+  await hydrated(page);
+  await page.getByRole('searchbox', { name: /Rechercher un profil/ }).fill('Lagrange');
+  await page.getByRole('link', { name: /Mathis Lagrange/ }).click();
+  await hydrated(page);
+
+  await slotButton(page, '13h30').click();
+  await page.getByLabel(/Un mot pour présenter votre demande/).fill('Bonjour Mathis, un point sur vos panneaux ?');
+  await page.getByRole('button', { name: 'Envoyer la demande pour 13h30' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Demande envoyée à Mathis' })).toContainText('Demande envoyée à Mathis');
+  await expect(slotButton(page, '13h30')).toContainText('Demande envoyée');
+
+  const [mail] = await waitForMails(MATHIS, `Demande de rendez-vous${NBSP}:`);
+  expect(mail.subject).toBe(`Demande de rendez-vous${NBSP}: Manon Bordenave`);
+  expect(mail.text).toContain('Bonjour Mathis, un point sur vos panneaux ?');
+  expect(mail.text.match(/https?:\/\/[^\s"'<>)]+\/espace\/verifier\?[^\s"'<>)]+/g)).toHaveLength(2);
+
+  await tab(page, 'Agenda').click();
+  await hydrated(page);
+  const sent = page.getByRole('region', { name: 'Demandes envoyées' });
+  await expect(sent).toContainText('Mathis Lagrange');
+  await expect(sent).toContainText('En attente de réponse');
+  await sent.getByRole('button', { name: /^Annuler la demande/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Annuler cette demande ?' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Oui, annuler la demande' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'annulée' })).toHaveText('Demande à Mathis Lagrange annulée.');
+  await expect(page.getByRole('region', { name: 'Demandes envoyées' })).toHaveCount(0);
+  await expect(page.locator('details').filter({ hasText: 'Historique (1)' })).toContainText('Annulé');
+});
+
+test('Léa écrit à Mathis : le message apparaît dans le fil et dans la liste (F-70, F-72)', async ({ page }) => {
+  await openSpace(page, LEA);
+  await tab(page, 'Messages').click();
+  await page.getByRole('main').getByRole('listitem').filter({ hasText: 'Mathis Lagrange' }).getByRole('link').click();
+  await hydrated(page);
+
+  const log = page.getByRole('log', { name: 'Messages' });
+  await expect(log.getByRole('listitem').filter({ hasText: 'J’apporterai nos échantillons de panneaux.' })).toBeVisible();
+  const draft = page.getByRole('textbox', { name: 'Votre message' });
+  await draft.fill('Merci Mathis, j’apporte les plans à 10h45.');
+  await page.getByRole('button', { name: 'Envoyer' }).click();
+
+  await expect(log.getByRole('listitem').filter({ hasText: 'Merci Mathis, j’apporte les plans à 10h45.' })).toContainText('Envoyé');
+  await expect(draft).toHaveValue('');
+  await page.reload();
+  await expect(page.getByRole('log', { name: 'Messages' }).getByRole('listitem').filter({ hasText: 'Merci Mathis, j’apporte les plans à 10h45.' })).toBeVisible();
+
+  await tab(page, 'Messages').click();
+  const first = page.getByRole('main').getByRole('listitem').first();
+  await expect(first).toContainText('Mathis Lagrange');
+  await expect(first).toContainText(`Vous${NBSP}: Merci Mathis, j’apporte les plans à 10h45.`);
+});
+
+test('Mathis reçoit le message de Léa, avec le badge de l’onglet Messages (F-24, F-70)', async ({ page }) => {
+  await openSpace(page, MATHIS);
+  await expect(tab(page, 'Messages')).toHaveAccessibleName(/^Messages\s*,\s*1 message non lu$/);
+  await tab(page, 'Messages').click();
+  const row = page.getByRole('main').getByRole('listitem').first();
+  await expect(row).toContainText('Léa Ducasse');
+  await expect(row).toContainText('Merci Mathis, j’apporte les plans à 10h45.');
+  await row.getByRole('link').click();
+  await hydrated(page);
+  await expect(page.getByRole('log', { name: 'Messages' }).getByRole('listitem').filter({ hasText: 'Merci Mathis, j’apporte les plans à 10h45.' })).toBeVisible();
+  await tab(page, 'Accueil').click();
+  await expect(tab(page, 'Messages')).toHaveAccessibleName('Messages');
+});
+
+test('l’organisateur ouvre E9 : indicateurs égaux aux comptes de l’API, aucun contenu de message, synchronisation sur le faux (F-90, R-63, I-12)', async ({ page, baseURL }) => {
+  const consoleWatch = watchConsole(page);
+  await openSpace(page, ORGANIZER);
+
+  // Première connexion de l'organisateur : E2 (A-26). Le profil provisoire suffit, on valide les choix tels quels.
+  if (page.url().endsWith('/bienvenue')) {
+    await hydrated(page);
+    // Retour de recette du 18/11 : au moins un sujet à l’arrivée.
+    if (!(await page.locator('input[id^="sujet-"]:checked').count()) && (await page.locator('input[id^="sujet-"]').count())) await page.locator('input[id^="sujet-"]').first().check();
+    await page.getByRole('button', { name: 'Continuer' }).click();
+    await page.getByRole('button', { name: 'Continuer sans apparaître' }).click(); // V2-B : confirmation, annuaire décoché
+    await expect(page).toHaveURL(`${baseURL}${ESPACE}/`);
+  }
+  await page.getByRole('link', { name: 'Organisation' }).click();
+  await expect(page).toHaveURL(`${baseURL}${ESPACE}/organisateur`);
+  await hydrated(page);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Pilotage de l’édition');
+  await expect(page.getByText('Jeudi 3 décembre 2026 à Bordeaux')).toBeVisible();
+
+  // Les mêmes chiffres que l'API (comptes en base) : participants, rendez-vous, messages.
+  const stats = await (await page.request.get(`${STRAPI_URL}/api/espace/admin/nouvelle-aquitaine-test/stats`)).json();
+  const indicator = (label: string) => page.getByRole('heading', { level: 3, name: label }).locator('xpath=ancestor::li[1]');
+  await expect(indicator('Inscrits importés')).toContainText(String(stats.attendees.active));
+  await expect(indicator('Inscrits importés')).toContainText('inscription annulée');
+  expect(stats.attendees.active).toBe(16);
+  expect(stats.attendees.cancelled).toBe(1);
+  await expect(indicator('Annuaire')).toContainText(String(stats.directoryOptIn));
+  await expect(indicator('Rendez-vous')).toContainText(String(stats.meetings.accepted + stats.meetings.pending));
+  await expect(indicator('Messages')).toContainText(String(stats.messages));
+  expect(stats.messages).toBeGreaterThanOrEqual(5);
+  expect(stats.meetings.accepted).toBeGreaterThanOrEqual(5);
+  await expect(page.getByRole('heading', { level: 2, name: 'Exposants les plus sollicités' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Avertissements' }).or(page.getByText('Aucun avertissement.'))).toBeVisible();
+  await capture(page, 'E9');
+
+  // R-63 : ni la page ni les statistiques ne contiennent le texte d'un message.
+  const page_text = await page.locator('main').innerText();
+  expect(page_text).not.toContain('échantillons');
+  expect(page_text).not.toContain('plans à 10h45');
+  expect(JSON.stringify(stats)).not.toContain('échantillons');
+
+  // Synchronisation sur le faux HelloAsso (démarré par le serveur e2e) : rien à créer, rien à mettre à jour, rien à annuler.
+  // Les fichiers du pilotage lancent aussi des synchronisations : l'historique grandit de une, il ne vaut pas forcément 1.
+  const historyBefore = Number((await page.locator('details').filter({ hasText: 'Historique des synchronisations' }).locator('summary').innerText()).match(/\((\d+)\)/)?.[1] ?? 0);
+  await page.getByRole('button', { name: 'Synchroniser maintenant' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Synchronisation terminée' })).toHaveText(/Synchronisation terminée\s*:\s*0\s+inscrit\s+créé,\s*0\s+mis\s+à\s+jour,\s*0\s+annulé\./);
+  const history = page.locator('details').filter({ hasText: 'Historique des synchronisations' });
+  await expect(history.locator('summary')).toContainText(`Historique des synchronisations (${historyBefore + 1})`);
+  await history.locator('summary').click();
+  await expect(history.getByRole('table').locator('tbody tr').first().locator('td')).toHaveText(['0', '0', '0', '0']);
+  consoleWatch.expectClean();
+});
+
+/**
+ * E9, bouton « Régénérer les créneaux » (F-94, R-02). Les pauses B2B se changent par le Document Service (programme.ts) : l'admin de
+ * Strapi n'est pas construit dans les tests. Les tests se suivent et chacun part de l'état laissé par le précédent ; `reset` remet le
+ * programme du seed et régénère les créneaux à la fin, pour les tests qui suivent dans ce fichier et dans les autres.
+ */
+test.describe('E9 : régénérer les créneaux (F-94, R-02)', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  const CAFE = `${TEST_PAUSE_PREFIX} Café B2B`;
+  const REGENERATE = /^(Régénérer les créneaux|Régénération en cours…)$/;
+
+  test.afterAll(() => {
+    test.setTimeout(120_000);
+    editProgram({ op: 'reset' });
+  });
+
+  // Strapi limite les liens de connexion à 5 par adresse et par 15 minutes (NF-03) : le premier test ouvre la session de l'organisateur,
+  // les suivants en reprennent le cookie plutôt que de redemander un lien.
+  let session: Awaited<ReturnType<BrowserContext['cookies']>> | undefined;
+
+  /** Ouvre E9 en organisateur et rend la carte « Rendez-vous par pause B2B », son bouton et ses deux zones de message. */
+  async function openCard(page: Page, baseURL: string | undefined) {
+    if (session) {
+      await page.context().addCookies(session);
+    } else {
+      await openSpace(page, ORGANIZER);
+      if (page.url().endsWith('/bienvenue')) {
+        await hydrated(page);
+        // Retour de recette du 18/11 : au moins un sujet à l’arrivée.
+        if (!(await page.locator('input[id^="sujet-"]:checked').count()) && (await page.locator('input[id^="sujet-"]').count())) await page.locator('input[id^="sujet-"]').first().check();
+        await page.getByRole('button', { name: 'Continuer' }).click();
+        await page.getByRole('button', { name: 'Continuer sans apparaître' }).click(); // V2-B : confirmation, annuaire décoché
+        await expect(page).toHaveURL(`${baseURL}${ESPACE}/`);
+      }
+      session = await page.context().cookies();
+    }
+    await page.goto(`${ESPACE}/organisateur`);
+    await hydrated(page);
+    const card = page.getByRole('heading', { level: 2, name: 'Rendez-vous par pause B2B' }).locator('xpath=ancestor::section[1]');
+    return {
+      card,
+      button: card.getByRole('button', { name: REGENERATE }),
+      status: card.getByRole('status'),
+      alert: card.getByRole('alert'),
+      groups: card.getByRole('heading', { level: 3 }),
+    };
+  }
+
+  type SlotFill = { sessionTitle: string; label: string; accepted: number; pending: number };
+  const slotsOf = async (page: Page): Promise<SlotFill[]> => (await (await page.request.get(`${STRAPI_URL}/api/espace/admin/${EDITION}/stats`)).json()).slots;
+
+  /** Même accord que `plural` de l'espace : zéro au singulier, espace insécable entre le nombre et le mot. */
+  const plural = (count: number, one: string, many = `${one}s`) => `${count}${NBSP}${count < 2 ? one : many}`;
+  /** Le message d'état tel que le serveur d'E9 l'écrit, espace insécable avant les deux-points comprise. */
+  const regenerated = (created: number, kept: number, removed: number) =>
+    `Créneaux régénérés${NBSP}: ${plural(created, 'créneau créé', 'créneaux créés')}, ${plural(kept, 'conservé')}, ${plural(removed, 'supprimé')}.`;
+  /** Ligne d'une pause écartée : guillemets et deux-points précédés d'une espace insécable. */
+  const discarded = (title: string, reason: string) => `«${NBSP}${title}${NBSP}»${NBSP}: ${reason}, aucun créneau.`;
+  const orphaned = (label: string, meetings: number) =>
+    `Le créneau de ${label} ne correspond plus à aucune pause, mais porte encore ${meetings}${NBSP}rendez-vous accepté${meetings > 1 ? 's' : ''} ou en attente${NBSP}: il est conservé.`;
+  const textOf = (locator: Locator) => () => locator.textContent();
+  /** F-122 : dès qu'il y a des créneaux à créer ou à supprimer, la régénération attend la confirmation du dialogue. */
+  const confirm = (page: Page) => page.getByRole('alertdialog').getByRole('button', { name: 'Confirmer la régénération' }).click();
+
+  test('le seed est à jour : « 0 créneau créé, 10 conservés, 0 supprimé », rien ne bouge et le bouton se libère (F-94, R-02)', async ({ page, baseURL }) => {
+    const { button, status, alert, groups } = await openCard(page, baseURL);
+    const titles = ['Pause et B2B, 10h45 (2 créneaux)', 'Cocktail déjeunatoire & B2B, 12h30 (6 créneaux)', 'Pause et B2B, 15h30 (2 créneaux)'];
+    await expect(groups).toHaveText(titles);
+    const before = await slotsOf(page);
+    expect(before).toHaveLength(10);
+    await expect(status).toHaveCount(0);
+
+    await button.click();
+    await expect.poll(textOf(status)).toBe(regenerated(0, 10, 0));
+    await expect(alert).toHaveCount(0);
+    await expect(button).toBeEnabled();
+    await expect(button).toHaveText('Régénérer les créneaux');
+    await expect(groups).toHaveText(titles);
+    expect(await slotsOf(page)).toEqual(before);
+  });
+
+  test('une pause B2B ajoutée dans Strapi : ses créneaux sont créés et la carte les montre sans recharger la page (F-94, R-01, R-02)', async ({ page, baseURL }) => {
+    test.setTimeout(120_000);
+    const { button, status, alert, groups } = await openCard(page, baseURL);
+    const before = (await slotsOf(page)).length;
+    await expect(groups).toHaveCount(3);
+
+    editProgram({ op: 'create-sequence', data: { title: CAFE, start_time: '9h00', end_time: '9h30', kind: 'b2b_break', order: 100 } });
+    await expect(groups).toHaveCount(3);
+
+    await button.click();
+    await confirm(page);
+    await expect.poll(textOf(status)).toBe(regenerated(2, before, 0));
+    await expect(alert).toHaveCount(0);
+    await expect(groups).toHaveCount(4);
+    await expect(groups.first()).toHaveText(`${CAFE}, 9h00 (2 créneaux)`);
+    expect(await slotsOf(page)).toHaveLength(before + 2);
+  });
+
+  test('la même pause raccourcie : le créneau en trop est supprimé, les autres sont conservés (F-94, R-02)', async ({ page, baseURL }) => {
+    test.setTimeout(120_000);
+    const { button, status, alert, groups } = await openCard(page, baseURL);
+    const before = (await slotsOf(page)).length;
+    await expect(groups.first()).toHaveText(`${CAFE}, 9h00 (2 créneaux)`);
+
+    editProgram({ op: 'update-sequence', match: { title: CAFE }, data: { end_time: '9h15' } });
+    await button.click();
+    await confirm(page);
+    await expect.poll(textOf(status)).toBe(regenerated(0, before - 1, 1));
+    await expect(alert).toHaveCount(0);
+    await expect(groups.first()).toHaveText(`${CAFE}, 9h00 (1 créneau)`);
+    expect(await slotsOf(page)).toHaveLength(before - 1);
+  });
+
+  test('une pause sans heure de fin est écartée : alerte avec son motif, son créneau supprimé (F-94, R-01)', async ({ page, baseURL }) => {
+    test.setTimeout(120_000);
+    const { button, status, alert, groups } = await openCard(page, baseURL);
+    const before = (await slotsOf(page)).length;
+
+    editProgram({ op: 'update-sequence', match: { title: CAFE }, data: { end_time: null } });
+    await button.click();
+    await confirm(page);
+    await expect.poll(textOf(alert.locator('p'))).toBe(regenerated(0, before - 1, 1));
+    expect(await alert.locator('li').allTextContents()).toEqual([discarded(CAFE, 'pas d’heure de fin')]);
+    await expect(status).toHaveCount(0);
+    await expect(groups).toHaveCount(3);
+    expect(await slotsOf(page)).toHaveLength(before - 1);
+  });
+
+  test('les autres motifs d’écart : plus courte qu’un créneau, chevauchement d’une autre pause (F-94, R-01)', async ({ page, baseURL }) => {
+    test.setTimeout(120_000);
+    const { button, status, alert } = await openCard(page, baseURL);
+    const before = (await slotsOf(page)).length;
+    const tooShort = `${TEST_PAUSE_PREFIX} Trop courte`;
+    const overlapping = `${TEST_PAUSE_PREFIX} Chevauchement`;
+
+    editProgram(
+      { op: 'create-sequence', data: { title: tooShort, start_time: '9h00', end_time: '9h10', kind: 'b2b_break' } },
+      // « Pause et B2B » de 10h45 à 11h15 est antérieure : c'est celle-là qui garde ses créneaux.
+      { op: 'create-sequence', data: { title: overlapping, start_time: '10h50', end_time: '11h10', kind: 'b2b_break' } },
+    );
+    await button.click();
+    await expect.poll(textOf(alert.locator('p'))).toBe(regenerated(0, before, 0));
+    expect((await alert.locator('li').allTextContents()).sort()).toEqual(
+      [
+        discarded(CAFE, 'pas d’heure de fin'),
+        discarded(tooShort, 'plus courte qu’un créneau'),
+        discarded(overlapping, 'chevauche une autre pause B2B'),
+      ].sort(),
+    );
+    await expect(status).toHaveCount(0);
+    expect(await slotsOf(page)).toHaveLength(before);
+  });
+
+  test('une heure illisible sur une pause B2B est refusée à l’enregistrement, « 9:15 » est lisible (R-86)', async () => {
+    test.setTimeout(120_000);
+    const title = `${TEST_PAUSE_PREFIX} Heures illisibles`;
+    expect(() => editProgram({ op: 'create-sequence', data: { title, start_time: '9.15', end_time: '9h45', kind: 'b2b_break' } })).toThrow(/pas lisible/);
+    // Écriture tolérante : acceptée, puis supprimée pour ne pas changer les créneaux des tests suivants.
+    editProgram({ op: 'create-sequence', data: { title, start_time: '9:15', end_time: '9:45', kind: 'b2b_break' } }, { op: 'delete-sequences', titlePrefix: title });
+  });
+
+  test('un créneau qui porte un rendez-vous n’est jamais supprimé : alerte « il est conservé », même au second clic (F-94, R-02)', async ({ page, baseURL }) => {
+    test.setTimeout(120_000);
+    const { button, status, alert, groups } = await openCard(page, baseURL);
+    const before = await slotsOf(page);
+    expect(before).toHaveLength(10);
+    // Seed : un rendez-vous en attente à 15h45. Raccourcir la pause de 15h30 (16h00 devient 15h45) laisse ce créneau sans pause.
+    expect(before.find(({ label }) => label === '15h45')?.pending).toBeGreaterThanOrEqual(1);
+
+    editProgram(
+      { op: 'delete-sequences', titlePrefix: TEST_PAUSE_PREFIX },
+      { op: 'update-sequence', match: { title: 'Pause et B2B', start_time: '15h30' }, data: { end_time: '15h45' } },
+    );
+    for (const click of [1, 2]) {
+      await button.click();
+      await expect.poll(textOf(alert.locator('p')), { message: `clic ${click}` }).toBe(regenerated(0, before.length - 1, 0));
+      expect(await alert.locator('li').allTextContents(), `clic ${click}`).toEqual([orphaned('15h45', 1)]);
+      await expect(status).toHaveCount(0);
+      await expect(groups.last()).toHaveText('Pause et B2B, 15h30 (2 créneaux)');
+      expect(await slotsOf(page)).toHaveLength(before.length);
+    }
+  });
+
+  test('l’édition publiée n’a pas de date : le message du serveur (409) s’affiche et le bouton se libère (F-94)', async ({ page, baseURL }) => {
+    test.setTimeout(120_000);
+    const { button, status, alert } = await openCard(page, baseURL);
+    editProgram({ op: 'update-edition', data: { date: null } });
+    try {
+      await button.click();
+      await expect(alert).toHaveText('L’édition publiée n’a pas de date.');
+      await expect(status).toHaveCount(0);
+      await expect(button).toBeEnabled();
+      await expect(button).toHaveText('Régénérer les créneaux');
+    } finally {
+      editProgram({ op: 'update-edition', data: { date: '2026-12-03' } });
+    }
+  });
+
+  test('le serveur ne répond pas : message générique, bouton libéré (F-94)', async ({ page, baseURL }) => {
+    const { button, status, alert } = await openCard(page, baseURL);
+    await page.route('**/api/espace/admin/*/slots/regenerate', (route) => route.abort('failed'));
+    await button.click();
+    await expect(alert).toHaveText('Les créneaux n’ont pas pu être régénérés. Vérifiez votre connexion et réessayez.');
+    await expect(status).toHaveCount(0);
+    await expect(button).toBeEnabled();
+  });
+
+  test('session expirée : le clic renvoie vers la connexion (F-94)', async ({ page, baseURL }) => {
+    const { button } = await openCard(page, baseURL);
+    // Les autres îlots du pilotage chargent leurs données au montage : sur un poste lent (CI), leurs requêtes partent après
+    // l'effacement des cookies, reçoivent 401 et renvoient vers la connexion avant le clic. On attend qu'elles soient terminées.
+    await page.waitForLoadState('networkidle');
+    await page.context().clearCookies();
+    await button.click();
+    await expect(page).toHaveURL(/\/connexion\?next=%2Fespace%2F[^&]+%2Forganisateur&expire=1$/);
+    expect(new URL(page.url()).pathname).toBe(`${ESPACE}/connexion`);
+    await expect(page.getByText('Votre session a expiré')).toBeVisible();
+  });
+});
+
+test('T-42 : un participant sur /organisateur reçoit 403 « Accès réservé » ; l’API des statistiques aussi', async ({ page }) => {
+  await openSpace(page, CLARA);
+  const response = await page.goto(`${ESPACE}/organisateur`);
+  expect(response?.status()).toBe(403);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Accès réservé');
+  await expect(page.getByText('Le tableau de bord est réservé aux organisateurs de l’édition.')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Organisation' })).toHaveCount(0);
+  await expect(page.getByText('Inscrits importés')).toHaveCount(0);
+
+  const api = await page.request.get(`${STRAPI_URL}/api/espace/admin/nouvelle-aquitaine-test/stats`);
+  expect(api.status()).toBe(403);
+});
+
+test('E8 est public : programme sans session, sans JavaScript, « Prendre RDV » vers E0, intervenants sans lien (F-80, F-81, NF-31)', async ({ browser, baseURL }) => {
+  const context = await browser.newContext({ baseURL, javaScriptEnabled: false });
+  try {
+    await context.route((url) => !['127.0.0.1', 'localhost'].includes(url.hostname), (route) => route.abort());
+    const page = await context.newPage();
+    const response = await page.goto(`${ESPACE}/programme`);
+    expect(response?.status()).toBe(200);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Programme');
+    await expect(page.getByRole('navigation', { name: 'Espace participant' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { level: 3, name: 'Forêt et adaptation' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Prendre RDV' }).first()).toHaveAttribute('href', `${ESPACE}/connexion`);
+
+    await page.getByRole('navigation', { name: 'Sections du programme' }).getByRole('link', { name: 'Intervenants' }).click();
+    await expect(page).toHaveURL(/#intervenants$/);
+    await expect(page.locator('#intervenants').getByText('Hélène Marquès')).toBeVisible();
+    await expect(page.getByRole('link', { name: /Hélène Marquès/ })).toHaveCount(0);
+    const html = await (await page.request.get(`${ESPACE}/programme`)).text();
+    expect(html).not.toMatch(/@example\.org/);
+  } finally {
+    await context.close();
+  }
+});

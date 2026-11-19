@@ -1,0 +1,43 @@
+{
+  "kind": "collectionType",
+  "collectionName": "espace_sync_runs",
+  "info": {
+    "singularName": "sync-run",
+    "pluralName": "sync-runs",
+    "displayName": "Synchronisation HelloAsso (espace participant)",
+    "description": "Historique des synchronisations des inscriptions HelloAsso."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "edition": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::edition.edition",
+      "required": true
+    },
+    "startedAt": {
+      "type": "datetime",
+      "required": true
+    },
+    "endedAt": {
+      "type": "datetime"
+    },
+    "created": {
+      "type": "integer",
+      "default": 0
+    },
+    "updated": {
+      "type": "integer",
+      "default": 0
+    },
+    "cancelled": {
+      "type": "integer",
+      "default": 0
+    },
+    "errors": {
+      "type": "json"
+    }
+  }
+}

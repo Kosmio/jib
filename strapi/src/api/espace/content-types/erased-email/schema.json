@@ -1,0 +1,34 @@
+{
+  "kind": "collectionType",
+  "collectionName": "espace_erased_emails",
+  "info": {
+    "singularName": "erased-email",
+    "pluralName": "erased-emails",
+    "displayName": "Empreinte d’e-mail effacé (espace participant)",
+    "description": "Empreinte salée de l’adresse d’une personne qui a demandé l’effacement de ses données ; l’import HelloAsso ignore ses billets (R-44)."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "pluginOptions": {
+    "content-manager": { "visible": false },
+    "content-type-builder": { "visible": false }
+  },
+  "attributes": {
+    "edition": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::edition.edition",
+      "required": true
+    },
+    "emailHash": {
+      "type": "string",
+      "required": true,
+      "private": true
+    },
+    "erasedAt": {
+      "type": "datetime",
+      "required": true
+    }
+  }
+}

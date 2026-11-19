@@ -1,0 +1,102 @@
+---
+// Carte d'un participant, ouverte par le QR code de son badge (F-95, F-96, R-80 à R-84, NF-54, NF-57). Publique : rendu serveur, sans JavaScript,
+// aucune ressource tierce. Profil visible : fiche R-42 (jamais l'e-mail ni le téléphone) ; sinon carte réduite (nom, fonction, entreprise, type).
+// Jeton inconnu, régénéré, périmé ou participant annulé : une seule page, « Cette carte n'est plus valable » (404), sans rien révéler de plus.
+// Un visiteur déjà connecté va directement à la fiche de l'annuaire si R-41 l'autorise (F-96), sinon il reste ici.
+import EspaceLayout from "../../../../layouts/EspaceLayout.astro";
+import EditionBanner from "../../../../components/espace/EditionBanner.astro";
+import EspaceCard from "../../../../components/espace/EspaceCard.astro";
+import EspaceButton from "../../../../components/espace/EspaceButton.astro";
+import { Avatar, tagOf } from "../../../../react-components/espace/ProfileCardView";
+import type { ProfileCard } from "../../../../react-components/espace/ProfileCardView";
+import { espaceGet, publicStrapiUrl } from "../../../../lib/espace/api";
+import type { EspaceEdition } from "../../../../lib/espace/api";
+import { editionLine } from "../../../../lib/espace/format";
+
+type Card = ProfileCard & {
+  firstName: string;
+  lastName: string;
+  jobTitle: string | null;
+  company: string | null;
+  type: string;
+  typeLabel: string;
+  reduced: boolean;
+  bio?: string | null;
+};
+type CardResponse = { edition: Pick<EspaceEdition, "slug" | "title" | "date" | "city" | "themeColor"> & { readOnly?: boolean }; card: Card };
+
+const slug = Astro.params.edition ?? "";
+const token = Astro.params.token ?? "";
+const base = `/espace/${encodeURIComponent(slug)}`;
+const cookie = Astro.request.headers.get("cookie");
+
+// NF-57, F-95 : en-têtes de la page. Le middleware (src/middleware.ts) réécrit Referrer-Policy après la page : voir le compte rendu du lot V4-D1.
+Astro.response.headers.set("Cache-Control", "private, no-store");
+Astro.response.headers.set("Referrer-Policy", "strict-origin");
+Astro.response.headers.set("X-Robots-Tag", "noindex");
+
+// NF-54 : la limite de débit de Strapi compte par visiteur. Astro.clientAddress n'est l'IP du visiteur que si security.allowedDomains est réglé :
+// on lit la dernière entrée de X-Forwarded-For (ajoutée par Traefik, un client ne peut pas la forger), à défaut l'adresse de la connexion.
+const visitorIp = Astro.request.headers.get("x-forwarded-for")?.split(",").at(-1)?.trim() || Astro.clientAddress;
+const result = await espaceGet<CardResponse>(`/cards/${encodeURIComponent(slug)}/${encodeURIComponent(token)}`, null, visitorIp);
+if (!result.ok && result.status !== 404 && result.status !== 429) throw new Error(`GET /cards : ${result.status}`);
+const found = result.ok ? result.data : null;
+if (!result.ok) Astro.response.status = result.status === 429 ? 429 : 404;
+const card = found?.card ?? null;
+
+// F-96 : session valable pour cette édition et fiche permise par R-41 (la réponse 200 de l'annuaire) : retour direct à la fiche.
+const profilePath = card ? `${base}/annuaire/p/${encodeURIComponent(card.id)}` : "";
+if (card && cookie) {
+  const allowed = await espaceGet(`/directory/p/${encodeURIComponent(card.id)}`, cookie).catch(() => null);
+  if (allowed?.ok) return Astro.redirect(profilePath, 303);
+}
+// F-96, R-41 : une carte réduite (profil masqué) n'a pas de fiche dans l'annuaire pour un autre participant : retour à l'accueil de l'édition.
+const loginHref = `${base}/connexion?next=${encodeURIComponent(card?.reduced ? `${base}/` : profilePath)}`;
+const tag = card ? tagOf(card) : null;
+---
+
+<EspaceLayout title={card ? card.displayName : "Carte non valable"} themeColor={found?.edition.themeColor}>
+  {
+    card && found ? (
+      <>
+        <EditionBanner title={found.edition.title} subtitle={editionLine(found.edition)} themeColor={found.edition.themeColor} readOnly={found.edition.readOnly} />
+        <EspaceCard>
+          <div class="flex items-center gap-4">
+            <span class="inline-flex shrink-0 rounded-full border-4 border-gold p-1">
+              <Avatar card={card} strapiUrl={publicStrapiUrl} size="size-20" />
+            </span>
+            <div class="min-w-0">
+              <h1 class="font-heading text-2xl leading-tight font-bold normal-case">{card.displayName}</h1>
+              {card.jobTitle && <p class="mt-1 text-lg leading-snug text-muted">{card.jobTitle}</p>}
+              {card.company && <p class="text-lg leading-snug font-bold text-ink">{card.company}</p>}
+            </div>
+          </div>
+          <ul class="mt-4 flex flex-wrap gap-2">
+            <li class={`rounded-md px-2 py-1 text-sm font-bold ${tag?.classes}`}>{card.typeLabel}</li>
+            {card.standNumber && <li class="rounded-md bg-surface px-2 py-1 text-sm font-bold text-ink">Stand {card.standNumber}</li>}
+          </ul>
+          {card.bio && <p class="mt-4 text-lg text-ink">{card.bio}</p>}
+          {(card.topics ?? []).length > 0 && (
+            <ul aria-label="Sujets" class="mt-4 flex flex-wrap gap-2">
+              {card.topics.map((topic) => (
+                <li class="rounded-full bg-surface px-3 py-1 text-sm font-semibold text-title">{topic.name}</li>
+              ))}
+            </ul>
+          )}
+          <EspaceButton variant="primary" href={loginHref} class="mt-6">
+            Se connecter pour proposer un rendez-vous
+          </EspaceButton>
+        </EspaceCard>
+      </>
+    ) : (
+      <>
+        <EditionBanner title="Journées de l’Innovation Filière Bois" subtitle="Espace participant" />
+        <EspaceCard heading={result.ok ? "" : result.status === 429 ? "Trop de requêtes" : "Cette carte n’est plus valable"}>
+          <p class="mt-3">
+            {result.ok || result.status !== 429 ? "Le badge scanné a été remplacé ou n’est plus actif. Rendez-vous à l’accueil pour en obtenir un nouveau." : "Réessayez dans une minute."}
+          </p>
+        </EspaceCard>
+      </>
+    )
+  }
+</EspaceLayout>

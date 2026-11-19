@@ -3,13 +3,14 @@ import Layout from "../layouts/Layout.astro";
 import Hero from "../components/Hero.astro";
 import { getStaticPageBySlug } from "../lib/strapi";
 import { marked } from "marked";
+import { safeHtml } from "../lib/html";
 
 const page = await getStaticPageBySlug("confidentialite");
 
 const title = page?.title ?? "Politique de confidentialité";
 const subtitle = page?.hero_subtitle || undefined;
 const description = page?.meta_description ?? "Politique de confidentialité et protection des données personnelles.";
-const html = page?.body ? marked.parse(page.body) : null;
+const html = page?.body ? safeHtml(marked.parse(page.body, { async: false }) as string) : null;
 ---
 
 <Layout title={`${title} — Journées de l'Innovation Filière Bois`} description={description}>

@@ -1,0 +1,17 @@
+---
+// Carte blanche qui chevauche le bandeau d'édition, dans la colonne de 720 px (07-design.md).
+// `relative` : sans lui, le bandeau positionné se peindrait par-dessus la carte.
+// Les h1 et h2 d'app.css sont en Azonix capitales : les titres de carte reprennent Sora (phase-1-design.md, section 0).
+export interface Props {
+  heading?: string;
+}
+
+const { heading } = Astro.props;
+---
+
+<div class="relative mx-auto -mt-10 max-w-180 px-4">
+  <section class="rounded-xl border border-surface-alt bg-white p-6">
+    {heading && <h2 class="font-heading text-xl font-semibold normal-case">{heading}</h2>}
+    <slot />
+  </section>
+</div>

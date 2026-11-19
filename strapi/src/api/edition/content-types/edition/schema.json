@@ -70,6 +70,12 @@
       "multiple": false,
       "allowedTypes": ["images"]
     },
+    "programmeImageUrl": {
+      "type": "string"
+    },
+    "programmePdfUrl": {
+      "type": "string"
+    },
     "hero_bg_color": {
       "type": "customField",
       "customField": "plugin::color-picker.color"
@@ -104,6 +110,62 @@
     },
     "testimonials": {
       "type": "richtext"
+    },
+    "participantSpaceEnabled": {
+      "type": "boolean",
+      "default": false,
+      "private": true
+    },
+    "b2bEnabled": {
+      "type": "boolean",
+      "default": true,
+      "private": true
+    },
+    "readOnlyAt": {
+      "type": "datetime",
+      "private": true
+    },
+    "welcomeStartedAt": {
+      "type": "datetime",
+      "private": true
+    },
+    "helloassoOrgSlug": {
+      "type": "string",
+      "private": true
+    },
+    "helloassoFormType": {
+      "type": "enumeration",
+      "enum": ["Event", "Membership", "CrowdFunding", "Donation", "PaymentForm", "Checkout", "Shop"],
+      "default": "Event",
+      "private": true
+    },
+    "helloassoFormSlug": {
+      "type": "string",
+      "private": true
+    },
+    "helloassoFieldMap": {
+      "type": "json",
+      "private": true
+    },
+    "slotDurationMinutes": {
+      "type": "integer",
+      "default": 15,
+      "min": 1,
+      "private": true
+    },
+    "tablesCount": {
+      "type": "integer",
+      "default": 20,
+      "min": 0,
+      "private": true
+    },
+    "meetingRequestsOpenAt": {
+      "type": "datetime",
+      "private": true
+    },
+    "meetingRequestsCloseAt": {
+      "type": "datetime",
+      "private": true
     }
   }
 }

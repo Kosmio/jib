@@ -5,11 +5,33 @@ module.exports = ({ env }) => ({
   app: {
     keys: env.array('APP_KEYS'),
   },
+  // Behind Traefik (dev, prod) the client IP is the last X-Forwarded-For entry (A-04, rate limiting).
+  proxy: { koa: env.bool('IS_PROXIED', false), maxIpsCount: 1 },
+  cron: { enabled: env.bool('CRON_ENABLED', false), tasks: require('./cron-tasks') },
+  // No npm registry lookup on startup (seed, develop, start), and strapi/.strapi-updater.json stays untouched.
+  logger: { updates: { enabled: false } },
   captcha: {
     hmacKey: env('ALTCHA_HMAC_KEY'),
   },
+  espace: {
+    publicUrl: env('PUBLIC_URL', 'http://localhost:4321'),
+    organizerEmails: env.array('ORGANIZER_EMAILS', []).filter(Boolean),
+    // NF-61 : demandes de lien par adresse IP et par fenêtre de 15 min (60 par défaut : un site partagé par un réseau d'entreprise).
+    linkRateIpMax: env.int('LINK_RATE_IP_MAX', 60),
+    corsOrigins: env.array('CORS_ORIGINS', ['http://localhost:4321']).filter(Boolean),
+  },
+  helloasso: {
+    apiBase: env('HELLOASSO_API_BASE', ''),
+    clientId: env('HELLOASSO_CLIENT_ID', ''),
+    clientSecret: env('HELLOASSO_CLIENT_SECRET', ''),
+  },
   email: {
     apiKey: env('EMAIL_API_KEY'),
+    provider: env('EMAIL_PROVIDER'),
+    from: env('EMAIL_FROM'),
+    outboxFile: env('EMAIL_OUTBOX_FILE', '.tmp/mail-outbox.jsonl'),
+    smtpHost: env('SMTP_HOST', ''),
+    smtpPort: env.int('SMTP_PORT', 1025),
     listId: env('EMAIL_LIST_ID'),
     contact: {
       to: env('EMAIL_CONTACT_TO'),

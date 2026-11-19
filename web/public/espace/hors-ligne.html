@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <title>Hors connexion | Espace participant, Journées de l’Innovation Filière Bois</title>
+    <style>
+      /* Page gardée par le service worker et servie sans réseau, donc sans la feuille du site : les valeurs de la charte
+         (07-design.md) sont recopiées ici une seule fois, les polices de l'appareil remplacent Source Sans 3 et Sora. */
+      :root {
+        --surface: #f5f0eb;
+        --surface-alt: #e8dfd4;
+        --ink: #2a3a44;
+        --title: #325062;
+        --gold: #f0ab00;
+        --gold-light: #ffbe33;
+        --gold-ink: #3a2410;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 1rem;
+        background: var(--surface);
+        color: var(--ink);
+        font-family: "Source Sans 3", system-ui, sans-serif;
+        font-size: 1.125rem;
+        line-height: 1.5;
+      }
+      main {
+        width: 100%;
+        max-width: 45rem;
+        padding: 1.5rem;
+        border: 1px solid var(--surface-alt);
+        border-radius: 0.75rem;
+        background: white;
+      }
+      h1 {
+        margin: 0;
+        color: var(--title);
+        font-family: "Sora", system-ui, sans-serif;
+        font-size: 1.5rem;
+        font-weight: 600;
+        line-height: 1.25;
+      }
+      p {
+        margin: 1rem 0 0;
+      }
+      #enregistrees h2 {
+        margin: 1.5rem 0 0;
+        color: var(--title);
+        font-family: "Sora", system-ui, sans-serif;
+        font-size: 1.125rem;
+        font-weight: 600;
+      }
+      #enregistrees ul {
+        margin: 0.5rem 0 0;
+        padding: 0;
+        list-style: none;
+      }
+      #enregistrees a {
+        display: flex;
+        align-items: center;
+        min-height: 3rem;
+        color: var(--title);
+        font-weight: 600;
+      }
+      #enregistrees a:focus-visible {
+        outline: 2px solid var(--title);
+        outline-offset: 2px;
+      }
+      button {
+        width: 100%;
+        min-height: 3.25rem;
+        margin-top: 1.5rem;
+        padding: 0 1.5rem;
+        border: 0;
+        border-radius: 0.5rem;
+        background: var(--gold);
+        color: var(--gold-ink);
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      button:hover {
+        background: var(--gold-light);
+      }
+      button:focus-visible {
+        outline: 2px solid var(--title);
+        outline-offset: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Vous êtes hors connexion</h1>
+      <p>
+        L’espace participant a besoin d’une connexion pour afficher vos rendez-vous et vos messages. Rétablissez votre connexion, puis
+        réessayez.
+      </p>
+      <section id="enregistrees" hidden aria-labelledby="enregistrees-titre">
+        <h2 id="enregistrees-titre">Pages enregistrées</h2>
+        <ul></ul>
+      </section>
+      <button type="button" id="reessayer">Réessayer</button>
+    </main>
+    <script>
+      document.getElementById("reessayer").addEventListener("click", function () {
+        location.reload();
+      });
+
+      // NF-24, F-131 : liens vers les copies gardées par le service worker (une par page et par édition, jamais une copie expirée).
+      if ("caches" in window) {
+        var LIBELLES = { agenda: "Agenda", programme: "Programme", messages: "Messages", "": "Accueil" };
+        caches.keys().then(function (noms) {
+          var liens = [];
+          return Promise.all(
+            noms
+              .filter(function (nom) {
+                return nom.indexOf("jib-espace-v2-ed-") === 0;
+              })
+              .map(function (nom) {
+                return caches.open(nom).then(function (cache) {
+                  return cache.keys().then(function (requetes) {
+                    return Promise.all(
+                      requetes.map(function (requete) {
+                        return cache.match(requete).then(function (reponse) {
+                          if (!reponse || Number(reponse.headers.get("X-Espace-Expire")) < Date.now()) return;
+                          var chemin = new URL(requete.url).pathname;
+                          var fin = chemin.split("/")[3] || "";
+                          liens.push({ chemin: chemin, edition: decodeURIComponent(chemin.split("/")[2]), libelle: LIBELLES[fin] });
+                        });
+                      }),
+                    );
+                  });
+                });
+              }),
+          ).then(function () {
+            if (!liens.length) return;
+            var ordre = ["Accueil", "Agenda", "Messages", "Programme"];
+            liens.sort(function (a, b) {
+              return a.edition.localeCompare(b.edition) || ordre.indexOf(a.libelle) - ordre.indexOf(b.libelle);
+            });
+            var plusieurs = new Set(liens.map(function (l) { return l.edition; })).size > 1;
+            var liste = document.querySelector("#enregistrees ul");
+            liens.forEach(function (lien) {
+              var li = document.createElement("li");
+              var a = document.createElement("a");
+              a.href = lien.chemin;
+              a.textContent = plusieurs ? lien.libelle + " (" + lien.edition + ")" : lien.libelle;
+              li.appendChild(a);
+              liste.appendChild(li);
+            });
+            document.getElementById("enregistrees").hidden = false;
+          });
+        }).catch(function () {});
+      }
+    </script>
+  </body>
+</html>

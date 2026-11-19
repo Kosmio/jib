@@ -1,0 +1,76 @@
+{
+  "kind": "collectionType",
+  "collectionName": "espace_meetings",
+  "info": {
+    "singularName": "meeting",
+    "pluralName": "meetings",
+    "displayName": "Rendez-vous (espace participant)",
+    "description": "Demande de rendez-vous B2B entre deux participants, ou vers un exposant."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "edition": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::edition.edition",
+      "required": true
+    },
+    "slot": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::espace.slot",
+      "required": true
+    },
+    "requester": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::espace.attendee",
+      "required": true
+    },
+    "targetAttendee": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::espace.attendee"
+    },
+    "targetExhibitor": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::espace.exhibitor"
+    },
+    "message": {
+      "type": "text",
+      "maxLength": 300
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": ["pending", "accepted", "declined", "cancelled", "expired"],
+      "default": "pending",
+      "required": true
+    },
+    "location": {
+      "type": "string"
+    },
+    "tableNumber": {
+      "type": "integer"
+    },
+    "tableKey": {
+      "type": "string"
+    },
+    "answeredBy": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::espace.attendee"
+    },
+    "answeredAt": {
+      "type": "datetime"
+    },
+    "cancelledAt": {
+      "type": "datetime"
+    },
+    "cancelReason": {
+      "type": "string"
+    }
+  }
+}

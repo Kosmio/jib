@@ -2,6 +2,7 @@
 import Layout from "../layouts/Layout.astro";
 import { getEditions, getIntervenants, getHomePage, buildImageUrl } from "../lib/strapi";
 import { regionLabels } from "../lib/types";
+import { safeHtml } from "../lib/html";
 
 let editions = { data: [] } as Awaited<ReturnType<typeof getEditions>>;
 try {
@@ -453,7 +454,7 @@ const statusColors: Record<string, string> = {
   <section class="py-20 md:py-28 bg-white">
     <div class="max-w-4xl mx-auto px-6 text-center">
       <h2 class="text-3xl md:text-4xl font-bold">{txt.dynamique_title}</h2>
-      <p class="mt-4 text-muted text-lg max-w-2xl mx-auto" set:html={renderBoldMd(txt.dynamique_body)} />
+      <p class="mt-4 text-muted text-lg max-w-2xl mx-auto" set:html={safeHtml(renderBoldMd(txt.dynamique_body))} />
       <div class="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
         <a href="/a-propos" class="inline-flex items-center justify-center px-7 py-3 bg-primary hover:bg-primary-dark text-white font-semibold text-sm rounded-lg transition-colors shadow-sm">
           Qui sommes-nous ?

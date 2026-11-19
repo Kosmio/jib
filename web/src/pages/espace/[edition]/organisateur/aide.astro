@@ -1,0 +1,63 @@
+---
+// Onglet « Aide » de l'interface organisation (15-administration.md, F-185, F-187) : sommaire des pages d'aide, recherche dans
+// les titres, accès à l'administration Strapi. Ouvert aussi sur une édition terminée (F-153).
+import OrganizerFrame from "../../../../components/espace/OrganizerFrame.astro";
+import { helpPages } from "../../../../lib/espace/help";
+import { organizerPage, strapiAdminUrl } from "../../../../lib/espace/organizer";
+import { publicStrapiUrl } from "../../../../lib/espace/api";
+
+const page = await organizerPage(Astro, "aide");
+if (page.kind === "response") return page.response;
+const { edition, me, slug, base } = page;
+---
+
+<OrganizerFrame title="Aide" heading="Aide de l’interface organisation" tab="aide" edition={edition} me={me} slug={slug} base={base} refused={page.kind === "refused"}>
+  <div class="grid items-start gap-8 lg:grid-cols-[2fr_1fr]">
+    <section aria-labelledby="sommaire">
+      <h2 id="sommaire" class="font-heading text-xl font-semibold normal-case">Sommaire</h2>
+      <label for="aide-recherche" class="mt-4 block font-semibold">Chercher dans les titres</label>
+      <input id="aide-recherche" type="search" class="mt-1.5 min-h-11 w-full max-w-md rounded-lg border-2 border-surface-alt bg-white px-3" placeholder="HelloAsso, badges, pause…" />
+      <p id="aide-vide" class="mt-3 hidden text-muted">Aucune page ne correspond. Essayez un autre mot.</p>
+      <ol id="aide-liste" class="mt-4 space-y-3">
+        {
+          helpPages.map((help, index) => (
+            <li data-titres={[help.title, ...help.sections.map((section) => section.title)].join(" ").toLowerCase()}>
+              <a href={`${base}/organisateur/aide/${help.slug}`} class="group grid grid-cols-[2.5rem_1fr] gap-3 rounded-xl border border-surface-alt bg-white p-4 hover:border-title">
+                <span class="font-heading text-2xl font-semibold text-muted tabular-nums">{index + 1}</span>
+                <span>
+                  <span class="block font-semibold text-title group-hover:underline">{help.title}</span>
+                  {help.summary && <span class="mt-0.5 block text-sm text-muted">{help.summary}</span>}
+                  {help.sections.length > 0 && <span class="mt-1 block text-sm text-muted">{help.sections.map((section) => section.title).join(" · ")}</span>}
+                </span>
+              </a>
+            </li>
+          ))
+        }
+      </ol>
+    </section>
+    <aside aria-labelledby="strapi-titre" class="rounded-xl bg-surface p-5">
+      <h2 id="strapi-titre" class="font-heading text-lg font-semibold normal-case">Administration Strapi</h2>
+      <p class="mt-2 text-sm">Pour les pages du site, la galerie, le bilan, les photos et les réglages fins.</p>
+      <p class="mt-2 text-sm text-muted">Compte distinct de celui de l’espace, avec le rôle « Organisation Xylofutur » : à demander à Kosmio.</p>
+      <a href={strapiAdminUrl(publicStrapiUrl)} target="_blank" rel="noopener" class="mt-4 inline-flex min-h-11 items-center rounded-lg border-2 border-title bg-white px-4 font-bold text-title hover:bg-white/60">
+        Ouvrir Strapi<span class="sr-only"> (nouvel onglet)</span>
+      </a>
+    </aside>
+  </div>
+  <script>
+    const input = document.getElementById("aide-recherche") as HTMLInputElement | null;
+    const items = [...document.querySelectorAll<HTMLLIElement>("#aide-liste > li")];
+    const empty = document.getElementById("aide-vide");
+    const fold = (text: string) => text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+    input?.addEventListener("input", () => {
+      const terms = fold(input.value).split(/\s+/).filter(Boolean);
+      let shown = 0;
+      for (const item of items) {
+        const visible = terms.every((term) => fold(item.dataset.titres ?? "").includes(term));
+        item.hidden = !visible;
+        if (visible) shown += 1;
+      }
+      empty?.classList.toggle("hidden", shown > 0);
+    });
+  </script>
+</OrganizerFrame>

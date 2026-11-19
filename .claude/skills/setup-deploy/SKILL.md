@@ -85,12 +85,14 @@ We have a shared SSH key for GitHub infrastructure. Check if it's already set up
 
 Ask for domain names per environment:
 - **Dev domain** (e.g. `dev.example.com`) -- if not known yet, keep `dev.your-domain.com` placeholder
+- **Preprod domain** (e.g. `preprod.example.com`) -- if not known yet, keep the current value
 - **Prod domain** (e.g. `example.com`) -- if not known yet, keep `your-domain.com` placeholder
 
 Explain: "These domains are used for routing and HTTPS certificates. You can change them later in the env files if you don't have them yet."
 
 If domains are provided, update the overlay env files:
 - `infra/deploy/overlays/dev/.env.dev`: `HOST_NAME`, `STRAPI_BASE_URL` (https://{dev_domain}), `STRAPI_PUBLIC_URL` (https://{dev_domain}/strapi)
+- `infra/deploy/overlays/preprod/.env.preprod`: `HOST_NAME`, `STRAPI_BASE_URL` (https://{preprod_domain}), `STRAPI_PUBLIC_URL` (https://{preprod_domain}/strapi)
 - `infra/deploy/overlays/prod/.env.prod`: `HOST_NAME`, `STRAPI_BASE_URL` (https://{prod_domain}), `STRAPI_PUBLIC_URL` (https://{prod_domain}/strapi)
 
 ### Step 5: Generate secrets
@@ -99,7 +101,7 @@ Explain: "I'm going to generate cryptographic secrets for your application. Thes
 
 Generate with `openssl rand -hex 32` (each call produces a unique value):
 
-**Per-environment secrets** (generate separate values for dev, prod, AND local):
+**Per-environment secrets** (generate separate values for dev, preprod, prod, AND local):
 - `POSTGRES_PASSWORD`
 - `STRAPI_APP_KEYS` -- 4 comma-separated keys: run `openssl rand -hex 32` four times, join with commas
 - `STRAPI_API_TOKEN_SALT`
@@ -149,6 +151,8 @@ gh secret set SECRET_STRAPI_ADMIN_JWT_SECRET --env dev --body "{dev_value}"
 gh secret set SECRET_STRAPI_JWT_SECRET --env dev --body "{dev_value}"
 gh secret set SECRET_ALTCHA_HMAC_KEY --env dev --body "{dev_value}"
 
+# Preprod: same six secrets with --env preprod and their own values
+
 # Prod
 gh secret set SECRET_POSTGRES_PASSWORD --env prod --body "{prod_value}"
 gh secret set SECRET_STRAPI_APP_KEYS --env prod --body "{prod_value}"
@@ -179,10 +183,11 @@ gh variable set EMAIL_LIST_ID --body "{value}"  # if provided
 
 ```bash
 gh api repos/{owner}/{repo}/environments/dev -X PUT
+gh api repos/{owner}/{repo}/environments/preprod -X PUT
 gh api repos/{owner}/{repo}/environments/prod -X PUT
 ```
 
-Explain: "GitHub environments scope secrets per deployment target — dev and prod each get their own set."
+Explain: "GitHub environments scope secrets per deployment target — dev, preprod and prod each get their own set."
 
 ### Step 11: Mark setup as done in CLAUDE.md
 
@@ -194,7 +199,7 @@ Add a `## Deployment Status` section to `CLAUDE.md` (after the "Build & Deploy" 
 `/setup-deploy` was run on {YYYY-MM-DD}. Deployment infrastructure is configured:
 - GitHub secrets: configured (SSH key, Strapi secrets, Postgres password{, optional services if set})
 - GitHub variables: configured (DEPLOY_HOST, DEPLOY_USER, SSH_PORT{, EMAIL_LIST_ID if set})
-- GitHub environments: dev, prod
+- GitHub environments: dev, preprod, prod
 - Local env files: strapi/.env, web/.env
 ```
 
@@ -216,7 +221,7 @@ Present a clear summary:
 > **GitHub variables:** X configured
 > - [list each with checkmark]
 >
-> **GitHub environments:** dev, prod
+> **GitHub environments:** dev, preprod, prod
 >
 > **Still needed:**
 > - [list anything skipped -- e.g. "Brevo API key (not provided)", "Matomo (not configured)"]

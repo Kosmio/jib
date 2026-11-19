@@ -1,0 +1,30 @@
+{
+  "edition": "nouvelle-aquitaine",
+  "source": "Liste des exposants transmise par Xylofutur (Apolline Oswald) le 13 novembre 2026 ; sujets par séquence du programme. Aucune donnée personnelle : les adresses des intervenants restent dans scripts/espace/local/.",
+  "topics": [
+    { "name": "Forêt", "sessions": ["Foret en transition"] },
+    { "name": "Ressource", "sessions": ["Foret en transition"] },
+    { "name": "Process", "sessions": ["Process, datas et IA"] },
+    { "name": "Data", "sessions": ["Process, datas et IA"] },
+    { "name": "IA", "sessions": ["Process, datas et IA"] },
+    { "name": "Valorisation des coproduits", "sessions": ["Valorisation des coproduits et diversification"] },
+    { "name": "Diversification", "sessions": ["Valorisation des coproduits et diversification"] },
+    { "name": "Aménagement urbain", "sessions": ["La place de l'arbre et du bois en ville"] },
+    { "name": "Construction bois", "sessions": ["Construire en bois"] }
+  ],
+  "replaceTopics": true,
+  "replaceExhibitors": true,
+  "exhibitors": [
+    { "organisation": "Bois de France" },
+    { "organisation": "Ceebios" },
+    { "organisation": "Cesefor" },
+    { "organisation": "Communes Forestières Nouvelle-Aquitaine" },
+    { "organisation": "EPSA" },
+    { "organisation": "Fibois Nouvelle-Aquitaine" },
+    { "organisation": "Kosmio" },
+    { "organisation": "Lokka" },
+    { "organisation": "Nobatek" },
+    { "organisation": "Odeys" },
+    { "organisation": "Xylofutur" }
+  ]
+}
