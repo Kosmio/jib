@@ -114,12 +114,12 @@ test.describe('pilotage : ouverture contrôlée et état du service (V1-C)', () 
 
     await send.click();
     await confirmation.getByRole('button', { name: /Envoyer|Confirmer/ }).click();
-    await expect(card.getByRole('status')).toContainText(/3\s+envoy/);
+    await expect(card.getByRole('status')).toContainText(/3\s+e-mails\s+envoy/);
     await expect(card.getByRole('status')).toContainText(/0\s+en\s+échec/);
     await expect.poll(() => welcomeMailsTo(GUESTS).length - before, { timeout: 15_000 }).toBe(3);
 
     // Plus personne à inviter : le bouton disparaît ou se désactive.
-    await expect(card.getByRole('button', { name: /Envoyer à/ })).toHaveCount(0);
+    await expect(card.getByRole('button', { name: 'Envoyer à 0 inscrit' })).toBeDisabled();
     consoleWatch.expectClean();
   });
 

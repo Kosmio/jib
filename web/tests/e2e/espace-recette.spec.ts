@@ -705,6 +705,9 @@ test.describe('E9 : régénérer les créneaux (F-94, R-02)', () => {
 
   test('session expirée : le clic renvoie vers la connexion (F-94)', async ({ page, baseURL }) => {
     const { button } = await openCard(page, baseURL);
+    // Les autres îlots du pilotage chargent leurs données au montage : sur un poste lent (CI), leurs requêtes partent après
+    // l'effacement des cookies, reçoivent 401 et renvoient vers la connexion avant le clic. On attend qu'elles soient terminées.
+    await page.waitForLoadState('networkidle');
     await page.context().clearCookies();
     await button.click();
     await expect(page).toHaveURL(/\/connexion\?next=%2Fespace%2F[^&]+%2Forganisateur&expire=1$/);

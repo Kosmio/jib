@@ -215,8 +215,10 @@ test.describe('pilotage : carte Relances (V3-B, F-92)', () => {
     const card = cardOf(page);
     await card.getByLabel('Scénario').selectOption({ label: 'Rappel d’activation' });
     await expect(card.getByText(/destinataires? pour «\s+Rappel d’activation\s+»/)).toBeVisible();
-    const real = await card.textContent();
-    const planned = Number(real?.match(/(\d+)\s+destinataires?\s+pour/)?.[1] ?? 0);
+    // Le nombre se lit dans la phrase « N destinataires pour … », pas dans tout le texte de la carte, qui contient d'autres chiffres.
+    const real = await card.getByText(/destinataires? pour «/).textContent();
+    const planned = Number(real?.match(/^\s*(\d+)\s+destinataires?\s+pour/)?.[1] ?? 0);
+    const alreadySent = Number((await card.getByText(/exclus?, déjà relancés?/).textContent())?.match(/(\d+)/)?.[1] ?? 0);
 
     const confirmSend = async () => {
       await card.getByRole('button', { name: /^Envoyer à / }).click();
@@ -240,7 +242,8 @@ test.describe('pilotage : carte Relances (V3-B, F-92)', () => {
     await expect(status).toContainText(/0\s+envoyé,/);
     await expect(status).toContainText(/\d+\s+déjà relancés?, 0\s+en échec\./);
     const skipped = Number((await status.textContent())?.match(/(\d+)\s+déjà relancé/)?.[1] ?? 0);
-    expect(skipped).toBeGreaterThanOrEqual(planned);
-    expect(skipped).toBeGreaterThan(0);
+    expect(skipped).toBeGreaterThanOrEqual(planned + alreadySent);
+    // Selon l'état laissé par les autres fichiers, personne n'est concerné par ce rappel : le second envoi reste à 0 sans échec.
+    if (planned + alreadySent > 0) expect(skipped).toBeGreaterThan(0);
   });
 });
