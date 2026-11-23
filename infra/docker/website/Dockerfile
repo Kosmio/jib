@@ -14,7 +14,7 @@ ENV NODE_ENV=production
 RUN pnpm build
 
 # ---> Serve stage
-FROM node:24-alpine AS node-server
+FROM node:24.22.1-alpine AS node-server
 ENV NODE_ENV=production
 COPY --from=node-build /usr/src/app/dist /usr/share/web/html/dist
 COPY --from=node-build /usr/src/app/package.json /usr/share/web/html/package.json

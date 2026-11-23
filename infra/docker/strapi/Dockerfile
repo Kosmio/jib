@@ -21,7 +21,7 @@ ENV STRAPI_ADMIN_BACKEND_URL=${STRAPI_ADMIN_BACKEND_URL}
 RUN pnpm build
 
 # ---> Runtime stage
-FROM node:24-alpine
+FROM node:24.22.1-alpine
 
 COPY --from=build /app /app
 
