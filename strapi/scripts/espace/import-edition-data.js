@@ -27,7 +27,8 @@
  * the real one (the fake address of a test account is replaced). Without an account, a speaker account is created. When
  * another attendee already holds the address (HelloAsso registration), that attendee becomes the speaker account and the
  * other one is reported, never removed.
- * `settings` (participantSpaceEnabled, tablesCount, slotDurationMinutes, meetingRequestsOpenAt, meetingRequestsCloseAt): written on the
+ * `settings` (participantSpaceEnabled, tablesCount, slotDurationMinutes, meetingRequestsOpenAt, meetingRequestsCloseAt, helloassoOrgSlug,
+ * helloassoFormType, helloassoFormSlug): written on the
  * draft and the published edition alike. `b2bSessions`: titles of the sequences that become B2B breaks, then the slots are regenerated.
  * `showTestSpeakers: true`: the speaker accounts with an @example.org address tick the directory and the meetings (test environments).
  * `testExhibitorReps: true`: a representative with an @example.org address for each exhibitor that has no active one (test environments).
@@ -274,7 +275,10 @@ async function importExhibitors(app, edition, rows, replace, apply, log) {
   }
 }
 
-const SETTING_KEYS = ['participantSpaceEnabled', 'tablesCount', 'slotDurationMinutes', 'meetingRequestsOpenAt', 'meetingRequestsCloseAt'];
+const SETTING_KEYS = [
+  'participantSpaceEnabled', 'tablesCount', 'slotDurationMinutes', 'meetingRequestsOpenAt', 'meetingRequestsCloseAt',
+  'helloassoOrgSlug', 'helloassoFormType', 'helloassoFormSlug',
+];
 const shown = (value) => (value === null || value === undefined ? 'vide' : String(value));
 const sameSetting = (key, a, b) => (key.endsWith('At') ? (a ? new Date(a).getTime() : null) === (b ? new Date(b).getTime() : null) : (a ?? null) === (b ?? null));
 
