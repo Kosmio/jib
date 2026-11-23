@@ -1,0 +1,31 @@
+{
+  "kind": "collectionType",
+  "collectionName": "espace_badge_settings",
+  "info": {
+    "singularName": "badge-setting",
+    "pluralName": "badge-settings",
+    "displayName": "Réglage des badges (espace participant)",
+    "description": "Une entrée par édition : plan du lieu imprimé au verso du badge et couleur du bandeau de type. Sans plan, le programme occupe tout le verso."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "edition": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::edition.edition",
+      "required": true
+    },
+    "plan": {
+      "type": "media",
+      "multiple": false,
+      "allowedTypes": ["images"]
+    },
+    "accent": {
+      "type": "string",
+      "regex": "^#[0-9a-fA-F]{6}$",
+      "maxLength": 7
+    }
+  }
+}

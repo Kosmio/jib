@@ -6,7 +6,7 @@ set -euo pipefail
 # =============================================================================
 # Usage: ./deploy.sh <environment> <action> [options]
 #
-# Environments: local, dev, prod
+# Environments: local, dev, preprod, prod
 # Actions: up, down, logs, ps, pull, restart, config, validate, kill
 #
 # Options:
@@ -44,7 +44,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Validate environment
-VALID_ENVIRONMENTS=("local" "dev" "prod")
+VALID_ENVIRONMENTS=("local" "dev" "preprod" "prod")
 if [[ ! " ${VALID_ENVIRONMENTS[@]} " =~ " ${ENVIRONMENT} " ]]; then
   echo "Error: Invalid environment '$ENVIRONMENT'"
   echo "Valid environments: ${VALID_ENVIRONMENTS[*]}"

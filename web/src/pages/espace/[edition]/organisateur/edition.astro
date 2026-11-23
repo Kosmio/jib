@@ -1,0 +1,25 @@
+---
+// Onglet « Édition » de l'interface organisation (15-administration.md, AD-1) : réglages de l'édition, HelloAsso, ouverture,
+// rendez-vous B2B et pauses. Réservé à l'organisateur de l'édition (NF-71) ; fermé sur une édition terminée (F-153).
+import OrganizerFrame from "../../../../components/espace/OrganizerFrame.astro";
+import Notice from "../../../../components/espace/Notice.astro";
+import EditionSettings, { type EditionSettingsData } from "../../../../react-components/espace/organizer/EditionSettings";
+import { espaceGet, publicStrapiUrl } from "../../../../lib/espace/api";
+import { organizerPage } from "../../../../lib/espace/organizer";
+
+const page = await organizerPage(Astro, "edition");
+if (page.kind === "response") return page.response;
+const { edition, me, slug, base } = page;
+const settings = page.kind === "page" ? await espaceGet<EditionSettingsData>(`/admin/${encodeURIComponent(slug)}/settings`, page.cookie) : null;
+if (settings && !settings.ok && settings.status === 401) return Astro.redirect(`${base}/connexion`);
+---
+
+<OrganizerFrame title="Réglages de l’édition" tab="edition" edition={edition} me={me} slug={slug} base={base} refused={page.kind === "refused"}>
+  {
+    settings?.ok ? (
+      <EditionSettings client:load edition={slug} strapiUrl={publicStrapiUrl} initial={settings.data} />
+    ) : (
+      <Notice kind="alert">Les réglages ne sont pas disponibles pour le moment. Rechargez la page dans quelques instants.</Notice>
+    )
+  }
+</OrganizerFrame>

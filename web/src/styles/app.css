@@ -52,11 +52,18 @@
   --color-gold-dark: #D49800;
   --color-gold-light: #FFBE33;
 
+  /* Bandeaux du programme, repris du programme imprimé. Texte blanc : forest 4,9:1, bordeaux 13:1 ; les autres thèmes
+     emploient accent-dark (4,6:1), title (8,4:1) et gold avec un texte sombre. */
+  --color-forest: #00805F;
+  --color-bordeaux: #5A1E2B;
+
   /* Helvetica LT STD n'est pas disponible en web — Source Sans 3 est le plus proche de Myriad Pro */
   --font-sans: "Source Sans 3", "Helvetica Neue", system-ui, sans-serif;
   --font-heading: "Sora", "Helvetica Neue", system-ui, sans-serif;
   --font-display: "Azonix", "Space Grotesk", "Sora", system-ui, sans-serif;
 
+  /* xs : plus petits téléphones ; sous 360 px, la barre d'onglets de l'espace réduit ses libellés */
+  --breakpoint-xs: 360px;
   --breakpoint-sm: 480px;
   --breakpoint-md: 768px;
   --breakpoint-lg: 1024px;
@@ -119,4 +126,30 @@
 @media (prefers-reduced-motion: reduce) {
   .hero-node, .hero-line, .hero-card { animation: none; }
   .hero-cta:hover { transform: none; }
+}
+
+/* Espace, Vue B2B de l'interface organisation : table bloquée, hachurée (F-181, R-90) */
+.b2b-blocked {
+  background: repeating-linear-gradient(-45deg, var(--color-surface-alt) 0 6px, var(--color-surface) 6px 12px);
+}
+
+/* Espace, textes riches de l'interface organisation (éditeur et aperçu, D-23) */
+.rich-text p + p, .rich-text p + ul, .rich-text p + ol, .rich-text ul + p, .rich-text ol + p { margin-top: 0.5em; }
+.rich-text ul { list-style: disc; padding-left: 1.25rem; }
+.rich-text ol { list-style: decimal; padding-left: 1.25rem; }
+.rich-text h3, .rich-text h4 { font-weight: 700; font-size: 1.05em; margin-top: 0.5em; text-transform: none; }
+.rich-text a { text-decoration: underline; }
+
+/* Espace, pages d'aide de l'interface organisation (F-187) */
+.help-text h3 { font-family: var(--font-heading, inherit); font-size: 1.3rem; font-weight: 600; text-transform: none; margin-top: 2rem; scroll-margin-top: 1rem; color: var(--color-title); }
+.help-text h3:first-child { margin-top: 0; }
+.help-text p, .help-text ul, .help-text ol { margin-top: 0.75rem; line-height: 1.6; }
+.help-text ul { list-style: disc; padding-left: 1.5rem; }
+.help-text ol { list-style: decimal; padding-left: 1.5rem; }
+.help-text li + li { margin-top: 0.35rem; }
+.help-text strong { color: var(--color-title); }
+.help-text code { background: var(--color-surface); border-radius: 0.25rem; padding: 0.05rem 0.3rem; font-size: 0.92em; overflow-wrap: anywhere; }
+@media print {
+  body:has(.help-article) nav, body:has(.help-article) header, body:has(.help-article) footer { display: none !important; }
+  .help-text { border: 0; padding: 0; max-width: none; }
 }

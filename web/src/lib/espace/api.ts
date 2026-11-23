@@ -1,0 +1,148 @@
+// Appels de l'API de l'espace participant depuis le rendu serveur des pages Astro (frontmatter).
+// STRAPI_URL ne sert qu'ici, côté serveur ; le navigateur reçoit REACT_STRAPI_URL (formulaires et îlots).
+// La session est un cookie posé et lu par Strapi seul : le rendu serveur relaie l'en-tête `Cookie` du navigateur.
+import type { Me } from "./client";
+
+const strapiUrl = import.meta.env.STRAPI_URL || process.env.STRAPI_URL;
+
+/** Adresse publique de Strapi, celle que le navigateur atteint (action des formulaires, appels des îlots). */
+export const publicStrapiUrl: string = import.meta.env.REACT_STRAPI_URL || process.env.REACT_STRAPI_URL;
+
+export type EspaceEdition = {
+  slug: string;
+  title: string;
+  date: string | null;
+  city: string | null;
+  themeColor: string | null;
+  participantSpaceEnabled: boolean;
+  /** NF-70 : l'édition est terminée (readOnlyAt passé) ; l'espace reste consultable, toute écriture répond 409 EDITION_READ_ONLY. */
+  readOnly: boolean;
+  /** F-178 : rendez-vous B2B de l'édition ; faux, l'agenda et les demandes disparaissent. */
+  b2bEnabled: boolean;
+  /** Fenêtre de prise de rendez-vous (instants ISO) ; null : pas de borne. */
+  meetingRequestsOpenAt: string | null;
+  meetingRequestsCloseAt: string | null;
+};
+
+/** A-18 : état d'un lien de connexion, sans le consommer. L'adresse n'est renvoyée que pour un lien connu mais inutilisable. */
+export type LinkState = { valid: boolean; editionSlug?: string; email?: string };
+
+/** Réponse de l'API, lue : `data` pour un succès, `error` (forme de 06-api.md) pour tout statut d'erreur. */
+export type EspaceResult<T> =
+  | { ok: true; status: number; data: T }
+  | { ok: false; status: number; error: { code: string; message: string; fields?: Record<string, string> } };
+
+const get = (path: string, headers?: HeadersInit) =>
+  fetch(`${strapiUrl}/api/espace${path}`, { headers, signal: AbortSignal.timeout(8000) });
+
+/**
+ * GET d'une route de l'API depuis le rendu serveur ; `path` commence par `/` (« /directory?type=all »), `cookie` est l'en-tête
+ * `Cookie` de la requête de la page (null pour une route publique). Ne lève que si Strapi ne répond pas : une réponse d'erreur
+ * (401, 404…) est rendue dans `error`, à la page d'en décider (redirection, `Astro.rewrite`, repli).
+ */
+export async function espaceGet<T>(path: string, cookie: string | null, clientIp?: string): Promise<EspaceResult<T>> {
+  // `clientIp` : adresse du visiteur, transmise à Strapi dans X-Forwarded-For (une seule entrée) pour que ses limites de débit
+  // (NF-54, carte publique) comptent par visiteur et non par serveur web. Strapi la lit avec IS_PROXIED=true.
+  const headers: Record<string, string> = { ...(cookie && { cookie }), ...(clientIp && { "x-forwarded-for": clientIp }) };
+  const response = await get(path, Object.keys(headers).length ? headers : undefined);
+  const body = await response.json().catch(() => null);
+  if (response.ok) return { ok: true, status: response.status, data: body as T };
+  return {
+    ok: false,
+    status: response.status,
+    error: { code: body?.error?.code ?? "UNKNOWN", message: body?.error?.message ?? "", fields: body?.error?.fields },
+  };
+}
+
+/** Édition publiée, ou null si elle est absente ou non publiée (404). Toute autre réponse d'erreur remonte. */
+export async function getEdition(slug: string): Promise<EspaceEdition | null> {
+  const result = await espaceGet<EspaceEdition>(`/editions/${encodeURIComponent(slug)}`, null);
+  if (result.ok) return result.data;
+  if (result.status === 404) return null;
+  throw new Error(`GET /editions/${slug} : ${result.status}`);
+}
+
+/** Édition dont l'espace est ouvert : absente, non publiée ou fermée, la page répond 404 (NF-52). */
+export async function getOpenEdition(slug: string): Promise<EspaceEdition | null> {
+  const edition = await getEdition(slug);
+  return edition?.participantSpaceEnabled ? edition : null;
+}
+
+const openCache = new Map<string, { at: number; open: boolean }>();
+const OPEN_TTL_MS = 60_000;
+
+/**
+ * L'espace participant de cette édition est-il ouvert ? Pour l'en-tête du site, lu à chaque page : réponse gardée une minute
+ * en mémoire, et en cas d'échec de l'API l'espace est tenu pour fermé (le bouton disparaît, la page reste servie).
+ */
+export async function isEspaceOpen(slug: string): Promise<boolean> {
+  const cached = openCache.get(slug);
+  if (cached && Date.now() - cached.at < OPEN_TTL_MS) return cached.open;
+  const open = await getEdition(slug)
+    .then((edition) => Boolean(edition?.participantSpaceEnabled))
+    .catch(() => false);
+  openCache.set(slug, { at: Date.now(), open });
+  return open;
+}
+
+/**
+ * Origine publique vue par le visiteur (derrière Traefik : en-têtes X-Forwarded-*), repli sur le site déclaré.
+ * Ne sert qu'à écrire une adresse complète dans un QR code.
+ */
+export function publicOrigin(request: Request, url: URL, site?: URL): string {
+  const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0].trim() || request.headers.get("host") || "";
+  const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0].trim();
+  const validProto = !forwardedProto || forwardedProto === "http" || forwardedProto === "https";
+  if (/^[a-z0-9.-]+(:\d+)?$/i.test(forwardedHost) && validProto) return `${forwardedProto ?? url.protocol.replace(":", "")}://${forwardedHost}`;
+  return site?.origin ?? "https://journees-innovation-bois.xylofutur.fr";
+}
+
+/** Profil de la session du navigateur (`Cookie` relayé), ou null sans session valable (401). Avec `counts` (A-36). */
+export async function getMe(cookie: string | null): Promise<Me | null> {
+  if (!cookie) return null;
+  const result = await espaceGet<Me>("/me", cookie);
+  if (result.ok) return result.data;
+  if (result.status === 401) return null;
+  throw new Error(`GET /me : ${result.status}`);
+}
+
+/**
+ * Garde commune des pages de l'espace avec session : à appeler en tête de page, puis
+ *   `if ("redirect" in guard) return Astro.redirect(guard.redirect);`
+ *   `if ("notFound" in guard) return Astro.rewrite("/espace/introuvable");`
+ * Édition absente ou fermée : `notFound`. Sans session valable pour cette édition : E0. Sans consentement enregistré : E2
+ * (sauf `consent: false`, pour E2 lui-même).
+ */
+/** F-100 à F-102 : `next` s'il reste dans l'espace de l'édition, sinon l'accueil (même règle que `safeNextPath` de Strapi). */
+export function safeNext(next: string | null | undefined, slug: string): string {
+  const home = `/espace/${slug}/`;
+  if (!next?.startsWith(home)) return home;
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(next);
+  } catch {
+    return home;
+  }
+  return [next, decoded].some((path) => /\/\/|\\|\.\.|[\u0000-\u001f]/.test(path)) ? home : next;
+}
+
+export type EspaceGuard = { edition: EspaceEdition; me: Me } | { redirect: string } | { notFound: true };
+
+export async function guardSession(slug: string, cookie: string | null, { consent = true, pilotage = false } = {}): Promise<EspaceGuard> {
+  const edition = await getEdition(slug);
+  if (!edition) return { notFound: true };
+  const base = `/espace/${encodeURIComponent(slug)}`;
+  const me = await getMe(cookie);
+  if (me?.edition.slug !== slug) return edition.participantSpaceEnabled || pilotage ? { redirect: `${base}/connexion` } : { notFound: true };
+  // F-103 : espace fermé, seul l'organisateur a une session ; il n'a accès qu'au pilotage (`pilotage: true`), les autres écrans le lui renvoient.
+  if (!edition.participantSpaceEnabled) return pilotage ? { edition, me } : { redirect: `${base}/organisateur` };
+  // F-124 : l'organisateur qui n'a jamais passé l'écran de bienvenue entre directement au pilotage.
+  if (consent && !me.consent.consentAt && !(pilotage && me.isOrganizer)) return { redirect: `${base}/bienvenue` };
+  return { edition, me };
+}
+
+export async function getLinkState(token: string): Promise<LinkState> {
+  const result = await espaceGet<LinkState>(`/auth/link?token=${encodeURIComponent(token)}`, null);
+  if (!result.ok) throw new Error(`GET /auth/link : ${result.status}`);
+  return result.data;
+}

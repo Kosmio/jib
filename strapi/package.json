@@ -7,7 +7,12 @@
     "develop": "strapi develop",
     "start": "strapi start",
     "build": "strapi build",
-    "strapi": "strapi"
+    "strapi": "strapi",
+    "seed": "node scripts/espace/seed.js",
+    "helloasso:fake": "node scripts/espace/fake-helloasso.js",
+    "test": "TZ=UTC node --require ./tests/helpers/no-network.js --test --test-concurrency=1 \"tests/unit/**/*.test.js\" \"tests/integration/**/*.test.js\"",
+    "test:unit": "TZ=UTC node --require ./tests/helpers/no-network.js --test --test-concurrency=1 \"tests/unit/**/*.test.js\"",
+    "test:integration": "TZ=UTC node --require ./tests/helpers/no-network.js --test --test-concurrency=1 \"tests/integration/**/*.test.js\""
   },
   "dependencies": {
     "@getbrevo/brevo": "^5.0.1",
@@ -16,7 +21,10 @@
     "@strapi/strapi": "5.59.0",
     "altcha-lib": "^1.4.1",
     "better-sqlite3": "^12.11.1",
+    "nodemailer": "^10.4.0",
+    "pdfkit": "^0.20.2",
     "pg": "^8.20.0",
+    "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.30.3",

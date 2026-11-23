@@ -1,0 +1,147 @@
+{
+  "kind": "collectionType",
+  "collectionName": "espace_attendees",
+  "info": {
+    "singularName": "attendee",
+    "pluralName": "attendees",
+    "displayName": "Participant (espace participant)",
+    "description": "Personne inscrite à une édition, importée de HelloAsso. Contient des données personnelles."
+  },
+  "options": {
+    "draftAndPublish": false
+  },
+  "attributes": {
+    "edition": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::edition.edition",
+      "required": true
+    },
+    "helloassoItemId": {
+      "type": "string"
+    },
+    "helloassoOrderId": {
+      "type": "string"
+    },
+    "email": {
+      "type": "string",
+      "required": true
+    },
+    "firstName": {
+      "type": "string",
+      "required": true
+    },
+    "lastName": {
+      "type": "string",
+      "required": true
+    },
+    "jobTitle": {
+      "type": "string"
+    },
+    "company": {
+      "type": "string"
+    },
+    "linkedinUrl": {
+      "type": "string"
+    },
+    "role": {
+      "type": "enumeration",
+      "enum": ["participant", "speaker", "exhibitor_rep", "organizer"],
+      "default": "participant",
+      "required": true
+    },
+    "speaker": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::intervenant.intervenant"
+    },
+    "exhibitor": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::espace.exhibitor",
+      "inversedBy": "representatives"
+    },
+    "photo": {
+      "type": "media",
+      "multiple": false,
+      "allowedTypes": ["images"]
+    },
+    "hostedTableNumber": {
+      "type": "integer",
+      "min": 1
+    },
+    "bio": {
+      "type": "text",
+      "maxLength": 280
+    },
+    "lookingFor": {
+      "type": "text",
+      "maxLength": 300
+    },
+    "offering": {
+      "type": "text",
+      "maxLength": 300
+    },
+    "phone": {
+      "type": "string",
+      "maxLength": 30,
+      "private": true
+    },
+    "topics": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::espace.topic"
+    },
+    "directoryOptIn": {
+      "type": "boolean",
+      "default": false
+    },
+    "meetingsOptIn": {
+      "type": "boolean",
+      "default": true
+    },
+    "newsOptIn": {
+      "type": "boolean",
+      "default": false
+    },
+    "consentAt": {
+      "type": "datetime"
+    },
+    "activatedAt": {
+      "type": "datetime"
+    },
+    "lastSeenAt": {
+      "type": "datetime"
+    },
+    "status": {
+      "type": "enumeration",
+      "enum": ["active", "cancelled"],
+      "default": "active",
+      "required": true
+    },
+    "emailPrefs": {
+      "type": "json",
+      "default": { "meetingRequests": true, "messages": true, "reminders": true }
+    },
+    "unavailableSessions": {
+      "type": "json",
+      "default": []
+    },
+    "statusLockedAt": {
+      "type": "datetime"
+    },
+    "editedFields": {
+      "type": "json",
+      "default": []
+    },
+    "cardTokenHash": {
+      "type": "string",
+      "unique": true,
+      "private": true
+    },
+    "cardTokenCreatedAt": {
+      "type": "datetime",
+      "private": true
+    }
+  }
+}

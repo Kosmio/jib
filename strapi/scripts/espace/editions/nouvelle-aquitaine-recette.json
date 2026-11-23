@@ -1,0 +1,14 @@
+{
+  "edition": "nouvelle-aquitaine",
+  "source": "Réglages de recette de la pré-production (demande de Mathieu du 18 novembre 2026) : espace ouvert, fenêtre de rendez-vous ouverte dès maintenant, 5 tables B2B, créneaux générés depuis les pauses B2B du programme, comptes de test des intervenants visibles, un représentant fictif par exposant ; retours de recette du 18 novembre : intervenant rattaché à l’inscrit du même nom, sujets des intervenants d’après leurs séquences (importer nouvelle-aquitaine.json avant, pour les sujets). À ne pas importer en prod.",
+  "settings": {
+    "participantSpaceEnabled": true,
+    "tablesCount": 5,
+    "meetingRequestsOpenAt": null
+  },
+  "b2bSessions": ["Pause et B2B", "Cocktail déjeunatoire & B2B", "Cocktail et B2B"],
+  "linkSpeakersByName": true,
+  "speakerTopics": true,
+  "showTestSpeakers": true,
+  "testExhibitorReps": true
+}

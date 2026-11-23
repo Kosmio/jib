@@ -2,6 +2,7 @@
 import Layout from "../../layouts/Layout.astro";
 import { getIntervenantBySlug, buildImageUrl } from "../../lib/strapi";
 import { getTagColor, getTagLabel } from "../../lib/tag-colors";
+import { safeHtml } from "../../lib/html";
 
 const { slug } = Astro.params;
 const response = await getIntervenantBySlug(slug!);
@@ -102,12 +103,12 @@ const editions = (intervenant.interventions || [])
 
       <!-- Bio -->
       {intervenant.bio && (
-        <div class="prose prose-gray max-w-none mb-8" set:html={intervenant.bio} />
+        <div class="prose prose-gray max-w-none mb-8" set:html={safeHtml(intervenant.bio)} />
       )}
 
       <!-- Long description -->
       {intervenant.long_description && (
-        <div class="prose prose-gray max-w-none mb-8" set:html={intervenant.long_description} />
+        <div class="prose prose-gray max-w-none mb-8" set:html={safeHtml(intervenant.long_description)} />
       )}
 
       <!-- Video -->

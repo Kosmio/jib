@@ -11,6 +11,16 @@ import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { createMcpExpressApp } from '@modelcontextprotocol/sdk/server/express.js';
 import { z } from 'zod';
 import { StrapiClient } from './lib/strapi-client.js';
+import {
+  extractToken,
+  hasTokenInUrl,
+  redactSecrets,
+  assertContentTypeAllowed,
+  assertDocumentId,
+  assertFieldName,
+  checkDelete,
+  describeContentTypes,
+} from './lib/guards.js';
 
 // ── Config ──────────────────────────────────────────────────
 
@@ -40,18 +50,8 @@ const pkg = JSON.parse(
 
 const sessionTokens = {};
 
-/**
- * Extract the Bearer token from an Express request.
- * Returns the token string or null.
- */
-function extractToken(req) {
-  const auth = req.headers['authorization'];
-  if (auth && auth.startsWith('Bearer ')) {
-    return auth.slice(7);
-  }
-  // Fallback: accept token as query param for clients that don't support custom headers
-  return req.query?.token || null;
-}
+// Le jeton est lu uniquement dans l'en-tête Authorization (extractToken, lib/guards.js).
+// Un jeton dans l'URL est refusé par le middleware plus bas et n'est jamais journalisé.
 
 // ── MCP Server factory ─────────────────────────────────────
 // Each session gets its own McpServer. Tools resolve the Strapi client
@@ -67,9 +67,9 @@ function createServer(sessionId) {
     const token = sessionTokens[sessionId];
     if (!token) {
       throw new Error(
-        'Not authenticated. Configure your MCP client with an Authorization header ' +
-        'containing a Strapi API token: "Authorization: Bearer <your-token>". ' +
-        'Create a token in your Strapi admin panel under Settings → API Tokens.',
+        'Non authentifié. Configurez votre client MCP avec un en-tête Authorization ' +
+        'contenant un jeton d\'API Strapi : "Authorization: Bearer <jeton>". ' +
+        'Le jeton se crée dans l\'administration Strapi, Réglages > Jetons d\'API.',
       );
     }
     return new StrapiClient(STRAPI_URL, token);
@@ -78,22 +78,10 @@ function createServer(sessionId) {
   // 1. list_content_types
   server.tool(
     'list_content_types',
-    'List all content types available on the website, with their fields and descriptions. Use this first to understand what content you can manage.',
+    'List all content types available on the website, with their fields and descriptions. Use this first to understand what content you can manage. The participant space types (api::espace.*) are not exposed. Fields marked private can be written but are never returned by the API.',
     {},
     async () => {
-      const result = Object.entries(contentTypes).map(([pluralName, ct]) => ({
-        pluralName,
-        singularName: ct.singularName,
-        displayName: ct.displayName,
-        description: ct.description,
-        draftAndPublish: ct.draftAndPublish,
-        fields: Object.entries(ct.fields).map(([name, f]) => ({
-          name,
-          type: f.type,
-          required: f.required || false,
-          description: f.description,
-        })),
-      }));
+      const result = describeContentTypes(contentTypes);
 
       return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
     },
@@ -111,6 +99,7 @@ function createServer(sessionId) {
       status: z.enum(['published', 'draft']).optional().describe('Filter by publication status'),
     },
     async ({ contentType, page, pageSize, sort, status }) => {
+      contentType = assertContentTypeAllowed(contentType, contentTypes);
       const client = getClient();
       const params = {
         'populate': '*',
@@ -136,14 +125,17 @@ function createServer(sessionId) {
       value: z.string().optional().describe('Field value to match'),
     },
     async ({ contentType, documentId, field, value }) => {
+      contentType = assertContentTypeAllowed(contentType, contentTypes);
       const client = getClient();
 
       if (documentId) {
+        assertDocumentId(documentId);
         const result = await client.get(`/${contentType}/${documentId}`, { populate: '*' });
         return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
       }
 
       if (field && value) {
+        assertFieldName(field);
         const result = await client.get(`/${contentType}`, {
           [`filters[${field}][$eq]`]: value,
           'populate': '*',
@@ -168,6 +160,7 @@ function createServer(sessionId) {
       publish: z.boolean().optional().default(false).describe('Publish immediately (default: false, creates as draft)'),
     },
     async ({ contentType, data, publish }) => {
+      contentType = assertContentTypeAllowed(contentType, contentTypes);
       const client = getClient();
       const body = { data, status: publish ? 'published' : 'draft' };
 
@@ -186,6 +179,8 @@ function createServer(sessionId) {
       data: z.record(z.unknown()).describe('Field values to update (only include fields you want to change)'),
     },
     async ({ contentType, documentId, data }) => {
+      contentType = assertContentTypeAllowed(contentType, contentTypes);
+      assertDocumentId(documentId);
       const client = getClient();
       const result = await client.put(`/${contentType}/${documentId}`, { data });
       return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
@@ -195,14 +190,16 @@ function createServer(sessionId) {
   // 6. delete_entry
   server.tool(
     'delete_entry',
-    `Permanently delete an entry. This cannot be undone. Known types: ${knownTypes}.`,
+    `Permanently delete an entry. This cannot be undone and is refused unless confirm is true: ask the user for explicit approval first. Participant space types (api::espace.*) are always refused. Known types: ${knownTypes}.`,
     {
-      contentType: z.string().describe('Plural API name (e.g. "articles")'),
+      contentType: z.string().describe('Plural API name (e.g. "organisations")'),
       documentId: z.string().describe('Document ID of the entry to delete'),
+      confirm: z.boolean().describe('Must be true to delete. Set it only after the user has explicitly confirmed this deletion.'),
     },
-    async ({ contentType, documentId }) => {
+    async ({ contentType, documentId, confirm }) => {
+      const checked = checkDelete({ contentType, documentId, confirm }, contentTypes);
       const client = getClient();
-      const result = await client.del(`/${contentType}/${documentId}`);
+      const result = await client.del(`/${checked.contentType}/${checked.documentId}`);
       return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
     },
   );
@@ -216,6 +213,8 @@ function createServer(sessionId) {
       documentId: z.string().describe('Document ID of the entry to publish'),
     },
     async ({ contentType, documentId }) => {
+      contentType = assertContentTypeAllowed(contentType, contentTypes);
+      assertDocumentId(documentId);
       const client = getClient();
       const result = await client.put(`/${contentType}/${documentId}`, { status: 'published' });
       return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
@@ -231,6 +230,8 @@ function createServer(sessionId) {
       documentId: z.string().describe('Document ID of the entry to unpublish'),
     },
     async ({ contentType, documentId }) => {
+      contentType = assertContentTypeAllowed(contentType, contentTypes);
+      assertDocumentId(documentId);
       const client = getClient();
       const result = await client.put(`/${contentType}/${documentId}`, { status: 'draft' });
       return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
@@ -282,6 +283,22 @@ const app = createMcpExpressApp({
 });
 const transports = {};
 
+// Aucun jeton dans l'URL : refus explicite, sans journaliser la requête.
+app.use((req, res, next) => {
+  if (hasTokenInUrl(req.query)) {
+    res.status(400).json({
+      jsonrpc: '2.0',
+      error: {
+        code: -32000,
+        message: 'Jeton refusé dans l\'URL. Passez-le dans l\'en-tête "Authorization: Bearer <jeton>".',
+      },
+      id: null,
+    });
+    return;
+  }
+  next();
+});
+
 // ── Streamable HTTP transport ───────────────────────────────
 
 app.all('/', async (req, res) => {
@@ -309,7 +326,7 @@ app.all('/', async (req, res) => {
         onsessioninitialized: (sid) => {
           transports[sid] = transport;
           // Store the token from the initialization request
-          const token = extractToken(req);
+          const token = extractToken(req.headers);
           if (token) sessionTokens[sid] = token;
         },
       });
@@ -335,12 +352,12 @@ app.all('/', async (req, res) => {
 
     // Update token on every request (client may send it with each request)
     const sid = transport.sessionId;
-    const token = extractToken(req);
+    const token = extractToken(req.headers);
     if (token && sid) sessionTokens[sid] = token;
 
     await transport.handleRequest(req, res, req.body);
   } catch (error) {
-    console.error('Error handling MCP request:', error);
+    console.error('Error handling MCP request:', redactSecrets(error?.message));
     if (!res.headersSent) {
       res.status(500).json({
         jsonrpc: '2.0',
@@ -359,7 +376,7 @@ app.get('/sse', async (req, res) => { // legacy SSE stays at /sse (becomes /mcp/
   transports[sid] = transport;
 
   // Store token from the SSE connection request
-  const token = extractToken(req);
+  const token = extractToken(req.headers);
   if (token) sessionTokens[sid] = token;
 
   res.on('close', () => {
@@ -381,7 +398,7 @@ app.post('/messages', async (req, res) => {
   }
 
   // Update token on message requests too
-  const token = extractToken(req);
+  const token = extractToken(req.headers);
   if (token && sessionId) sessionTokens[sessionId] = token;
 
   await transport.handlePostMessage(req, res, req.body);

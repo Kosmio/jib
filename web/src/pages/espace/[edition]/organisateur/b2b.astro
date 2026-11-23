@@ -1,0 +1,24 @@
+---
+// Onglet « Vue B2B » de l'interface organisation (15-administration.md, AD-4, F-181, F-182) : grille des créneaux par tables et stands,
+// déplacer, annuler, bloquer ; `?jour=1` ouvre le mode jour J. Ouvert aussi sur une édition terminée, en consultation (F-153).
+import OrganizerFrame from "../../../../components/espace/OrganizerFrame.astro";
+import Notice from "../../../../components/espace/Notice.astro";
+import B2BBoard from "../../../../react-components/espace/organizer/B2BBoard";
+import type { EditionSettingsData } from "../../../../react-components/espace/organizer/EditionSettings";
+import { espaceGet, publicStrapiUrl } from "../../../../lib/espace/api";
+import { organizerPage } from "../../../../lib/espace/organizer";
+
+const page = await organizerPage(Astro, "b2b");
+if (page.kind === "response") return page.response;
+const { edition, me, slug, base } = page;
+const settings = page.kind === "page" ? await espaceGet<EditionSettingsData>(`/admin/${encodeURIComponent(slug)}/settings`, page.cookie) : null;
+if (settings && !settings.ok && settings.status === 401) return Astro.redirect(`${base}/connexion`);
+const b2bOff = settings?.ok && !settings.data.space.b2bEnabled;
+---
+
+<OrganizerFrame title="Vue B2B" heading="Vue B2B de la journée" tab="b2b" edition={edition} me={me} slug={slug} base={base} refused={page.kind === "refused"} wide>
+  {b2bOff && <Notice kind="status">Les rendez-vous B2B sont désactivés pour cette édition : les participants ne voient ni agenda ni demandes. Réactivez-les dans l’onglet Édition.</Notice>}
+  <div class="mt-4">
+    <B2BBoard client:load edition={slug} strapiUrl={publicStrapiUrl} slotMinutes={settings?.ok ? settings.data.space.slotDurationMinutes : 15} initialDayMode={Astro.url.searchParams.get("jour") === "1"} />
+  </div>
+</OrganizerFrame>

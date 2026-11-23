@@ -1,0 +1,94 @@
+name: Tests
+
+# Tests de l'espace participant (phase 0, lot C) : unitaires et intégration de Strapi, puis bout en bout (Playwright).
+# Aucun secret, aucune image construite ni publiée, aucun déploiement. Les valeurs factices (clés, sels, e-mail
+# console, DEMO_SEED=false) sont posées par strapi/tests/helpers/env.js : aucun fichier .env n'est lu.
+# Le projet Playwright `visual` reste local (références propres à macOS, données de prod absentes en CI).
+
+on:
+  push:
+    branches:
+      - main
+      - 'feat/**'
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: strapi
+          POSTGRES_PASSWORD: strapi
+          # Base de maintenance seulement : la base `strapi` n'existe pas en CI.
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U strapi -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    env:
+      CI: 'true'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # Corepack choisit pnpm d'après le champ packageManager du package.json du répertoire courant.
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Install Strapi dependencies
+        working-directory: strapi
+        run: pnpm install --frozen-lockfile
+
+      - name: Install web dependencies
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare test databases (strapi_test, strapi_e2e)
+        working-directory: strapi
+        run: node tests/prepare-databases.js
+
+      - name: Strapi tests (unit and integration)
+        working-directory: strapi
+        run: pnpm test
+
+      - name: Install Chromium for Playwright
+        working-directory: web
+        run: pnpm exec playwright install --with-deps chromium
+
+      # Playwright démarre Strapi (strapi_e2e, seed de recette) et le front construit, voir web/playwright.config.ts.
+      - name: End-to-end tests (Playwright)
+        working-directory: web
+        run: pnpm test:e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            web/playwright-report/
+            web/test-results/
+          if-no-files-found: ignore
+          retention-days: 7

@@ -1,0 +1,19 @@
+---
+// Onglet « Personnes » de l'interface organisation (15-administration.md, AD-2) : personnes et rôles cumulés, organisations et
+// exposants. Réservé à l'organisateur de l'édition (NF-71) ; fermé sur une édition terminée (F-153).
+import OrganizerFrame from "../../../../components/espace/OrganizerFrame.astro";
+import PeopleManager from "../../../../react-components/espace/organizer/PeopleManager";
+import type { EditionSettingsData } from "../../../../react-components/espace/organizer/EditionSettings";
+import { espaceGet, publicStrapiUrl } from "../../../../lib/espace/api";
+import { organizerPage } from "../../../../lib/espace/organizer";
+
+const page = await organizerPage(Astro, "personnes");
+if (page.kind === "response") return page.response;
+const { edition, me, slug, base } = page;
+const settings = page.kind === "page" ? await espaceGet<EditionSettingsData>(`/admin/${encodeURIComponent(slug)}/settings`, page.cookie) : null;
+if (settings && !settings.ok && settings.status === 401) return Astro.redirect(`${base}/connexion`);
+---
+
+<OrganizerFrame title="Personnes" heading="Personnes et organisations" tab="personnes" edition={edition} me={me} slug={slug} base={base} refused={page.kind === "refused"} wide>
+  <PeopleManager client:load edition={slug} strapiUrl={publicStrapiUrl} tablesCount={settings?.ok ? settings.data.space.tablesCount : 20} />
+</OrganizerFrame>

@@ -1,0 +1,240 @@
+{
+  "edition": {
+    "title": "Nouvelle-Aquitaine (test)",
+    "slug": "nouvelle-aquitaine-test",
+    "year": 2026,
+    "region": "nouvelle-aquitaine",
+    "date": "2026-12-03",
+    "city": "Bordeaux",
+    "edition_status": "inscriptions-ouvertes",
+    "hero_bg_color": "#600e24",
+    "description": "Édition fictive pour la recette de l’espace participant. Toutes les données sont inventées.",
+    "lieux": [
+      {
+        "name": "Salle de recette (lieu fictif)",
+        "address": "1 rue de l’Exemple\n33000 Bordeaux",
+        "time_slot": "Journée (9h00 - 17h00)"
+      }
+    ]
+  },
+
+  "editionSettings": {
+    "participantSpaceEnabled": true,
+    "helloassoOrgSlug": "xylofutur-test",
+    "helloassoFormType": "Event",
+    "helloassoFormSlug": "jib-nouvelle-aquitaine-test",
+    "helloassoFieldMap": { "email": "Email", "company": "Organisation", "jobTitle": "Poste" },
+    "slotDurationMinutes": 15,
+    "tablesCount": 3,
+    "meetingRequestsOpenAt": "2026-10-01T08:00:00.000Z",
+    "meetingRequestsCloseAt": "2026-12-02T17:00:00.000Z"
+  },
+
+  "topics": [
+    "Forêt et adaptation",
+    "Process, data et IA",
+    "Économie circulaire",
+    "Territoires résilients",
+    "Construction bois"
+  ],
+
+  "sequences": [
+    { "title": "Accueil et ouverture", "start_time": "9h15", "end_time": "9h45", "kind": "other" },
+    { "title": "Forêt et adaptation", "start_time": "9h45", "end_time": "10h45", "kind": "talk", "topic": "Forêt et adaptation" },
+    { "title": "Pause et B2B", "start_time": "10h45", "end_time": "11h15", "kind": "b2b_break" },
+    { "title": "Process, data et IA", "start_time": "11h15", "end_time": "12h30", "kind": "talk", "topic": "Process, data et IA" },
+    { "title": "Cocktail déjeunatoire & B2B", "start_time": "12h30", "end_time": "14h00", "kind": "b2b_break" },
+    { "title": "Économie circulaire", "start_time": "14h00", "end_time": "14h45", "kind": "talk", "topic": "Économie circulaire" },
+    { "title": "Territoires résilients", "start_time": "14h45", "end_time": "15h30", "kind": "talk", "topic": "Territoires résilients" },
+    { "title": "Pause et B2B", "start_time": "15h30", "end_time": "16h00", "kind": "b2b_break" },
+    { "title": "Construction bois", "start_time": "16h00", "end_time": "17h00", "kind": "talk", "topic": "Construction bois" }
+  ],
+
+  "organisations": [
+    {
+      "name": "Sylvadour",
+      "slug": "test-sylvadour",
+      "description": "Scierie fictive du Sud-Ouest, exposante de la recette (stand 4).",
+      "website": "https://example.org/sylvadour"
+    },
+    {
+      "name": "Résinéo",
+      "slug": "test-resineo",
+      "description": "Fabricant fictif de produits biosourcés, exposant de la recette (stand 12).",
+      "website": "https://example.org/resineo"
+    },
+    {
+      "name": "Institut Lignéa",
+      "slug": "test-institut-lignea",
+      "description": "Institut de recherche fictif, structure d’un intervenant de la recette.",
+      "website": "https://example.org/lignea"
+    },
+    {
+      "name": "Cabinet Verdelis",
+      "slug": "test-cabinet-verdelis",
+      "description": "Cabinet de conseil fictif, structure d’un intervenant de la recette.",
+      "website": "https://example.org/verdelis"
+    }
+  ],
+
+  "intervenants": [
+    {
+      "name": "Hélène Marquès",
+      "slug": "test-helene-marques",
+      "title": "Directrice scientifique",
+      "bio": "Intervenante fictive de la recette.",
+      "topic": "Forêt et adaptation",
+      "organisation": "test-institut-lignea",
+      "sequence": "Forêt et adaptation"
+    },
+    {
+      "name": "Antoine Vergnes",
+      "slug": "test-antoine-vergnes",
+      "title": "Associé",
+      "bio": "Intervenant fictif de la recette.",
+      "topic": "Économie circulaire",
+      "organisation": "test-cabinet-verdelis",
+      "sequence": "Économie circulaire"
+    }
+  ],
+
+  "exhibitors": [
+    { "organisation": "test-sylvadour", "standNumber": "4", "topics": ["Construction bois", "Économie circulaire"] },
+    { "organisation": "test-resineo", "standNumber": "12", "topics": ["Process, data et IA"] }
+  ],
+
+  "organizerEmails": ["organisation@example.org"],
+
+  "attendees": {
+    "lea.ducasse@example.org": { "bio": "Responsable du bureau d’études de Charpentes du Pibal. Je cherche des fournisseurs de bois locaux et des partenaires pour des projets de construction bois.", "role": "participant", "status": "active", "activated": true, "directoryOptIn": true, "meetingsOptIn": true, "newsOptIn": true, "topics": ["Construction bois", "Process, data et IA"] },
+    "mathis.lagrange@example.org": { "bio": "Je dirige Pinède & Fils, une scierie familiale. Nous développons des panneaux à base de coproduits de scierie et cherchons des débouchés dans la construction.", "role": "participant", "status": "active", "activated": true, "directoryOptIn": true, "meetingsOptIn": true, "newsOptIn": false, "topics": ["Économie circulaire"] },
+    "ines.castaing@example.org": { "bio": "Architecte associée à l’Atelier Mérisier. Je conçois des bâtiments en structure bois et je veux rencontrer des charpentiers et des industriels du territoire.", "role": "participant", "status": "active", "activated": true, "directoryOptIn": true, "meetingsOptIn": true, "newsOptIn": false, "topics": ["Construction bois", "Territoires résilients"] },
+    "hugo.peyrat@example.org": { "role": "participant", "status": "active", "activated": true, "directoryOptIn": true, "meetingsOptIn": true, "newsOptIn": false, "topics": ["Forêt et adaptation", "Territoires résilients"] },
+    "manon.bordenave@example.org": { "role": "participant", "status": "active", "activated": true, "directoryOptIn": true, "meetingsOptIn": false, "newsOptIn": false, "topics": ["Forêt et adaptation"] },
+    "nathan.lasserre@example.org": { "role": "participant", "status": "active", "activated": true, "directoryOptIn": true, "meetingsOptIn": true, "newsOptIn": true, "topics": ["Process, data et IA"] },
+    "clara.dubourdieu@example.org": { "role": "participant", "status": "active", "activated": true, "directoryOptIn": false, "meetingsOptIn": false, "newsOptIn": false, "topics": [] },
+    "jules.mazeres@example.org": { "role": "participant", "status": "active", "activated": true, "directoryOptIn": true, "meetingsOptIn": true, "newsOptIn": false, "topics": ["Process, data et IA", "Économie circulaire"] },
+    "alice.fourcade@example.org": { "role": "participant", "status": "active", "activated": true, "directoryOptIn": true, "meetingsOptIn": true, "newsOptIn": false, "topics": ["Territoires résilients"] },
+    "tom.laffitte@example.org": { "role": "participant", "status": "active", "activated": false, "directoryOptIn": false, "meetingsOptIn": true, "newsOptIn": false, "topics": [] },
+    "eva.cazaux@example.org": { "role": "participant", "status": "active", "activated": true, "directoryOptIn": true, "meetingsOptIn": true, "newsOptIn": false, "topics": ["Forêt et adaptation", "Économie circulaire"] },
+    "lucas.darrigade@example.org": { "role": "participant", "status": "cancelled", "activated": true, "directoryOptIn": true, "meetingsOptIn": true, "newsOptIn": false, "topics": ["Construction bois"] },
+    "helene.marques@example.org": { "role": "speaker", "speaker": "test-helene-marques", "status": "active", "activated": true, "directoryOptIn": true, "meetingsOptIn": true, "newsOptIn": false, "topics": ["Forêt et adaptation"] },
+    "antoine.vergnes@example.org": { "hostedTableNumber": 2, "bio": "Associé du Cabinet Verdelis, je conseille les entreprises sur l’économie circulaire. Je tiens la table 2 pendant les pauses B2B\u00a0: réservez un créneau pour échanger.", "role": "speaker", "speaker": "test-antoine-vergnes", "status": "active", "activated": true, "directoryOptIn": true, "meetingsOptIn": true, "newsOptIn": false, "topics": ["Économie circulaire"] },
+    "benoit.tastet@example.org": { "bio": "Responsable commercial de Sylvadour, scierie du Sud-Ouest. Retrouvez-nous au stand 4 pour parler de bois de construction et de réemploi.", "role": "exhibitor_rep", "exhibitor": "test-sylvadour", "status": "active", "activated": true, "directoryOptIn": true, "meetingsOptIn": true, "newsOptIn": false, "topics": ["Construction bois"] },
+    "marion.lacoste@example.org": { "role": "exhibitor_rep", "exhibitor": "test-sylvadour", "status": "active", "activated": true, "directoryOptIn": true, "meetingsOptIn": true, "newsOptIn": false, "topics": ["Économie circulaire"] },
+    "pierre.haurie@example.org": { "role": "exhibitor_rep", "exhibitor": "test-resineo", "status": "active", "activated": true, "directoryOptIn": true, "meetingsOptIn": true, "newsOptIn": false, "topics": ["Process, data et IA"] }
+  },
+
+  "meetings": [
+    {
+      "requester": "lea.ducasse@example.org",
+      "target": "mathis.lagrange@example.org",
+      "slot": "10h45",
+      "status": "accepted",
+      "tableNumber": 1,
+      "answeredBy": "mathis.lagrange@example.org",
+      "answeredAt": "2026-10-26T09:12:00.000Z",
+      "createdAt": "2026-10-25T18:40:00.000Z",
+      "message": "Bonjour Mathis, je souhaite échanger sur vos panneaux biosourcés."
+    },
+    {
+      "requester": "hugo.peyrat@example.org",
+      "target": "antoine.vergnes@example.org",
+      "slot": "10h45",
+      "status": "accepted",
+      "tableNumber": 2,
+      "answeredAt": "2026-10-27T08:05:00.000Z",
+      "createdAt": "2026-10-27T08:05:00.000Z"
+    },
+    {
+      "requester": "lea.ducasse@example.org",
+      "targetExhibitor": "test-sylvadour",
+      "slot": "12h30",
+      "status": "accepted",
+      "answeredBy": "benoit.tastet@example.org",
+      "answeredAt": "2026-10-27T14:20:00.000Z",
+      "createdAt": "2026-10-27T10:00:00.000Z",
+      "message": "Bonjour, je cherche un fournisseur d’épicéa pour une charpente à Bordeaux."
+    },
+    {
+      "requester": "ines.castaing@example.org",
+      "target": "lea.ducasse@example.org",
+      "slot": "13h00",
+      "status": "pending",
+      "createdAt": "2026-10-29T16:30:00.000Z",
+      "message": "Bonjour Léa, échangeons sur la construction bois."
+    },
+    {
+      "requester": "lea.ducasse@example.org",
+      "target": "helene.marques@example.org",
+      "slot": "15h30",
+      "status": "pending",
+      "createdAt": "2026-10-29T18:05:00.000Z",
+      "message": "Bonjour Hélène, votre intervention sur la forêt m’intéresse beaucoup."
+    },
+    {
+      "requester": "jules.mazeres@example.org",
+      "target": "lea.ducasse@example.org",
+      "slot": "13h15",
+      "status": "declined",
+      "answeredBy": "lea.ducasse@example.org",
+      "answeredAt": "2026-10-28T12:00:00.000Z",
+      "createdAt": "2026-10-28T09:00:00.000Z",
+      "message": "Bonjour Léa, un point sur les données de chantier\u00a0?"
+    },
+    {
+      "requester": "eva.cazaux@example.org",
+      "target": "nathan.lasserre@example.org",
+      "slot": "11h00",
+      "status": "cancelled",
+      "cancelledAt": "2026-10-28T15:30:00.000Z",
+      "cancelReason": "Empêchement",
+      "createdAt": "2026-10-27T11:00:00.000Z"
+    },
+    {
+      "requester": "alice.fourcade@example.org",
+      "targetExhibitor": "test-resineo",
+      "slot": "15h45",
+      "status": "pending",
+      "createdAt": "2026-10-30T07:45:00.000Z",
+      "message": "Bonjour, nous étudions des solutions biosourcées pour nos assurés."
+    }
+  ],
+
+  "conversations": [
+    {
+      "participants": ["lea.ducasse@example.org", "mathis.lagrange@example.org"],
+      "messages": [
+        {
+          "author": "mathis.lagrange@example.org",
+          "at": "2026-10-26T09:20:00.000Z",
+          "readAt": "2026-10-26T10:00:00.000Z",
+          "body": "Bonjour Léa, j’ai accepté votre demande pour 10h45. Quels panneaux vous intéressent\u00a0?"
+        },
+        {
+          "author": "lea.ducasse@example.org",
+          "at": "2026-10-26T10:05:00.000Z",
+          "readAt": "2026-10-26T11:30:00.000Z",
+          "body": "Bonjour Mathis, merci. Je pense surtout aux panneaux pour les cloisons intérieures."
+        },
+        {
+          "author": "mathis.lagrange@example.org",
+          "at": "2026-10-29T17:10:00.000Z",
+          "readAt": null,
+          "body": "J’apporterai nos échantillons de panneaux."
+        }
+      ]
+    },
+    {
+      "participants": ["ines.castaing@example.org", "lea.ducasse@example.org"],
+      "messages": [
+        {
+          "author": "ines.castaing@example.org",
+          "at": "2026-10-29T16:35:00.000Z",
+          "readAt": null,
+          "body": "Bonjour Léa, je viens de vous envoyer une demande pour 13h00. Dites-moi si ce créneau vous convient."
+        }
+      ]
+    }
+  ]
+}

@@ -1,62 +1,43 @@
-# Journées de l'Innovation Filière Bois — AI Content Management Guide
+# Journées de l'Innovation Filière Bois, AI Content Management Guide
 
-> Site officiel des Journées de l'Innovation Filière Bois (Xylofutur × Fibois). Construit avec Astro (frontend) et Strapi (CMS). Un serveur MCP intégré permet de gérer le contenu (organisations, intervenants, partenaires, éditions, programme, tags, médias) avec un assistant IA.
+> Site officiel des Journées de l'Innovation Filière Bois (Xylofutur × Fibois). Construit avec Astro et Strapi. Un serveur MCP intégré permet de gérer le contenu (organisations, intervenants, partenaires, éditions, programme, tags, médias) avec un assistant IA.
 
-## Quick setup
+## Mise en route
 
-1. Create an API token in Strapi admin (see below)
-2. Configure your AI tool with the token and MCP endpoint
-3. Restart your AI tool
-4. Call `list_content_types` to verify
+1. Créer un jeton d'API à droits limités dans l'administration Strapi (voir ci-dessous)
+2. Configurer l'outil d'IA avec le point d'entrée MCP et l'en-tête Authorization
+3. Redémarrer l'outil
+4. Appeler `list_content_types` pour vérifier
 
-## MCP endpoint
+## Point d'entrée MCP
 
-- Streamable HTTP (recommended): /mcp
-- Legacy SSE: GET /mcp/sse + POST /mcp/messages
-- Discovery: /.well-known/mcp.json
+- Streamable HTTP (recommandé) : /mcp
+- SSE ancien : GET /mcp/sse + POST /mcp/messages
+- Découverte : /.well-known/mcp.json
 
-## Authentication — Create an API token
+## Authentification : créer un jeton d'API
 
-Guide the user through these exact steps:
+Guider la personne pas à pas :
 
-1. Open the admin panel at: {this_site_url}/strapi/admin
-2. Log in with their admin account
-3. Click the gear icon (Settings) in the left sidebar
-4. Under Global Settings, click API Tokens
-5. Click the "Create new API Token" button (top right)
-6. Fill in:
-   - Name: "AI Assistant" (or any name)
-   - Token duration: Unlimited
-   - Token type: Full access
-7. Click Save
-8. Copy the token string immediately — it cannot be viewed again after leaving the page
+1. Ouvrir l'administration : {this_site_url}/strapi/admin et se connecter
+2. Roue crantée (Réglages), puis Jetons d'API, puis « Créer un nouveau jeton d'API »
+3. Nom : « Assistant IA ». Durée : 30 jours (éviter « Illimité »). Type : **Personnalisé** (jamais « Accès complet »)
+4. Cocher find, findOne, create, update (et publish si besoin) sur les types de contenu à gérer. Ne PAS cocher delete. Médias : find et upload. Ne rien cocher dans la section Espace
+5. Enregistrer et copier le jeton immédiatement : il ne sera plus affichable
 
-To revoke access later: Settings → API Tokens → click the trash icon on the token.
+Pour révoquer : Réglages, Jetons d'API, corbeille sur la ligne du jeton.
 
-## Passing the token
+## Transmission du jeton
 
-The preferred method is appending `?token=TOKEN_HERE` to the MCP URL. If the tool supports custom headers, you can alternatively use `Authorization: Bearer TOKEN_HERE`.
+Le jeton passe UNIQUEMENT par l'en-tête `Authorization: Bearer TOKEN_HERE`. Un jeton dans l'URL (`?token=`) est refusé par le serveur (HTTP 400). Un outil qui n'envoie pas d'en-tête personnalisé n'est pas compatible.
 
-## Configure the MCP connection
+## Configurer la connexion MCP
 
-The MCP endpoint is: {this_site_url}/mcp
+Le point d'entrée est : {this_site_url}/mcp
 
 ### Claude Desktop
 
-Edit ~/Library/Application Support/Claude/claude_desktop_config.json (macOS) or %APPDATA%\Claude\claude_desktop_config.json (Windows):
-
-```json
-{
-  "mcpServers": {
-    "jib-cms": {
-      "type": "http",
-      "url": "{this_site_url}/mcp?token=TOKEN_HERE"
-    }
-  }
-}
-```
-
-If the tool supports headers instead:
+Fichier ~/Library/Application Support/Claude/claude_desktop_config.json (macOS) ou %APPDATA%\Claude\claude_desktop_config.json (Windows) :
 
 ```json
 {
@@ -74,48 +55,30 @@ If the tool supports headers instead:
 
 ### Claude Code
 
-Create .mcp.json in your project root:
-
-```json
-{
-  "mcpServers": {
-    "jib-cms": {
-      "type": "http",
-      "url": "{this_site_url}/mcp?token=TOKEN_HERE"
-    }
-  }
-}
-```
+Créer .mcp.json à la racine du projet (ne pas le versionner), même contenu que ci-dessus.
 
 ### Cursor
 
-Settings → MCP Servers → Add Server:
-- Type: HTTP
-- URL: {this_site_url}/mcp?token=TOKEN_HERE
+Réglages, MCP Servers, ajouter un serveur : type HTTP, URL {this_site_url}/mcp, en-tête Authorization: Bearer TOKEN_HERE.
 
 ### Windsurf
 
-Edit ~/.codeium/windsurf/mcp_config.json:
+Fichier ~/.codeium/windsurf/mcp_config.json, même structure que Claude Desktop.
 
-```json
-{
-  "mcpServers": {
-    "jib-cms": {
-      "type": "http",
-      "url": "{this_site_url}/mcp?token=TOKEN_HERE"
-    }
-  }
-}
-```
+### Autre outil
 
-### Generic
+- Streamable HTTP (recommandé) : {this_site_url}/mcp
+- SSE ancien : GET {this_site_url}/mcp/sse + POST {this_site_url}/mcp/messages
+- En-tête Authorization: Bearer TOKEN_HERE obligatoire
 
-Any MCP-compatible tool:
-- Streamable HTTP (recommended): {this_site_url}/mcp?token=TOKEN_HERE
-- Legacy SSE: GET {this_site_url}/mcp/sse?token=TOKEN_HERE + POST {this_site_url}/mcp/messages
-- Alternative: Authorization: Bearer TOKEN_HERE header
+## Limites
 
-## Available tools
+- Les données de l'espace participant (types api::espace.* : participants, rendez-vous, messages, etc.) ne sont pas accessibles par le MCP
+- delete_entry exige confirm=true, à poser seulement après l'accord explicite de la personne ; un type de l'espace est toujours refusé
+- Seuls les types renvoyés par list_content_types sont atteignables
+- Les réglages de l'espace portés par une édition (participantSpaceEnabled, helloasso*, slotDurationMinutes, tablesCount, meetingRequestsOpenAt, meetingRequestsCloseAt) sont privés : modifiables, mais jamais relus par l'API
+
+## Outils disponibles
 
 ### list_content_types
 List all content types available on the website. Use this first.
@@ -124,39 +87,40 @@ Parameters: none
 ### list_entries
 List entries of a content type.
 Parameters:
-- contentType (string, required) — plural API name. Available: "tags", "organisations", "intervenants", "partenaires", "editions", "programme-items"
+- contentType (string, required), plural API name. Available: "tags", "organisations", "intervenants", "partenaires", "editions", "static-pages", "sequences", "home-page", "interventions"
 - page (number, optional, default 1)
 - pageSize (number, optional, default 25, max 100)
-- sort (string, optional) — e.g. "title:asc", "createdAt:desc"
-- status (string, optional) — "published" or "draft"
+- sort (string, optional), e.g. "title:asc", "createdAt:desc"
+- status (string, optional), "published" or "draft"
 
 ### get_entry
 Get a single entry by document ID or by filtering on a field.
 Parameters:
 - contentType (string, required)
-- documentId (string, optional) — the entry's document ID
-- field (string, optional) — field name to filter by, e.g. "slug"
-- value (string, optional) — field value to match
+- documentId (string, optional), the entry's document ID
+- field (string, optional), field name to filter by, e.g. "slug"
+- value (string, optional), field value to match
 
 ### create_entry
 Create a new entry.
 Parameters:
 - contentType (string, required)
-- data (object, required) — field values
-- publish (boolean, optional, default false) — publish immediately
+- data (object, required), field values
+- publish (boolean, optional, default false), publish immediately
 
 ### update_entry
 Update an existing entry.
 Parameters:
 - contentType (string, required)
 - documentId (string, required)
-- data (object, required) — fields to update
+- data (object, required), fields to update
 
 ### delete_entry
 Permanently delete an entry. Cannot be undone.
 Parameters:
 - contentType (string, required)
 - documentId (string, required)
+- confirm (boolean, required), doit valoir true, seulement après l'accord explicite de la personne
 
 ### publish_entry
 Publish a draft entry to make it visible on the website.
@@ -173,9 +137,9 @@ Parameters:
 ### upload_media
 Upload an image or file from a URL to the media library.
 Parameters:
-- url (string, required) — public URL of the file
-- fileName (string, optional) — override filename
-- alternativeText (string, optional) — alt text for accessibility
+- url (string, required), public URL of the file
+- fileName (string, optional), override filename
+- alternativeText (string, optional), alt text for accessibility
 - caption (string, optional)
 
 ### list_media
@@ -184,27 +148,28 @@ Parameters:
 - page (number, optional, default 1)
 - pageSize (number, optional, default 25)
 
-## Content model — quick reference
+## Content model, quick reference
 
 - **tags** : étiquettes thématiques (innovation, bois-construction, etc.). Pas de draft/publish
 - **organisations** : entreprises, labos, institutions (Xylofutur, FCBA, INRAE, etc.)
 - **intervenants** : personnes qui interviennent. Lié à une organisation
 - **partenaires** : lien Organisation × Édition avec un rôle (soutien, co-organisateur, institutionnel, prive)
 - **editions** : éditions régionales (Paris 2025, Normandie 2024, …). Contient un composant `lieux` répétable
-- **programme-items** : éléments du programme d'une édition (conférences, tables rondes)
+- **sequences** et **interventions** : programme d'une édition (séquences, puis prises de parole)
+- **static-pages**, **home-page** : pages statiques et textes de la page d'accueil
 
 Pour les détails de chaque content type (champs, types, relations), récupère le schéma via `list_content_types` et inspecte le contenu de `strapi/mcp/content-types.json` côté projet.
 
 ## Site structure
 
-- / — Homepage (présentation, prochaines éditions)
-- /editions — Liste des éditions
-- /editions/{slug} — Détail d'une édition (programme, intervenants, partenaires, lieux)
-- /intervenants/{slug} — Fiche intervenant
-- /organisations/{slug} — Fiche organisation
-- /partenaires — Liste consolidée des partenaires
-- /pourquoi — Pourquoi ces journées
-- /a-propos — À propos
-- /contact — Formulaire de contact
-- /mentions-legales — Mentions légales
-- /confidentialite — Politique de confidentialité
+- /, Homepage (présentation, prochaines éditions)
+- /editions, Liste des éditions
+- /editions/{slug}, Détail d'une édition (programme, intervenants, partenaires, lieux)
+- /intervenants/{slug}, Fiche intervenant
+- /organisations/{slug}, Fiche organisation
+- /partenaires, Liste consolidée des partenaires
+- /pourquoi, Pourquoi ces journées
+- /a-propos, À propos
+- /contact, Formulaire de contact
+- /mentions-legales, Mentions légales
+- /confidentialite, Politique de confidentialité

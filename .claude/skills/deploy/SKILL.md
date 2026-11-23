@@ -1,6 +1,6 @@
 ---
 name: deploy
-description: Deploy the application to dev or prod. Runs pre-flight checks, triggers the GitHub Actions pipeline, and monitors progress. Designed for non-technical users.
+description: Deploy the application to dev, preprod or prod. Runs pre-flight checks, triggers the GitHub Actions pipeline, and monitors progress. Designed for non-technical users.
 ---
 
 # Deploy
@@ -53,7 +53,7 @@ Run these checks and report results clearly. Present them as a checklist so the 
 - Check `CLAUDE.md` for the `## Deployment Status` section
 - If missing: tell the user deployment hasn't been set up yet, then invoke `/setup-deploy`. Resume deployment after it completes.
 - If present: verify with `gh secret list` and `gh variable list` that at minimum `SSH_PRIVATE_KEY` exists as a secret and `DEPLOY_HOST` exists as a variable
-- Check GitHub environments exist: `gh api repos/{owner}/{repo}/environments` -- verify `dev` and `prod` are present
+- Check GitHub environments exist: `gh api repos/{owner}/{repo}/environments` -- verify `dev`, `preprod` and `prod` are present
 - If anything is still missing after setup-deploy ran, explain what's wrong and try to fix it (e.g. re-set the missing secret/variable). Ask the user before making changes.
 
 **1c. Docker images:**
@@ -75,7 +75,8 @@ If all checks pass, proceed. If critical issues exist (missing config), stop and
 
 Ask: "Where do you want to deploy?"
 > 1. **Dev** -- your staging/testing environment
-> 2. **Prod** -- production
+> 2. **Preprod** -- pre-production (https://jib.kosmio.dev), same setup as prod on its own server
+> 3. **Prod** -- production
 
 ### Step 3: Version
 
@@ -153,7 +154,7 @@ Then investigate the issue: check variables, check logs, try to fix it. Escalate
 ## ARGUMENTS
 
 - No argument: interactive mode (full wizard with checks)
-- `--env dev|prod`: skip environment selection
+- `--env dev|preprod|prod`: skip environment selection
 - `--yes`: skip all confirmations **except database reset** (reset_db confirmation is ALWAYS required, regardless of flags)
 - `--build-first`: trigger build pipeline before deploy, without asking
 

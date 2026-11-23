@@ -1,0 +1,31 @@
+---
+// Bouton de l'espace participant, aux couleurs de 07-design.md. `Button.astro` (lien vert, blanc sur le vert Xylofutur à 2,7:1) ne sert pas ici.
+// Avec `href`, rend un lien ; sinon un bouton de formulaire. Cible tactile d'au moins 44 px (quiet) ou 52 px.
+export interface Props {
+  variant?: "primary" | "secondary" | "quiet";
+  type?: "submit" | "button";
+  href?: string;
+  class?: string;
+}
+
+const { variant = "primary", type = "submit", href, class: extra = "" } = Astro.props;
+
+const variants = {
+  primary: "min-h-13 w-full bg-gold text-gold-ink shadow-md shadow-gold/25 hover:bg-gold-light disabled:opacity-60",
+  secondary: "min-h-13 w-full border-2 border-title bg-white text-title hover:bg-surface",
+  quiet: "min-h-11 text-title underline",
+};
+const classes = `inline-flex items-center justify-center rounded-lg px-6 text-lg font-bold disabled:cursor-not-allowed ${variants[variant]} ${extra}`;
+---
+
+{
+  href ? (
+    <a href={href} class={classes}>
+      <slot />
+    </a>
+  ) : (
+    <button type={type} class={classes}>
+      <slot />
+    </button>
+  )
+}

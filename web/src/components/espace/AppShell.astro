@@ -1,0 +1,237 @@
+---
+// Coquille des écrans à onglets de l'espace (E1, E3 à E9) : EspaceLayout plus la barre d'onglets, basse sur mobile (cinq onglets, filet
+// vert sur l'onglet actif) et latérale à partir de 1024 px (logo, onglets, « Mon profil »). À utiliser À LA PLACE de EspaceLayout :
+//   <AppShell title="Annuaire" active="directory" editionSlug={slug} me={me}> … </AppShell>
+// `me` : profil de `getMe` ou `guardSession` (api.ts), dont les `counts` posent les badges de F-24. `me` null, par exemple E8 sans
+// session : ni barre ni retrait, le contenu est celui d'un EspaceLayout. Les pages gardent leur propre en-tête (titre d'écran,
+// bandeau d'édition) et leur colonne de 720 px (`mx-auto max-w-180 px-4`).
+import EspaceLayout from "../../layouts/EspaceLayout.astro";
+import { initialsOf, photoSrc } from "../../lib/espace/format";
+import { publicStrapiUrl } from "../../lib/espace/api";
+import type { Me } from "../../lib/espace/client";
+
+export type ShellTab = "home" | "directory" | "agenda" | "messages" | "program" | "profile" | "organizer";
+
+export interface Props {
+  title: string;
+  active: ShellTab;
+  editionSlug: string;
+  me: Me | null;
+  /** F-130 : couleur de l'édition, déjà lue par la page (`edition.themeColor`), relayée à EspaceLayout pour la balise theme-color. */
+  themeColor?: string | null;
+  /** V3-C : date de l'événement (`edition.date`), relayée à EspaceLayout pour l'expiration des copies hors connexion. */
+  eventDate?: string | null;
+  /** NF-70 : `edition.readOnly`, déjà lu par la page. Affiche le bandeau ; hors pilotage, les actions qui écrivent sont désactivées (EspaceLayout). */
+  readOnly?: boolean;
+}
+
+const { title, active, editionSlug, me, themeColor = null, eventDate = null, readOnly = false } = Astro.props;
+const base = `/espace/${encodeURIComponent(editionSlug)}`;
+
+// Icônes en trait (stroke 2 px) en SVG en ligne, décoratives : le libellé voisin porte le sens.
+const ICONS: Record<string, string> = {
+  home: '<path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z" />',
+  directory:
+    '<circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6" /><circle cx="17" cy="9" r="2.5" /><path d="M17.5 14c2.6.3 4 2.2 4 5" />',
+  agenda: '<rect x="3.5" y="5" width="17" height="15.5" rx="2" /><path d="M3.5 10h17M8 3v4M16 3v4" />',
+  messages: '<path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H10l-5 4v-4H6a2 2 0 0 1-2-2z" />',
+  program: '<path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" />',
+  profile: '<circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 3.6-6 8-6s8 2 8 6" />',
+  organizer: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />',
+};
+
+const allTabs: { id: ShellTab; label: string; href: string; count?: number; live?: string; countLabel?: (n: number) => string }[] = [
+  { id: "home", label: "Accueil", href: `${base}/` },
+  { id: "directory", label: "Annuaire", href: `${base}/annuaire` },
+  {
+    id: "agenda",
+    label: "Agenda",
+    href: `${base}/agenda`,
+    live: "pendingReceived",
+    count: me?.counts?.pendingReceived,
+    countLabel: (n) => `${n} ${n > 1 ? "demandes reçues en attente" : "demande reçue en attente"}`,
+  },
+  {
+    id: "messages",
+    label: "Messages",
+    href: `${base}/messages`,
+    live: "unreadMessages",
+    count: me?.counts?.unreadMessages,
+    countLabel: (n) => `${n} ${n > 1 ? "messages non lus" : "message non lu"}`,
+  },
+  { id: "program", label: "Programme", href: `${base}/programme` },
+];
+// F-178 : sans rendez-vous B2B, pas d'onglet Agenda.
+const BAR_COLUMNS: Record<number, string> = { 4: "grid-cols-4", 5: "grid-cols-5", 6: "grid-cols-6" };
+const tabs = me?.edition.b2bEnabled === false ? allTabs.filter((tab) => tab.id !== "agenda") : allTabs;
+
+// F-119 : l'organisateur a une sixième entrée dans la barre basse (sous 1024 px) ; à partir de 1024 px, « Organisation » reste dans la colonne latérale.
+const organizerInBar = Boolean(me?.isOrganizer);
+
+const photo = me ? photoSrc(publicStrapiUrl, me.photoUrl) : null;
+const linkBase =
+  "relative flex min-h-16 flex-col items-center justify-center gap-1 border-t-4 px-0.5 text-sm font-semibold lg:min-h-12 lg:flex-row lg:justify-start lg:gap-3 lg:rounded-lg lg:border-t-0 lg:border-l-4 lg:px-3 lg:text-base";
+const linkClass = (id: ShellTab) =>
+  `${linkBase} ${id === active ? "border-primary text-primary-ink lg:bg-surface" : "border-transparent text-muted hover:text-title lg:hover:bg-surface"}`;
+---
+
+<EspaceLayout title={title} shell={me !== null} themeColor={themeColor} eventDate={eventDate} readOnly={readOnly && active !== "organizer"}>
+  {
+    me && (
+      <nav
+        slot="nav"
+        aria-label="Espace participant"
+        data-live-nav
+        data-strapi-url={publicStrapiUrl}
+        class="fixed inset-x-0 bottom-0 z-40 border-t border-surface-alt bg-white lg:inset-y-0 lg:right-auto lg:flex lg:w-64 lg:flex-col lg:justify-between lg:border-t-0 lg:border-r lg:p-4"
+      >
+        <p class="sr-only" role="status" aria-live="polite" aria-atomic="true" data-live-announce></p>
+        {/* F-149 : sous 1024 px, l'avatar menant au profil reste présent sur tous les écrans sauf l'accueil, dont l'en-tête a le sien (la colonne latérale le porte au-delà). */}
+        {active !== "home" && (me.firstName.trim() || me.lastName.trim()) && (
+        <a
+          href={`${base}/profil`}
+          data-profil-avatar
+          aria-current={active === "profile" ? "page" : undefined}
+          class="fixed top-2 right-2 z-40 flex size-11 items-center justify-center rounded-full border-2 border-white bg-white shadow-md lg:hidden"
+        >
+          {photo ? (
+            <img src={photo} alt="" width="96" height="96" class="size-10 rounded-full bg-surface-alt object-cover" />
+          ) : (
+            <span aria-hidden="true" class="flex size-10 items-center justify-center rounded-full bg-title text-sm font-semibold text-white">
+              {initialsOf(me.firstName, me.lastName)}
+            </span>
+          )}
+          <span class="sr-only">Mon profil, {me.firstName} {me.lastName}</span>
+        </a>
+        )}
+        <div class="lg:flex lg:flex-col lg:gap-6">
+          <img
+            src="/assets/logo-jib.svg"
+            alt="La Journée de l’Innovation de la Filière Bois"
+            width="649"
+            height="160"
+            class="hidden h-12 w-auto self-start lg:block"
+          />
+          <ul class={`grid ${BAR_COLUMNS[tabs.length + (organizerInBar ? 1 : 0)]} lg:flex lg:flex-col lg:gap-1`}>
+            {tabs.map((tab) => (
+              <li>
+                <a href={tab.href} class={linkClass(tab.id)} aria-current={tab.id === active ? "page" : undefined}>
+                  <span class="relative">
+                    <svg
+                      aria-hidden="true"
+                      class="size-6"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      set:html={ICONS[tab.id]}
+                    />
+                    {tab.countLabel && (
+                      <span
+                        aria-hidden="true"
+                        data-live-badge={tab.live}
+                        data-count={tab.count ?? 0}
+                        class={`${tab.count ? "flex" : "hidden"} absolute -top-2 -right-3 h-5 min-w-5 items-center justify-center rounded-full bg-gold px-1 text-xs font-bold text-gold-ink`}
+                      >
+                        {(tab.count ?? 0) > 99 ? "99+" : tab.count}
+                      </span>
+                    )}
+                  </span>
+                  {/* Sous 360 px, une colonne fait moins de 72 px : « Programme » en 14 px déborderait de l'écran. */}
+                  <span class={organizerInBar ? "max-lg:text-xs" : "max-xs:text-xs"}>{tab.label}</span>
+                  {tab.countLabel && (
+                    <span class="sr-only" data-live-sr={tab.live}>
+                      {tab.count ? `, ${tab.countLabel(tab.count)}` : ""}
+                    </span>
+                  )}
+                </a>
+              </li>
+            ))}
+            {organizerInBar && (
+              <li class="lg:hidden">
+                <a
+                  href={`${base}/organisateur`}
+                  class={linkClass("organizer")}
+                  aria-current={active === "organizer" ? "page" : undefined}
+                >
+                  <svg
+                    aria-hidden="true"
+                    class="size-6"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    set:html={ICONS.organizer}
+                  />
+                  <span class="max-lg:text-xs">Pilotage</span>
+                </a>
+              </li>
+            )}
+          </ul>
+        </div>
+        <ul class="hidden lg:flex lg:flex-col lg:gap-1">
+          {me.isOrganizer && (
+            <li>
+              <a
+                href={`${base}/organisateur`}
+                class={linkClass("organizer")}
+                aria-current={active === "organizer" ? "page" : undefined}
+              >
+                <svg
+                  aria-hidden="true"
+                  class="size-6"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  set:html={ICONS.organizer}
+                />
+                <span>Organisation</span>
+              </a>
+            </li>
+          )}
+          <li>
+            <a href={`${base}/profil`} class={linkClass("profile")} aria-current={active === "profile" ? "page" : undefined}>
+              {photo ? (
+                <img src={photo} alt="" width="96" height="96" class="size-8 shrink-0 rounded-full bg-surface-alt object-cover" />
+              ) : (
+                <span
+                  aria-hidden="true"
+                  class="flex size-8 shrink-0 items-center justify-center rounded-full bg-title text-sm font-semibold text-white"
+                >
+                  {initialsOf(me.firstName, me.lastName)}
+                </span>
+              )}
+              <span class="min-w-0">
+                <span class="block truncate">Mon profil</span>
+                <span class="block truncate text-sm font-normal text-muted">
+                  {me.firstName} {me.lastName}
+                </span>
+              </span>
+            </a>
+          </li>
+        </ul>
+      </nav>
+    )
+  }
+  {
+    readOnly && (
+      <p role="status" data-lecture-seule-bandeau class="bg-surface-alt px-4 py-3 text-center text-base font-semibold text-title">
+        L’édition est terminée, votre espace reste consultable.
+      </p>
+    )
+  }
+  <slot />
+</EspaceLayout>
+
+<script>
+  // F-132 : badges mis à jour toutes les 60 s onglet visible (module sans React, voir LiveBadges.tsx).
+  import { initLiveBadges } from "../../react-components/espace/LiveBadges";
+  initLiveBadges();
+</script>

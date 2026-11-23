@@ -169,6 +169,10 @@ All audits require the dev server running (`cd web && pnpm dev`).
 - `/setup-deploy` — Interactive wizard to configure deployment: generates secrets, sets up GitHub secrets/variables/environments, creates local `.env` files. Run once before first deployment.
 - `/deploy` — Deploy to dev or prod. Runs pre-flight checks, triggers the GitHub Actions pipeline, monitors progress. Designed for non-technical users.
 
+## Participant space (in progress)
+
+The participant space (`/espace/*`: magic-link access, directory, B2B meetings, messaging, reminders, organiser dashboard, HelloAsso import) is specified in `docs/espace/`. Before any task on it, read `docs/espace/CLAUDE.md` in full: it holds the agents' shared memory, the reading order of the specs and the conventions specific to this feature.
+
 ## Practices
 
 Read `.claude/practices.md` for the index of all practice docs. Key docs:

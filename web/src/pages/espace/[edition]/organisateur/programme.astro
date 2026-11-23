@@ -1,0 +1,25 @@
+---
+// Onglet « Programme » de l'interface organisation (15-administration.md, AD-3) : éditeur du programme sur le brouillon de Strapi,
+// publication groupée (D-22). Réservé à l'organisateur de l'édition (NF-71) ; fermé sur une édition terminée (F-153).
+import OrganizerFrame from "../../../../components/espace/OrganizerFrame.astro";
+import Notice from "../../../../components/espace/Notice.astro";
+import ProgramEditor, { type ProgramData } from "../../../../react-components/espace/organizer/ProgramEditor";
+import { espaceGet, publicStrapiUrl } from "../../../../lib/espace/api";
+import { organizerPage } from "../../../../lib/espace/organizer";
+
+const page = await organizerPage(Astro, "programme");
+if (page.kind === "response") return page.response;
+const { edition, me, slug, base } = page;
+const program = page.kind === "page" ? await espaceGet<ProgramData>(`/admin/${encodeURIComponent(slug)}/program`, page.cookie) : null;
+if (program && !program.ok && program.status === 401) return Astro.redirect(`${base}/connexion`);
+---
+
+<OrganizerFrame title="Programme" heading="Programme de la journée" tab="programme" edition={edition} me={me} slug={slug} base={base} refused={page.kind === "refused"}>
+  {
+    program?.ok ? (
+      <ProgramEditor client:only="react" edition={slug} strapiUrl={publicStrapiUrl} publicPath={`/editions/${encodeURIComponent(slug)}`} initial={program.data} />
+    ) : (
+      <Notice kind="alert">Le programme n’est pas disponible pour le moment. Rechargez la page dans quelques instants.</Notice>
+    )
+  }
+</OrganizerFrame>

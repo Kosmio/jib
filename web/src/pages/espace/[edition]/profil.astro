@@ -1,0 +1,143 @@
+---
+// E3 : mon profil (F-30 à F-32, F-12). Un seul îlot, ProfileForm ; la déconnexion est un formulaire HTML (POST /auth/logout, 303 vers E0).
+// Sans session valable pour l'édition de l'URL : E0. Sans consentement enregistré : E2.
+import AppShell from "../../../components/espace/AppShell.astro";
+import EspaceButton from "../../../components/espace/EspaceButton.astro";
+import PrivacyActions from "../../../react-components/espace/PrivacyActions";
+import ProfileForm from "../../../react-components/espace/ProfileForm";
+import { espaceGet, guardSession, publicStrapiUrl } from "../../../lib/espace/api";
+import type { Topic } from "../../../lib/espace/client";
+import { hourRange } from "../../../lib/espace/meetings";
+
+const slug = Astro.params.edition ?? "";
+const cookie = Astro.request.headers.get("cookie");
+const guard = await guardSession(slug, cookie);
+if ("notFound" in guard) return Astro.rewrite("/espace/introuvable");
+if ("redirect" in guard) return Astro.redirect(guard.redirect);
+const { me, edition } = guard;
+
+const base = `/espace/${encodeURIComponent(slug)}`;
+// Sans sujets (route absente ou en erreur), le formulaire omet simplement le bloc des sujets.
+const topicsResult = await espaceGet<Topic[]>(`/editions/${encodeURIComponent(slug)}/topics`, cookie).catch(() => null);
+const topics = topicsResult?.ok ? topicsResult.data : [];
+
+// Plages de rendez-vous B2B de la journée (séquences « pause B2B » du programme), pour le choix des disponibilités (D-10).
+type ProgramSession = { id: string; title: string; start: string | null; end: string | null; kind: string };
+const program = await espaceGet<{ sessions: ProgramSession[] }>(`/editions/${encodeURIComponent(slug)}/program`, cookie).catch(() => null);
+const b2bRanges = (program?.ok ? program.data.sessions : [])
+  .filter((session) => session.kind === "b2b_break")
+  .map(({ id, title, start, end }) => ({ id, title, hours: start && end ? hourRange(start, end) : (start ?? "") }));
+
+// V5-D : GET /me les renvoie ; le type partagé Me ne les déclare pas.
+const b2b = me as typeof me & { lookingFor?: string | null; offering?: string | null; phone?: string | null };
+const initial = {
+  firstName: me.firstName,
+  lastName: me.lastName,
+  jobTitle: me.jobTitle ?? "",
+  company: me.company ?? "",
+  bio: me.bio ?? "",
+  lookingFor: b2b.lookingFor ?? "",
+  offering: b2b.offering ?? "",
+  phone: b2b.phone ?? "",
+  linkedinUrl: me.linkedinUrl ?? "",
+  unavailableSessions: me.unavailableSessions ?? [],
+  photoUrl: me.photoUrl,
+  topics: me.topics.map((topic) => topic.id),
+  emailPrefs: me.emailPrefs,
+  directoryOptIn: me.consent.directoryOptIn,
+  meetingsOptIn: me.consent.meetingsOptIn,
+  newsOptIn: me.consent.newsOptIn,
+};
+---
+
+<AppShell title="Mon profil" active="profile" editionSlug={slug} me={me} readOnly={edition.readOnly}>
+  <div class="mx-auto max-w-180 space-y-4 px-4 py-4">
+    <h1 class="text-2xl leading-tight">Mon profil</h1>
+
+    {
+      me.exhibitor && (
+        <p class="rounded-xl border border-surface-alt bg-white p-4">
+          Vous représentez <strong>{me.exhibitor.name}</strong>
+          {me.exhibitor.standNumber ? <>, stand&nbsp;{me.exhibitor.standNumber}</> : null}.
+          <a href={`${base}/annuaire/x/${encodeURIComponent(me.exhibitor.id)}`} class="mt-1 flex min-h-11 items-center font-bold text-primary-ink underline">
+            Voir la fiche de mon exposant
+          </a>
+        </p>
+      )
+    }
+
+    <section class="rounded-xl border border-surface-alt bg-white p-5">
+      <noscript>
+        <p class="font-semibold">Cette page demande JavaScript. Activez-le ou utilisez un autre navigateur.</p>
+      </noscript>
+      <ProfileForm client:load strapiUrl={publicStrapiUrl} editionSlug={slug} initial={initial} topics={topics} b2bRanges={b2bRanges} readOnly={edition.readOnly} />
+    </section>
+
+    <PrivacyActions client:load strapiUrl={publicStrapiUrl} editionSlug={slug} />
+
+    {
+      me.isOrganizer && (
+        <EspaceButton variant="secondary" href={`${base}/organisateur`}>
+          Tableau de bord organisateur
+        </EspaceButton>
+      )
+    }
+
+    <form method="post" action={`${publicStrapiUrl}/api/espace/auth/logout`} data-espace-deconnexion>
+      <input type="hidden" name="editionSlug" value={slug} />
+      <EspaceButton variant="secondary">Me déconnecter</EspaceButton>
+    </form>
+
+    {/* F-148 : confirmation avant déconnexion. Sans JavaScript, le formulaire part tel quel. */}
+    <dialog
+      id="confirmation-deconnexion"
+      data-permis-lecture-seule
+      aria-labelledby="confirmation-deconnexion-titre"
+      aria-describedby="confirmation-deconnexion-texte"
+      class="m-auto w-[calc(100%-2rem)] max-w-md rounded-xl border-2 border-title bg-white p-5 text-ink backdrop:bg-ink/50"
+    >
+      <h2 id="confirmation-deconnexion-titre" class="font-heading text-xl font-semibold normal-case">Se déconnecter ?</h2>
+      <p id="confirmation-deconnexion-texte" class="mt-2">
+        Pour revenir, il faudra un nouveau lien de connexion ou un code, envoyé par e-mail.
+      </p>
+      <div class="mt-4 grid gap-3">
+        <button
+          type="button"
+          data-deconnexion-confirmer
+          class="inline-flex min-h-13 items-center justify-center rounded-lg border-2 border-title bg-white px-6 text-lg font-bold text-title hover:bg-surface"
+        >
+          Me déconnecter
+        </button>
+        <button
+          type="button"
+          data-deconnexion-annuler
+          autofocus
+          class="inline-flex min-h-13 items-center justify-center rounded-lg bg-gold px-6 text-lg font-bold text-gold-ink hover:bg-gold-light"
+        >
+          Rester connecté
+        </button>
+      </div>
+    </dialog>
+  </div>
+</AppShell>
+
+<script>
+  const form = document.querySelector<HTMLFormElement>("form[data-espace-deconnexion]");
+  const dialogue = document.getElementById("confirmation-deconnexion") as HTMLDialogElement | null;
+  if (form && dialogue && typeof dialogue.showModal === "function") {
+    let confirme = false;
+    // Écouteur du formulaire : il passe avant celui du document (EspaceLayout) qui vide les copies hors connexion.
+    form.addEventListener("submit", (event) => {
+      if (confirme) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      dialogue.showModal();
+    });
+    dialogue.querySelector("[data-deconnexion-annuler]")?.addEventListener("click", () => dialogue.close());
+    dialogue.querySelector("[data-deconnexion-confirmer]")?.addEventListener("click", () => {
+      confirme = true;
+      dialogue.close();
+      form.requestSubmit();
+    });
+  }
+</script>

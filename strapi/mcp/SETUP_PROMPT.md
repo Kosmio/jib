@@ -1,125 +1,65 @@
-# MCP Setup Instructions for AI Agents
+# Instructions de connexion du MCP, à l'usage des agents d'IA
 
-You are helping a user connect their AI tool to their website's content management system via MCP.
+Tu aides une personne à connecter son outil d'IA au serveur MCP du site des Journées de l'Innovation Filière Bois.
 
-## What this is
+## Ce qu'il faut savoir
 
-The user's website has a built-in MCP server that lets AI assistants manage content (articles, images, etc.). The server is already running on the website — the user needs to create an API token and configure their AI tool.
+- Le serveur MCP tourne déjà sur le site. Il permet de gérer le contenu (éditions, programme, intervenants, organisations, partenaires, tags, pages, médias).
+- Il n'expose aucune donnée de l'espace participant (types `api::espace.*`) et refuse toute suppression sans `confirm: true`.
+- Le jeton d'API Strapi passe **uniquement** par l'en-tête `Authorization: Bearer <jeton>`. Le serveur refuse un jeton dans l'URL (HTTP 400). Ne jamais écrire `?token=` dans une configuration.
 
-## What you need from the user
+## Ce qu'il te faut
 
-1. **Their website URL** (e.g. `https://example.com`)
-2. **A Strapi API token** — the user creates this in their admin panel (instructions below)
+1. L'URL du site (ex. `https://example.org`) ; le point d'entrée MCP est `{url}/mcp`. En local : `http://localhost:3100/`.
+2. Un jeton d'API Strapi à droits limités, créé par la personne.
 
-## Step-by-step process
+## Étape 1 : faire créer le jeton
 
-### 1. Determine the MCP endpoint
+Dis exactement ceci :
 
-From the website URL, derive the MCP endpoint:
-
-- Website URL: `https://example.com` → MCP endpoint: `https://example.com/mcp`
-- The pattern is always `{website_url}/mcp`
-- For local development: `http://localhost:3100/` (no `/mcp` prefix — Traefik isn't in the loop locally)
-
-### 2. Ask the user to create an API token
-
-Tell the user exactly this:
-
-> To connect your AI assistant to your website, you need to create an API token. Here's how:
+> 1. Ouvrez **{url}/strapi/admin** et connectez-vous.
+> 2. Roue crantée (Réglages), puis **Jetons d'API**, puis **Créer un nouveau jeton d'API**.
+> 3. Nom : `Assistant IA`. Durée : 30 jours. Type : **Personnalisé** (pas « Accès complet »).
+> 4. Cochez `find`, `findOne`, `create`, `update` (et `publish` si besoin) sur les types de contenu à gérer. Ne cochez **pas** `delete`. Pour les médias, `find` et `upload`. Ne cochez rien dans la section Espace.
+> 5. Enregistrez, puis copiez le jeton tout de suite : il ne sera plus affichable.
 >
-> 1. Open your website's admin panel: **{website_url}/strapi/admin**
-> 2. Log in with your admin account
-> 3. Click the **gear icon** (Settings) in the left sidebar
-> 4. Under **Global Settings**, click **API Tokens**
-> 5. Click the **Create new API Token** button (top right)
-> 6. Fill in:
->    - **Name**: `AI Assistant` (or any name you like)
->    - **Token duration**: **Unlimited**
->    - **Token type**: **Full access**
-> 7. Click **Save**
-> 8. You'll see a long text string — that's your token. **Copy it now** — you won't be able to see it again after leaving this page.
->
-> Paste the token here when you have it.
+> Collez-le-moi quand vous l'avez.
 
-### 3. Configure the user's AI tool
+## Étape 2 : écrire la configuration
 
-Once you have the MCP endpoint URL and the token, configure the MCP connection.
+Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_config.json` sur macOS, `%APPDATA%\Claude\claude_desktop_config.json` sur Windows), Claude Code (`.mcp.json` à la racine du projet, à ne pas versionner) ou Windsurf (`~/.codeium/windsurf/mcp_config.json`) :
 
-The token is passed as a query parameter appended to the URL: `{mcp_endpoint}?token={token}`. If the tool supports custom headers, `Authorization: Bearer {token}` also works as an alternative.
-
-**Claude Desktop** — edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
 ```json
 {
   "mcpServers": {
-    "website-cms": {
+    "jib-cms": {
       "type": "http",
-      "url": "{mcp_endpoint}?token={token}"
+      "url": "{url}/mcp",
+      "headers": { "Authorization": "Bearer {jeton}" }
     }
   }
 }
 ```
 
-**Claude Code** — create or edit `.mcp.json` in the user's project root:
-```json
-{
-  "mcpServers": {
-    "website-cms": {
-      "type": "http",
-      "url": "{mcp_endpoint}?token={token}"
-    }
-  }
-}
-```
+Cursor : Réglages, MCP Servers, type HTTP, URL `{url}/mcp`, en-tête `Authorization: Bearer {jeton}`.
 
-**Cursor** — add via Settings → MCP Servers:
-- Type: HTTP
-- URL: `{mcp_endpoint}?token={token}`
+Si l'outil ne sait pas envoyer d'en-tête personnalisé, il n'est pas compatible : le dire à la personne.
 
-**Windsurf** — edit `~/.codeium/windsurf/mcp_config.json`:
-```json
-{
-  "mcpServers": {
-    "website-cms": {
-      "type": "http",
-      "url": "{mcp_endpoint}?token={token}"
-    }
-  }
-}
-```
+### Transports
 
-**If you cannot determine the user's tool**, tell them:
-> Add an MCP server in your AI tool's settings with:
-> - **Type**: HTTP
-> - **URL**: `{mcp_endpoint}?token={token}`
-
-### Transport selection
-
-The server supports two MCP transports. Use the one that fits the user's tool:
-
-| Transport | When to use | Endpoint |
+| Transport | Usage | Point d'entrée |
 |---|---|---|
-| **Streamable HTTP** (recommended) | Most modern MCP clients (Claude Desktop, Claude Code, Cursor, Windsurf) | `{mcp_endpoint}?token={token}` |
-| **Legacy SSE** | Older clients that don't support Streamable HTTP | `GET {website_url}/mcp/sse?token={token}` to open stream, `POST {website_url}/mcp/messages?sessionId=<id>` to send |
+| Streamable HTTP (recommandé) | Claude Desktop, Claude Code, Cursor, Windsurf | `{url}/mcp` |
+| SSE ancien | Clients qui ne gèrent pas Streamable HTTP | `GET {url}/mcp/sse`, puis `POST {url}/mcp/messages?sessionId=<id>` |
 
-Try Streamable HTTP first. Only fall back to SSE if the tool reports an error or explicitly requires SSE.
+Essayer Streamable HTTP d'abord. Dans les deux cas, l'en-tête `Authorization` est obligatoire.
 
-### 4. Tell the user what to do next
+## Étape 3 : conclure
 
-> Your MCP configuration is ready. Here's what to do:
->
-> 1. {If you wrote the config file: "The config has been saved." / If not: "Copy the JSON above into your AI tool's MCP settings."}
-> 2. **Restart your AI tool** to load the new MCP server.
-> 3. Once restarted, ask me to "list my content types" to verify everything works.
->
-> Your token is stored only in your local config — it's never shared with anyone else.
+> La configuration est prête. Redémarrez votre outil d'IA, puis demandez « liste les types de contenu » pour vérifier. Le jeton reste dans votre configuration locale.
 
-### 5. Verify the setup
+Vérification : l'outil `list_content_types` doit renvoyer les types. En cas d'erreur d'authentification, faire recopier le jeton en entier ou en créer un nouveau.
 
-Once the MCP is loaded, call the `list_content_types` tool. If it returns content types, the setup is complete.
+## Révoquer l'accès
 
-If you get an auth error, the token may be wrong. Ask the user to double-check they copied the full token, or to create a new one following the steps above.
-
-## If the user wants to revoke access
-
-Tell them:
-> Go to your admin panel ({website_url}/strapi/admin) → Settings → API Tokens. Find the token and click the trash icon to delete it. This immediately revokes access.
+> Administration ({url}/strapi/admin), Réglages, Jetons d'API, corbeille sur la ligne du jeton. L'accès est coupé immédiatement.

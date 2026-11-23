@@ -2,6 +2,7 @@
 import Layout from "../../layouts/Layout.astro";
 import { getOrganisationBySlug, buildImageUrl } from "../../lib/strapi";
 import { getTagColor, getTagLabel } from "../../lib/tag-colors";
+import { safeHtml } from "../../lib/html";
 
 const { slug } = Astro.params;
 const response = await getOrganisationBySlug(slug!);
@@ -106,7 +107,7 @@ const allEditions = [...editionsFromPartenariats, ...editionsFromIntervenants]
 
       <!-- Long description -->
       {organisation.long_description && (
-        <div class="prose prose-gray max-w-none mb-8" set:html={organisation.long_description} />
+        <div class="prose prose-gray max-w-none mb-8" set:html={safeHtml(organisation.long_description)} />
       )}
 
       <!-- Intervenants -->

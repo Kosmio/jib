@@ -9,9 +9,10 @@ on:
         type: choice
         options:
           - dev
+          - preprod
           - prod
       version:
-        description: 'Version to deploy (e.g., 0.1.0)'
+        description: 'Version to deploy (e.g., 0.2.0)'
         required: true
         type: string
       dry_run:
@@ -20,7 +21,22 @@ on:
         type: boolean
         default: false
       reset_db:
-        description: 'Reset database before deploy (DROP + re-seed)'
+        description: 'Reset database before deploy (DROP + re-seed). Refused on prod'
+        required: false
+        type: boolean
+        default: false
+      copy_prod_data:
+        description: 'Preprod only: replace the database and uploads with a copy of prod (vars.SOURCE_HOST)'
+        required: false
+        type: boolean
+        default: false
+      edition_data:
+        description: 'Optional: file of strapi/scripts/espace/editions/ to import after the deploy (topics, exhibitors, no personal data)'
+        required: false
+        type: string
+        default: ''
+      edition_data_apply:
+        description: 'Write the edition data (otherwise a simulation that only lists the changes)'
         required: false
         type: boolean
         default: false
@@ -30,10 +46,19 @@ jobs:
     name: Deploy to ${{ inputs.environment }}
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
+    env:
+      SSH_PORT: ${{ vars.SSH_PORT || '2234' }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      # NF-58 : la prod ne se réinitialise jamais par ce workflow. L'étape échoue avant toute connexion SSH.
+      - name: Refuse reset on prod
+        if: ${{ inputs.environment == 'prod' && inputs.reset_db }}
+        run: |
+          echo "::error::reset_db is refused on prod: it would DROP the production database. Uncheck reset_db."
+          exit 1
 
       - name: Validate inputs
         run: |
@@ -46,6 +71,34 @@ jobs:
             exit 1
           fi
 
+          if [[ "${{ inputs.copy_prod_data }}" == "true" && "${{ inputs.environment }}" != "preprod" ]]; then
+            echo "Error: copy_prod_data only runs on preprod"
+            exit 1
+          fi
+
+      # NF-60 : en prod, un expéditeur ou une liste d'organisateurs vide rendrait l'espace muet ou sans pilotage.
+      # L'étape tourne aussi en dry run, et avant le transfert.
+      - name: Check prod variables
+        if: ${{ inputs.environment == 'prod' }}
+        env:
+          EMAIL_FROM_VAR: ${{ vars.EMAIL_FROM }}
+          ORGANIZER_EMAILS_VAR: ${{ vars.ORGANIZER_EMAILS }}
+        run: |
+          missing=0
+          if [[ -z "${EMAIL_FROM_VAR//[[:space:]]/}" ]]; then
+            echo "::error::GitHub variable EMAIL_FROM is empty in the prod environment (sender of the participant e-mails)."
+            missing=1
+          fi
+          if [[ -z "${ORGANIZER_EMAILS_VAR//[[:space:]]/}" ]]; then
+            echo "::error::GitHub variable ORGANIZER_EMAILS is empty in the prod environment (nobody could reach the organizer panel)."
+            missing=1
+          fi
+          if [[ $missing == 1 ]]; then
+            echo "Set them with: gh variable set <NAME> --env prod --body '<value>' (see docs/espace/exploitation.md)"
+            exit 1
+          fi
+          echo "EMAIL_FROM and ORGANIZER_EMAILS are set."
+
       - name: Setup SSH
         if: ${{ !inputs.dry_run }}
         uses: webfactory/ssh-agent@v0.9.0
@@ -56,10 +109,10 @@ jobs:
         if: ${{ !inputs.dry_run }}
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -H -p 2234 ${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H -p $SSH_PORT ${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts
           cat >> ~/.ssh/config << EOF
           Host ${{ vars.DEPLOY_HOST }}
-            Port 2234
+            Port $SSH_PORT
             ServerAliveInterval 30
             ServerAliveCountMax 10
             TCPKeepAlive yes
@@ -78,10 +131,20 @@ jobs:
           ALTCHA_HMAC_KEY=${{ secrets.SECRET_ALTCHA_HMAC_KEY }}
           EMAIL_API_KEY=${{ secrets.SECRET_EMAIL_API_KEY }}
           EMAIL_LIST_ID=${{ vars.EMAIL_LIST_ID }}
+          EMAIL_FROM=${{ vars.EMAIL_FROM }}
+          ORGANIZER_EMAILS=${{ vars.ORGANIZER_EMAILS }}
+          LINK_RATE_IP_MAX=${{ vars.LINK_RATE_IP_MAX }}
           EMAIL_CONTACT_TEMPLATE_ID=${{ secrets.SECRET_EMAIL_CONTACT_TEMPLATE_ID }}
           PUBLIC_MATOMO_URL=${{ secrets.SECRET_PUBLIC_MATOMO_URL }}
           PUBLIC_MATOMO_SITE_ID=${{ secrets.SECRET_PUBLIC_MATOMO_SITE_ID }}
+          HELLOASSO_CLIENT_SECRET=${{ secrets.SECRET_HELLOASSO_CLIENT_SECRET }}
+          MAILPIT_AUTH=${{ secrets.SECRET_MAILPIT_AUTH }}
+          ADMIN_RESET=${{ secrets.SECRET_ADMIN_RESET }}
           EOF
+
+          # Une variable GitHub non renseignée ne doit pas écraser la valeur du fichier d'overlay (ni le défaut du compose).
+          grep -v -E '^(EMAIL_FROM|ORGANIZER_EMAILS|LINK_RATE_IP_MAX)=[[:space:]]*$' /tmp/.env.secrets > /tmp/.env.secrets.filtered
+          mv /tmp/.env.secrets.filtered /tmp/.env.secrets
 
       - name: Copy infrastructure files to server
         if: ${{ !inputs.dry_run }}
@@ -101,6 +164,29 @@ jobs:
           cat /tmp/.env.secrets | ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} \
             "cat > ~/jib/infra/deploy/overlays/${{ inputs.environment }}/.env.secrets"
 
+      # NF-59 : sauvegarde de la base et des téléversements avant tout changement en prod. Un échec arrête le déploiement.
+      # La planification quotidienne à 3h00 est (ré)installée au passage, sans doublon.
+      - name: Backup prod
+        if: ${{ !inputs.dry_run && inputs.environment == 'prod' }}
+        run: |
+          ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} bash << 'EOF'
+            set -e
+            cd ~/jib/infra/deploy
+            bash scripts/backup.sh prod
+            bash scripts/backup.sh prod install-cron
+          EOF
+
+      # Chaque build sous une même étiquette laisse l'ancienne image sans étiquette sur le serveur : sans ce ménage, le disque se remplit
+      # et le déploiement s'arrête sur « no space left on device ». Seules les images sans étiquette et sans conteneur sont supprimées.
+      - name: Remove dangling images
+        if: ${{ !inputs.dry_run }}
+        run: |
+          ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} bash << 'EOF' 2>&1 | cat
+            df -h / | tail -1
+            docker image prune -f | tail -1
+            df -h / | tail -1
+          EOF
+
       - name: Pull latest images
         if: ${{ !inputs.dry_run }}
         run: |
@@ -108,17 +194,20 @@ jobs:
           echo "${{ secrets.GITHUB_TOKEN }}" | ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} \
             "docker login ghcr.io -u ${{ github.actor }} --password-stdin"
 
-          # Pull images
+          # Pull images. Avec pipefail, un téléchargement en échec arrête le déploiement : sans lui, « | cat » masquait l'erreur
+          # et les conteneurs repartaient sur l'ancienne image, déploiement affiché en succès.
+          set -o pipefail
           ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} bash << 'EOF' 2>&1 | cat
             set -e
             cd ~/jib/infra/deploy
             ENV_FILE="overlays/${{ inputs.environment }}/.env.${{ inputs.environment }}"
             SECRETS_FILE="overlays/${{ inputs.environment }}/.env.secrets"
+            # Le fichier fusionné contient les secrets : il est retiré même si le téléchargement échoue.
+            trap 'rm -f "$ENV_FILE.merged"' EXIT
             cp "$ENV_FILE" "$ENV_FILE.merged"
             cat "$SECRETS_FILE" >> "$ENV_FILE.merged"
             sed -i "s/^JIB_VERSION=.*/JIB_VERSION=${{ inputs.version }}/" "$ENV_FILE.merged"
             DOCKER_COMPOSE_ENV_FILE="$ENV_FILE.merged" scripts/deploy.sh ${{ inputs.environment }} pull 2>&1
-            rm -f "$ENV_FILE.merged"
           EOF
 
       - name: Reset database
@@ -163,6 +252,71 @@ jobs:
             rm -f "$SECRETS_FILE" "$ENV_FILE.merged"
           ENDSSH
 
+      - name: Copy prod data
+        if: ${{ !inputs.dry_run && inputs.copy_prod_data && inputs.environment == 'preprod' }}
+        run: |
+          SRC="${{ vars.SOURCE_USER }}@${{ vars.SOURCE_HOST }}"
+          DST="${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}"
+          ssh-keyscan -H -p $SSH_PORT ${{ vars.SOURCE_HOST }} >> ~/.ssh/known_hosts
+          cat >> ~/.ssh/config << EOF
+          Host ${{ vars.SOURCE_HOST }}
+            Port $SSH_PORT
+            ServerAliveInterval 30
+            Compression yes
+          EOF
+
+          echo "Stopping Strapi and MCP on preprod..."
+          ssh $DST "docker stop jib-mcp jib-strapi"
+
+          echo "Replacing the preprod database with a dump of prod..."
+          ssh $DST 'docker exec jib-postgres psql -v ON_ERROR_STOP=1 -U strapi -d strapi -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"'
+          ssh $SRC 'docker exec jib-postgres pg_dump -U strapi -d strapi --no-owner --no-privileges | gzip' | \
+            ssh $DST 'gunzip | docker exec -i jib-postgres psql -q -v ON_ERROR_STOP=1 -U strapi -d strapi'
+
+          echo "Replacing the preprod uploads with those of prod..."
+          ssh $SRC 'docker run --rm -v ~/jib/data/uploads:/u:ro alpine:3.20 tar -C /u -czf - .' | \
+            ssh $DST 'docker run --rm -i -v ~/jib/data/uploads:/u alpine:3.20 sh -c "find /u -mindepth 1 -delete && tar -C /u -xzpf -"'
+
+          echo "Starting Strapi on the prod data (it migrates the schema to this version)..."
+          ssh $DST "docker start jib-strapi"
+          for i in $(seq 1 60); do
+            if ssh $DST "docker exec jib-strapi wget -q -O /dev/null http://127.0.0.1:1337/_health" 2>/dev/null; then
+              echo "Strapi is up."
+              break
+            fi
+            if [[ $i == 60 ]]; then
+              ssh $DST "docker logs --tail 100 jib-strapi"
+              echo "Error: Strapi did not come up within 5 minutes"
+              exit 1
+            fi
+            sleep 5
+          done
+          ssh $DST "docker start jib-mcp"
+
+      # Données d'une édition (sujets, exposants) sans donnée personnelle, versionnées dans strapi/scripts/espace/editions/.
+      # Le script du dépôt est copié dans le conteneur : il sert aussi sur une image plus ancienne. Simulation par défaut.
+      - name: Import edition data
+        if: ${{ !inputs.dry_run && inputs.edition_data != '' }}
+        env:
+          EDITION_DATA: ${{ inputs.edition_data }}
+          EDITION_DATA_APPLY: ${{ inputs.edition_data_apply }}
+        run: |
+          case "$EDITION_DATA" in
+            */*|*..*|'') echo "::error::edition_data est un nom de fichier de strapi/scripts/espace/editions/"; exit 1 ;;
+          esac
+          FILE="strapi/scripts/espace/editions/$EDITION_DATA"
+          [ -f "$FILE" ] || { echo "::error::$FILE introuvable"; exit 1; }
+          if grep -q '"speakers"' "$FILE"; then
+            echo "::error::$FILE contient des intervenants (données personnelles) : refusé"; exit 1
+          fi
+          DST="${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}"
+          cat "$FILE" | ssh $DST "docker exec -i jib-strapi sh -c 'cat > /tmp/edition-data.json'"
+          cat strapi/scripts/espace/import-edition-data.js | \
+            ssh $DST "docker exec -i jib-strapi sh -c 'cat > /tmp/import-edition-data.js'"
+          FLAG=""
+          if [ "$EDITION_DATA_APPLY" = "true" ]; then FLAG="--apply"; fi
+          ssh $DST "docker exec -w /app -e NODE_PATH=/app/node_modules jib-strapi node /tmp/import-edition-data.js /tmp/edition-data.json $FLAG; status=\$?; docker exec jib-strapi rm -f /tmp/edition-data.json /tmp/import-edition-data.js; exit \$status"
+
       - name: Verify container environment
         if: ${{ !inputs.dry_run }}
         run: |
@@ -194,5 +348,5 @@ jobs:
         if: ${{ failure() && !inputs.dry_run }}
         run: |
           echo "Deployment failed. Check logs manually on the server with:"
-          echo "  ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} -p 2234"
+          echo "  ssh ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} -p $SSH_PORT"
           echo "  cd ~/jib/infra/deploy && ./scripts/deploy.sh ${{ inputs.environment }} logs"

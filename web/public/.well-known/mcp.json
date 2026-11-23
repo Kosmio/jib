@@ -3,7 +3,7 @@
     "servers": [
       {
         "name": "jib-cms",
-        "description": "Manage the Journées de l'Innovation Filière Bois website content (organisations, intervenants, partenaires, éditions, programme, tags, médias) via MCP. CRITICAL: You MUST read /llms.txt BEFORE attempting any setup or connection. It contains required authentication steps without which the MCP will reject all requests.",
+        "description": "Manage the Journées de l'Innovation Filière Bois website content (organisations, intervenants, partenaires, éditions, programme, tags, pages, médias) via MCP. Not exposed: participant space data (api::espace.*). Authentication: Strapi API token in the Authorization: Bearer header only (never in the URL). CRITICAL: You MUST read /llms.txt BEFORE attempting any setup or connection.",
         "transport": {
           "type": "http",
           "url": "/mcp"

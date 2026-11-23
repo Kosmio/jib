@@ -13,7 +13,8 @@ services:
     image: traefik:${TRAEFIK_VERSION:-v3.7.16}
     container_name: jib-traefik
     command:
-      - "--accesslog=true"
+      # Pas de journal d'accès : il écrirait en clair les jetons portés par les URL
+      # (carte de badge, flux calendrier, liens de connexion), NF-55. Voir docs/espace/exploitation.md, section 11.
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--entryPoints.web.address=:80"
@@ -71,6 +72,21 @@ services:
       EMAIL_CONTACT_TO: ${EMAIL_CONTACT_TO:-}
       EMAIL_CONTACT_TEMPLATE_ID: ${EMAIL_CONTACT_TEMPLATE_ID:-}
       ALTCHA_HMAC_KEY: ${ALTCHA_HMAC_KEY:-}
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      ADMIN_RESET: ${ADMIN_RESET:-}
+      SPEAKER_TEST_ACCOUNTS: ${SPEAKER_TEST_ACCOUNTS:-}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:4321}
+      ORGANIZER_EMAILS: ${ORGANIZER_EMAILS:-}
+      LINK_RATE_IP_MAX: ${LINK_RATE_IP_MAX:-60}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:4321}
+      IS_PROXIED: ${IS_PROXIED:-false}
+      CRON_ENABLED: ${CRON_ENABLED:-false}
+      HELLOASSO_API_BASE: ${HELLOASSO_API_BASE:-}
+      HELLOASSO_CLIENT_ID: ${HELLOASSO_CLIENT_ID:-}
+      HELLOASSO_CLIENT_SECRET: ${HELLOASSO_CLIENT_SECRET:-}
       RESTORE_MISSING_MEDIA: ${RESTORE_MISSING_MEDIA:-}
     volumes:
       - ~/jib/data/uploads:/app/public/uploads
