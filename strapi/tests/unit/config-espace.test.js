@@ -85,7 +85,7 @@ describe('config/middlewares.js : CORS restreint (A-05, NF-04)', () => {
 
   it('est une fonction de { env } qui rend la liste des intergiciels de Strapi dans le même ordre', () => {
     const names = middlewares().map((entry) => (typeof entry === 'string' ? entry : entry.name));
-    assert.deepEqual(names, ['strapi::logger', 'strapi::errors', 'strapi::security', 'strapi::cors', 'strapi::poweredBy', 'strapi::query', 'strapi::body', 'strapi::session', 'strapi::favicon', 'strapi::public']);
+    assert.deepEqual(names, ['strapi::logger', 'strapi::errors', 'strapi::security', 'strapi::cors', 'strapi::poweredBy', 'strapi::query', 'strapi::body', 'global::admin-status-field', 'strapi::session', 'strapi::favicon', 'strapi::public']);
   });
 
   it('limite CORS à l’origine du front local par défaut, avec les cookies (credentials)', () => {
