@@ -107,7 +107,7 @@ function renderLayout({ subject, preheader = '', title, blocks, footer, manage =
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="${COLORS.page}" style="background-color:${COLORS.page}"><tr><td align="center" style="padding:24px 12px">
 <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background-color:${COLORS.card};border-radius:16px;overflow:hidden">
 <tr><td bgcolor="${color}" style="background-color:${color};padding:28px 40px">
-<img src="${escapeHtml(base)}/assets/logo-jib-blanc.png" width="180" alt="${JIB_LOGO_ALT}" style="display:block;border:0;width:180px;height:auto;margin:0 0 20px">
+<img src="${escapeHtml(base)}/assets/logo-jib-mail-blanc.png" width="200" alt="${JIB_LOGO_ALT}" style="display:block;border:0;width:200px;height:auto;margin:0 0 20px">
 <div style="margin:0 0 6px;font-size:24px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:${COLORS.white}">${escapeHtml(title)}</div>
 <div style="font-size:16px;font-weight:600;color:${COLORS.white}">${escapeHtml(edition.title)}</div>
 </td></tr>

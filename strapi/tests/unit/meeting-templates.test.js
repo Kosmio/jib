@@ -69,7 +69,7 @@ function describeTemplate(name, { data, urls, mustContain, hostile }) {
     it('enveloppe commune : 600 px, logo blanc, pied Xylofutur', () => {
       const { html } = rendered();
       assert.match(html, /600/);
-      assert.ok(html.includes(`${PUBLIC_URL}/assets/logo-jib-blanc.png`));
+      assert.ok(html.includes(`${PUBLIC_URL}/assets/logo-jib-mail-blanc.png`));
       assert.match(html, /Xylofutur/);
     });
 
