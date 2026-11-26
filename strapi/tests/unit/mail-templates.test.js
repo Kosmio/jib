@@ -156,7 +156,7 @@ function describeTemplate(name, { data, mustContain, subjectPattern, manage = tr
 
 describeTemplate('welcome', {
   data: { edition: EDITION, publicUrl: PUBLIC_URL, firstName: 'Léa', url: ACTION_URL, validityHours: 72 },
-  mustContain: ['Léa', '72'],
+  mustContain: ['Léa', '72', 'Journée de l’Innovation de la Filière Bois en Nouvelle-Aquitaine (test) a bien été enregistrée', 'programme personnalisé'],
 });
 
 describeTemplate('meeting-cancelled', {
