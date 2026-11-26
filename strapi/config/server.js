@@ -35,7 +35,6 @@ module.exports = ({ env }) => ({
     listId: env('EMAIL_LIST_ID'),
     contact: {
       to: env('EMAIL_CONTACT_TO'),
-      templateId: env('EMAIL_CONTACT_TEMPLATE_ID'),
     },
   },
 });

@@ -252,12 +252,13 @@ The `@getbrevo/brevo` v5 SDK uses a client-based API:
 const { BrevoClient } = require('@getbrevo/brevo');
 const client = new BrevoClient({ apiKey: strapi.config.get('server.email.apiKey') });
 
-// Send transactional email
-await client.transactionalEmails.sendTransacEmail({ templateId, to, replyTo, params });
-
 // Create contact in list
 await client.contacts.createContact({ email, listIds: [listId] });
 ```
+
+Transactional e-mails (contact form, participant space) never call the SDK directly: they go through
+`createMailProvider()` (`src/api/espace/lib/mail`), which picks brevo, smtp or console from `EMAIL_PROVIDER`
+and `NODE_ENV`, sends from `EMAIL_FROM`, and takes `{ to, replyTo?, subject, html, text }`. No Brevo template.
 
 ### Altcha (captcha)
 

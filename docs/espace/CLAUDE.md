@@ -113,7 +113,7 @@ Démarrer Strapi sur une base aligne son schéma sur le code. Le premier démarr
 
 ### Variables d'environnement
 
-Existantes. Strapi (`strapi/.env`, lu par `strapi/config/*.js`) : `HOST`, `PORT`, `BASE_URL`, `ADMIN_URL`, `APP_KEYS`, `API_TOKEN_SALT`, `ADMIN_JWT_SECRET`, `TRANSFER_TOKEN_SALT`, `JWT_SECRET`, `DATABASE_CLIENT`, `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_NAME`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `EMAIL_API_KEY` (clé Brevo réelle), `EMAIL_LIST_ID`, `EMAIL_CONTACT_TO`, `EMAIL_CONTACT_TEMPLATE_ID`, `ALTCHA_HMAC_KEY`, `RESTORE_MISSING_MEDIA`. Front (`web/.env`) : `STRAPI_URL` (serveur), `REACT_STRAPI_URL` (navigateur), `PUBLIC_COOKIE_CONSENT`, `PUBLIC_MATOMO_URL`, `PUBLIC_MATOMO_SITE_ID`.
+Existantes. Strapi (`strapi/.env`, lu par `strapi/config/*.js`) : `HOST`, `PORT`, `BASE_URL`, `ADMIN_URL`, `APP_KEYS`, `API_TOKEN_SALT`, `ADMIN_JWT_SECRET`, `TRANSFER_TOKEN_SALT`, `JWT_SECRET`, `DATABASE_CLIENT`, `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_NAME`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `EMAIL_API_KEY` (clé Brevo réelle), `EMAIL_LIST_ID`, `EMAIL_CONTACT_TO`, `ALTCHA_HMAC_KEY`, `RESTORE_MISSING_MEDIA`. Front (`web/.env`) : `STRAPI_URL` (serveur), `REACT_STRAPI_URL` (navigateur), `PUBLIC_COOKIE_CONSENT`, `PUBLIC_MATOMO_URL`, `PUBLIC_MATOMO_SITE_ID`.
 
 Ajoutées par l'espace (Strapi) :
 

@@ -35,11 +35,11 @@ describe('config/server.js : section email', () => {
 
   it('garde la clé Brevo et les réglages existants du site (contact, liste)', () => {
     const { email } = serverConfig({
-      env: makeEnv({ EMAIL_API_KEY: 'cle', EMAIL_LIST_ID: '7', EMAIL_CONTACT_TO: 'c@example.org', EMAIL_CONTACT_TEMPLATE_ID: '3' }),
+      env: makeEnv({ EMAIL_API_KEY: 'cle', EMAIL_LIST_ID: '7', EMAIL_CONTACT_TO: 'c@example.org' }),
     });
     assert.equal(email.apiKey, 'cle');
     assert.equal(email.listId, '7');
-    assert.deepEqual(email.contact, { to: 'c@example.org', templateId: '3' });
+    assert.deepEqual(email.contact, { to: 'c@example.org' });
   });
 
   it('laisse le reste de la configuration serveur intact', () => {
