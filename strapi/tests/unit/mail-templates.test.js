@@ -115,7 +115,7 @@ function describeTemplate(name, { data, mustContain, subjectPattern, manage = tr
     it('enveloppe le contenu dans le gabarit commun : 600 px, logo blanc, pied Xylofutur', async () => {
       const { html } = await rendered();
       assert.match(html, /600/);
-      assert.ok(html.includes(`${PUBLIC_URL}/assets/logo-jib-blanc.png`), 'logo blanc absent');
+      assert.ok(html.includes(`${PUBLIC_URL}/assets/logo-jib-mail-blanc.png`), 'logo blanc absent');
       assert.match(html, /Xylofutur/);
     });
 

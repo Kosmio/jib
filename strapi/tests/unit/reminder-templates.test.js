@@ -90,7 +90,7 @@ for (const [name, data, urls, hostile] of TEMPLATES) {
       const { html } = rendered({ edition: { ...EDITION, themeColor: '#123abc' } });
       assert.match(html, /#123abc/i);
       assert.match(html, /600/);
-      assert.ok(html.includes(`${PUBLIC_URL}/assets/logo-jib-blanc.png`));
+      assert.ok(html.includes(`${PUBLIC_URL}/assets/logo-jib-mail-blanc.png`));
       assert.match(html, /Xylofutur/);
     });
 
