@@ -400,16 +400,17 @@ test('critère 3, F-111 : fenêtre fermée, aucune action de l’accueil ne mèn
 });
 
 test('F-111 : avant l’ouverture, « Les demandes ouvrent le … à … » sur l’accueil et sur la fiche', async ({ page }) => {
-  setWindow('2026-11-25 08:00:00', SEED_CLOSE_AT);
+  // An opening far in the future, so that the test does not depend on the day it runs (25/11/2026 had become the past).
+  setWindow('2030-11-27 08:00:00', '2030-12-04 17:00:00');
   await openHome(page, NATHAN);
-  await expect(page.getByText('Les demandes ouvrent le mercredi 25 novembre à 9h00.')).toBeVisible();
+  await expect(page.getByText('Les demandes ouvrent le mercredi 27 novembre à 9h00.')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Trouver des interlocuteurs' })).toHaveCount(0);
   const suggestions = page.getByRole('region', { name: 'Ils partagent vos sujets' });
   await expect(suggestions.getByRole('link', { name: /Rencontrer/ })).toHaveCount(0);
 
   await suggestions.getByRole('link', { name: /Voir la fiche/ }).first().click();
   await hydrated(page);
-  await expect(page.getByText('Les demandes ouvrent le mercredi 25 novembre à 9h00.')).toBeVisible();
+  await expect(page.getByText('Les demandes ouvrent le mercredi 27 novembre à 9h00.')).toBeVisible();
   await expect(page.getByLabel(/Un mot pour présenter votre demande/)).toHaveCount(0);
   setWindow(SEED_OPEN_AT, SEED_CLOSE_AT);
 });
