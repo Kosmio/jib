@@ -7,6 +7,8 @@ module.exports = ({ env }) => [
   'strapi::poweredBy',
   'strapi::query',
   'strapi::body',
+  // The `status` enumerations of the participant space against the draft & publish `status` of the content manager.
+  'global::admin-status-field',
   'strapi::session',
   'strapi::favicon',
   'strapi::public',
