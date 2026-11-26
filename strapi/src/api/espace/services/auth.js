@@ -17,8 +17,8 @@ const CODE_EMAIL_MAX = 10;
 const DAY_MS = 24 * 60 * 60 * 1000;
 const SESSION_MS = 30 * DAY_MS;
 
-// Identity given to an organizer created from ORGANIZER_EMAILS (I-23): the required fields of Attendee, so that E2 passes as it is.
-const ORGANIZER_PROFILE = { firstName: 'Organisateur', lastName: 'JIB', company: 'Xylofutur' };
+// Identity given to an organizer created from ORGANIZER_EMAILS (I-23): its name from its address (lib/people.js).
+const { organizerProfile } = require('../lib/people');
 
 module.exports = ({ strapi }) => {
   const documents = (uid) => strapi.documents(uid);
@@ -61,7 +61,7 @@ module.exports = ({ strapi }) => {
       `attendee:${editionDocumentId}`,
       async () =>
         (await findAttendee(editionDocumentId, email)) ??
-        documents(ATTENDEE).create({ data: { ...ORGANIZER_PROFILE, email, role: 'organizer', meetingsOptIn: false, edition: { documentId: editionDocumentId } } })
+        documents(ATTENDEE).create({ data: { ...organizerProfile(email), email, role: 'organizer', meetingsOptIn: false, edition: { documentId: editionDocumentId } } })
     );
 
   /** Link token found by its hash, with its attendee and the published edition: { link, edition }, empty when unknown. */

@@ -12,8 +12,8 @@ const SESSION_MS = 30 * 24 * 60 * 60 * 1000;
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
-// Same identity as the organizer created by auth.js from ORGANIZER_EMAILS (I-23).
-const ORGANIZER_PROFILE = { firstName: 'Organisateur', lastName: 'JIB', company: 'Xylofutur' };
+// Identity given to an organizer created from ORGANIZER_EMAILS (I-23): its name from its address (lib/people.js).
+const { organizerProfile } = require('../lib/people');
 const SEQUENCE_FIELDS = ['title', 'start_time', 'end_time', 'description', 'order', 'kind', 'theme', 'subtitle'];
 
 const validation = (fields) => new EspaceError(400, 'VALIDATION', 'Corrigez les champs signalés.', { fields });
@@ -42,7 +42,7 @@ module.exports = ({ strapi }) => {
       `attendee:${editionDocumentId}`,
       async () =>
         (await documents(ATTENDEE).findFirst({ filters: { edition: { documentId: editionDocumentId }, email: { $eqi: email } } })) ??
-        documents(ATTENDEE).create({ data: { ...ORGANIZER_PROFILE, email, role: 'organizer', meetingsOptIn: false, edition: { documentId: editionDocumentId } } })
+        documents(ATTENDEE).create({ data: { ...organizerProfile(email), email, role: 'organizer', meetingsOptIn: false, edition: { documentId: editionDocumentId } } })
     );
 
   /** Copies the settings, the draft program and the topics of `source` into a new draft edition (runs inside the lock's transaction). */
