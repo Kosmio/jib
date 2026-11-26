@@ -1593,6 +1593,22 @@ async function runDataMigrations(strapi) {
       .update({ meetings_opt_in: true });
     if (attendees > 0) strapi.log.info(`[migration] meetingsOptIn on by default for ${attendees} attendee(s) without recorded consent`);
   }
+
+  // 2026-11-26: the organizers created from ORGANIZER_EMAILS were all « Organisateur JIB ». Those still named so take the name
+  // of their address (prenom.nom@). A name an organizer has set stays ; an address without a name keeps the placeholder.
+  if (await knex.schema.hasTable('espace_attendees')) {
+    const { ORGANIZER_PLACEHOLDER, organizerProfile } = require('./api/espace/lib/people');
+    const placeholders = await knex('espace_attendees')
+      .where({ first_name: ORGANIZER_PLACEHOLDER.firstName, last_name: ORGANIZER_PLACEHOLDER.lastName })
+      .select('id', 'email');
+    let renamed = 0;
+    for (const { id, email } of placeholders) {
+      const { firstName, lastName } = organizerProfile(email);
+      if (firstName === ORGANIZER_PLACEHOLDER.firstName) continue;
+      renamed += await knex('espace_attendees').where({ id }).update({ first_name: firstName, last_name: lastName });
+    }
+    if (renamed > 0) strapi.log.info(`[migration] ${renamed} organizer account(s) named after their address`);
+  }
 }
 
 /**

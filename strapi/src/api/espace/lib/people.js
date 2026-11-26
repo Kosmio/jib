@@ -128,4 +128,22 @@ function readOrganisation(body = {}, { partial = false } = {}) {
   return { data, errors };
 }
 
-module.exports = { fold, nameKey, primaryRole, readOrganisation, rolesOf, similarOrganisations, uniqueSlug };
+// Identity of an organizer created from ORGANIZER_EMAILS (I-23) when the address does not give a name.
+const ORGANIZER_PLACEHOLDER = { firstName: 'Organisateur', lastName: 'JIB' };
+
+const capitalized = (word) => word.replace(/(^|-)(\p{L})/gu, (match, dash, letter) => dash + letter.toUpperCase());
+
+/**
+ * Identity given to an organizer created from ORGANIZER_EMAILS: the required fields of Attendee. The name comes from an
+ * address of the form prenom.nom@ (prenom_nom@ too): « apolline.oswald@xylofutur.fr » -> Apolline Oswald, « jean-marc.du-pont@ »
+ * -> Jean-Marc Du-Pont. Any other address keeps the placeholder « Organisateur JIB ». Accents cannot be guessed.
+ */
+function organizerProfile(email) {
+  const local = String(email ?? '').split('@')[0].toLowerCase();
+  const [first, ...rest] = local.split(/[._]/).filter(Boolean);
+  const valid = (part) => /^\p{L}+(-\p{L}+)*$/u.test(part);
+  const name = first && rest.length && [first, ...rest].every(valid) ? { firstName: capitalized(first), lastName: rest.map(capitalized).join(' ') } : ORGANIZER_PLACEHOLDER;
+  return { ...name, company: 'Xylofutur' };
+}
+
+module.exports = { ORGANIZER_PLACEHOLDER, fold, nameKey, organizerProfile, primaryRole, readOrganisation, rolesOf, similarOrganisations, uniqueSlug };

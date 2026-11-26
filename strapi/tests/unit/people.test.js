@@ -54,3 +54,25 @@ describe('fiche d’organisation', () => {
     assert.equal(uniqueSlug('Wood & Co', new Set(['wood-et-co'])), 'wood-et-co-2');
   });
 });
+
+describe('organizerProfile : nom d’un organisateur créé depuis ORGANIZER_EMAILS', () => {
+  const { organizerProfile } = require('../../src/api/espace/lib/people');
+  const name = (email) => {
+    const { firstName, lastName } = organizerProfile(email);
+    return `${firstName} ${lastName}`;
+  };
+
+  it('prend le prénom et le nom d’une adresse prenom.nom@', () => {
+    assert.deepEqual(organizerProfile('apolline.oswald@xylofutur.fr'), { firstName: 'Apolline', lastName: 'Oswald', company: 'Xylofutur' });
+    assert.equal(name('Charlotte.Perrier@xylofutur.fr'), 'Charlotte Perrier');
+    assert.equal(name('jean-marc.du-pont@example.org'), 'Jean-Marc Du-Pont');
+    assert.equal(name('lea_martin@example.org'), 'Lea Martin');
+    assert.equal(name('anne.de.villiers@example.org'), 'Anne De Villiers');
+  });
+
+  it('garde « Organisateur JIB » quand l’adresse ne donne pas de nom', () => {
+    for (const email of ['apollineoswald@xylofutur.fr', 'contact@xylofutur.fr', 'mathieu@kosm.io', 'jean.2@example.org', '', null]) {
+      assert.equal(name(email), 'Organisateur JIB', String(email));
+    }
+  });
+});
