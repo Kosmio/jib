@@ -12,10 +12,11 @@ function createSmtpProvider({
   transport = require('nodemailer').createTransport({ host, port, secure: false, ignoreTLS: true }),
 }) {
   return {
-    async send({ to, subject, html, text, attachments, headers }) {
+    async send({ to, replyTo, subject, html, text, attachments, headers }) {
       const info = await transport.sendMail({
         from: from.name ? { name: from.name, address: from.email } : from.email,
         to: to.name ? { name: to.name, address: to.email } : to.email,
+        ...(replyTo && { replyTo: replyTo.name ? { name: replyTo.name, address: replyTo.email } : replyTo.email }),
         subject,
         html,
         text,

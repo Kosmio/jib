@@ -11,7 +11,7 @@
 - [ ] **Nom de domaine** : choisir et configurer le domaine du site
 - [ ] **Brevo** : créer un compte sur brevo.com et obtenir une clé API
   - Renseigner `EMAIL_API_KEY` dans `strapi/.env` et les fichiers d'overlay
-  - Créer un template email pour le formulaire de contact → renseigner `EMAIL_CONTACT_TEMPLATE_ID`
+  - Renseigner `EMAIL_FROM` (expéditeur, domaine vérifié dans Brevo) et `EMAIL_CONTACT_TO` (destinataire du formulaire de contact)
   - Créer une liste pour la newsletter → renseigner `EMAIL_LIST_ID`
 - [ ] **Secrets de production** : regénérer tous les secrets pour les environnements dev/prod (les fichiers overlay contiennent `changeme`)
 - [ ] **Docker registry** : configurer le registry dans les fichiers `.env.dev` et `.env.prod` (remplacer `ghcr.io/your-org/`)

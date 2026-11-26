@@ -126,7 +126,7 @@ Create `.env` files for local development from the `.env.example` templates:
 
 - **`strapi/.env`** -- from `strapi/.env.example` with:
   - Local secrets — keep them simple and human-readable where possible (e.g. `POSTGRES_PASSWORD=strapi`, `ALTCHA_HMAC_KEY=local-dev-key`). Only use `openssl rand` for secrets that must be cryptographically strong even locally (JWT secrets, APP_KEYS, salts).
-  - User-provided values (EMAIL_API_KEY, EMAIL_LIST_ID, EMAIL_CONTACT_TO, EMAIL_CONTACT_TEMPLATE_ID if provided)
+  - User-provided values (EMAIL_API_KEY, EMAIL_LIST_ID, EMAIL_CONTACT_TO if provided)
   - Keep defaults for HOST, PORT, BASE_URL, DATABASE_* (they're correct for local dev)
 
 - **`web/.env`** -- from `web/.env.example` with:
@@ -165,7 +165,6 @@ gh secret set SECRET_ALTCHA_HMAC_KEY --env prod --body "{prod_value}"
 **Optional secrets** (if values were provided -- set at repository level):
 ```bash
 gh secret set SECRET_EMAIL_API_KEY --body "..."
-gh secret set SECRET_EMAIL_CONTACT_TEMPLATE_ID --body "..."
 gh secret set SECRET_PUBLIC_MATOMO_URL --body "..."
 gh secret set SECRET_PUBLIC_MATOMO_SITE_ID --body "..."
 ```

@@ -416,3 +416,34 @@ describe('SmtpMailProvider : serveur SMTP de test (preprod)', () => {
     assert.throws(() => createMailProvider({ provider: 'smtp', smtpHost: 'mailpit', from: FROM, nodeEnv: 'test' }), /NODE_ENV=test/);
   });
 });
+
+describe('Reply-To (formulaire de contact)', () => {
+  it('Brevo : transmet replyTo, et l’omet quand il n’y en a pas', async () => {
+    const client = makeBrevoClient();
+    const provider = createMailProvider({ provider: 'brevo', apiKey: 'cle-factice', from: FROM, nodeEnv: 'production', client });
+    await provider.send({ ...MESSAGE, replyTo: 'Léa Ducasse <lea.ducasse@example.org>' });
+    await provider.send(MESSAGE);
+    assert.deepEqual(client.calls[0].replyTo, { email: 'lea.ducasse@example.org', name: 'Léa Ducasse' });
+    assert.ok(!('replyTo' in client.calls[1]));
+  });
+
+  it('SMTP : transmet replyTo au transport', async () => {
+    const transport = makeTransport();
+    const provider = createMailProvider({ provider: 'smtp', smtpHost: 'mailpit', from: FROM, transport });
+    await provider.send({ ...MESSAGE, replyTo: { email: 'ana@example.org' } });
+    assert.equal(transport.calls[0].replyTo, 'ana@example.org');
+  });
+
+  it('console : écrit replyTo dans la boîte de sortie', async () => {
+    const provider = createMailProvider({ provider: 'console', outboxFile: outbox, logger: makeLogger() });
+    await provider.send({ ...MESSAGE, replyTo: 'ana@example.org' });
+    assert.deepEqual(readOutbox()[0].replyTo, { email: 'ana@example.org' });
+  });
+
+  it('refuse un replyTo invalide avant tout envoi', async () => {
+    const client = makeBrevoClient();
+    const provider = createMailProvider({ provider: 'brevo', apiKey: 'cle-factice', from: FROM, nodeEnv: 'production', client });
+    await assert.rejects(provider.send({ ...MESSAGE, replyTo: 'pas-une-adresse' }), /Invalid e-mail address/);
+    assert.equal(client.calls.length, 0);
+  });
+});

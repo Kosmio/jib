@@ -4,8 +4,8 @@
  * Mail providers of the participant space (I-30, NF-06, NF-53).
  *
  * createMailProvider() returns { name, send(message) } where
- *   message = { to, subject, html, text, attachments?, headers? }
- *   to      = "a@b.c" | "Name <a@b.c>" | { email, name? }
+ *   message = { to, subject, html, text, replyTo?, attachments?, headers? }
+ *   to, replyTo = "a@b.c" | "Name <a@b.c>" | { email, name? }
  *   attachments[].content = Buffer, or string (UTF-8 text, e.g. an .ics file)
  * and send() resolves with { messageId }.
  *
@@ -39,12 +39,13 @@ function parseAddress(input) {
 }
 
 /** Validates a message and gives the providers one shape: attachments in base64. */
-function normalizeMessage({ to, subject, html, text, attachments = [], headers = {} } = {}) {
+function normalizeMessage({ to, subject, html, text, replyTo, attachments = [], headers = {} } = {}) {
   for (const [key, value] of Object.entries({ subject, html, text })) {
     if (typeof value !== 'string' || !value) throw new Error(`Mail message needs a non-empty "${key}"`);
   }
   return {
     to: parseAddress(to),
+    ...(replyTo !== undefined && { replyTo: parseAddress(replyTo) }),
     subject,
     html,
     text,

@@ -105,7 +105,6 @@ function buildTestEnv({ database = testDatabaseName(), port = 0, outboxFile, ove
     EMAIL_OUTBOX_FILE: outbox,
     EMAIL_LIST_ID: '',
     EMAIL_CONTACT_TO: '',
-    EMAIL_CONTACT_TEMPLATE_ID: '',
 
     DEMO_SEED: 'false',
     CRON_ENABLED: 'false',

@@ -11,10 +11,11 @@ function createBrevoProvider({
   client = new (require('@getbrevo/brevo').BrevoClient)({ apiKey }),
 }) {
   return {
-    async send({ to, subject, html, text, attachments, headers }) {
+    async send({ to, replyTo, subject, html, text, attachments, headers }) {
       const response = await client.transactionalEmails.sendTransacEmail({
         sender: from,
         to: [to],
+        ...(replyTo && { replyTo }),
         subject,
         htmlContent: html,
         textContent: text,
